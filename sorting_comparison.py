@@ -12,8 +12,16 @@ def correlation(first_recording_spatial_firing_path, second_recording_spatial_fi
 
     if os.path.exists(first_recording_spatial_firing_path):
         first_recording_spatial_firing = pd.read_pickle(first_recording_spatial_firing_path)
+        first_recording_spatial_firing = first_recording_spatial_firing["firing_times"]
+        print(len(first_recording_spatial_firing.iloc[0]))
+        print(first_recording_spatial_firing.iloc[0][0:20])
+
     if os.path.exists(second_recording_spatial_firing_path):
         second_recording_spatial_firing = pd.read_pickle(second_recording_spatial_firing_path)
+        second_recording_spatial_firing = second_recording_spatial_firing["firing_times"]
+        print(len(second_recording_spatial_firing.iloc[0]))
+        print(second_recording_spatial_firing.iloc[0][0:20])
+
 
     # for vr consider correlating "same cell" 'x_position_cm' firing
     # for of consider
