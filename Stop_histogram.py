@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import plot_utility
 
 
-def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
+def plot_histogram(processed_position_path, save_path, cummulative=False):
     title = processed_position_path.split("\\")[6].split(".")[0]
     if cummulative:
         save_path = save_path+"\FirstStopCumHistogram_"+title+".png"
@@ -13,7 +13,7 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
 
     all_days_processed_position = pd.read_pickle(processed_position_path)
 
-    bin_size = 2
+    bin_size = 5
     bins = np.arange(-200, 200, bin_size)
     bin_centres = 0.5*(bins[1:]+bins[:-1])
     beaconed_stops_early = []
@@ -22,7 +22,9 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
     beaconed_stops_late = []
     non_beaconed_stops_late = []
 
-    for day in range(len(all_days_processed_position)):
+    n_days = len(all_days_processed_position)
+
+    for day in range(n_days):
         beaconed_idx = all_days_processed_position.iloc[day]["first_series_trial_type_postcue"]==0 # beaconed
         non_beaconed_idx = all_days_processed_position.iloc[day]["first_series_trial_type_postcue"]==1 # non_beaconed
         n_beaconed_trials = all_days_processed_position.iloc[day]["beaconed_total_trial_number"][0]
@@ -30,6 +32,7 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
 
         beaconed_stop_histogram, _ = np.histogram(all_days_processed_position.iloc[day]["first_series_location_cm_postcue"][beaconed_idx], bins)/n_beaconed_trials
         non_beaconed_stop_histogram, _ =  np.histogram(all_days_processed_position.iloc[day]["first_series_location_cm_postcue"][non_beaconed_idx], bins)/n_non_beaconed_trials
+        # TODO consider if the divide by n_trials is a good idea
 
         # remove stops 60 cm after reward zone
         beaconed_stop_histogram[int(260/bin_size):] = 0
@@ -45,7 +48,7 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
         if day<5:
             beaconed_stops_early.append(beaconed_stop_histogram)
             non_beaconed_stops_early.append(non_beaconed_stop_histogram)
-        elif day>20:
+        elif n_days-day<5:
             beaconed_stops_late.append(beaconed_stop_histogram)
             non_beaconed_stops_late.append(non_beaconed_stop_histogram)
 
@@ -68,21 +71,21 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
     fig = plt.figure(figsize = (12,4))
     ax = fig.add_subplot(1,2,1) #stops per trial
     ax.set_title('Beaconed', fontsize=20, verticalalignment='bottom', style='italic')  # title
-    ax.plot(bin_centres,avg_beaconed_stops_early,color = 'blue',label = 'Early', linewidth = 2) #plot becaoned trials
+    ax.plot(bin_centres,avg_beaconed_stops_early,color = 'blue',label = 'First 5 days', linewidth = 2) #plot becaoned trials
     ax.fill_between(bin_centres,avg_beaconed_stops_early-std_beaconed_stops_early,avg_beaconed_stops_early+std_beaconed_stops_early, facecolor = 'blue', alpha = 0.3)
-    ax.plot(bin_centres,avg_beaconed_stops_late,color = 'red',label = 'Late', linewidth = 2) #plot becaoned trials
+    ax.plot(bin_centres,avg_beaconed_stops_late,color = 'red',label = 'Last 5 days', linewidth = 2) #plot becaoned trials
     ax.fill_between(bin_centres,avg_beaconed_stops_late-std_beaconed_stops_late,avg_beaconed_stops_late+std_beaconed_stops_late, facecolor = 'red', alpha = 0.3)
     ax.set_xlim(-200,200)
-    ax.set_ylabel('1st stop probability', fontsize=16, labelpad = 18)
+    ax.set_ylabel('First Stop Probability', fontsize=16, labelpad = 18)
     plot_utility.style_vr_plot_offset(ax, max(avg_beaconed_stops_late))
     plot_utility.style_track_plot_cue_conditioned(ax, 300)
     ax.legend(loc="upper left")
 
     ax = fig.add_subplot(1,2,2) #stops per trial
     ax.set_title('Non-Beaconed', fontsize=20, verticalalignment='bottom', style='italic')  # title
-    ax.plot(bin_centres,avg_non_beaconed_stops_early,color = 'blue', label = 'Early', linewidth = 2) #plot becaoned trials
+    ax.plot(bin_centres,avg_non_beaconed_stops_early,color = 'blue', label = 'First 5 days', linewidth = 2) #plot becaoned trials
     ax.fill_between(bin_centres,avg_non_beaconed_stops_early-std_non_beaconed_stops_early,avg_non_beaconed_stops_early+std_non_beaconed_stops_early, facecolor = 'blue', alpha = 0.3)
-    ax.plot(bin_centres,avg_non_beaconed_stops_late,color = 'red', label = 'Late', linewidth = 2) #plot becaoned trials
+    ax.plot(bin_centres,avg_non_beaconed_stops_late,color = 'red', label = 'Last 5 days', linewidth = 2) #plot becaoned trials
     ax.fill_between(bin_centres,avg_non_beaconed_stops_late-std_non_beaconed_stops_late,avg_non_beaconed_stops_late+std_non_beaconed_stops_late, facecolor = 'red', alpha = 0.3)
     ax.set_xlim(-200,200)
     #ax.set_xlabel("Track Position relative to goal (cm)", fontsize=16, labelpad = 18)
@@ -90,7 +93,7 @@ def plot_first_stop_days(processed_position_path, save_path, cummulative=False):
     plot_utility.style_track_plot_cue_conditioned(ax, 300)
 
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.6, left = 0.15, right = 0.82, top = 0.85)
-    fig.text(0.5, 0.04, 'Track Position relative to goal (cm)', ha='center', fontsize=16)
+    fig.text(0.5, 0.04, 'Track Position Relative to Goal (cm)', ha='center', fontsize=16)
     plt.show()
     fig.savefig(save_path,  dpi=200)
     plt.close()
@@ -102,14 +105,18 @@ def main():
 
     server_path = "Z:\ActiveProjects\Harry\MouseVR\data\Cue_conditioned_cohort1_190902"
     save_path = server_path+ "\Summary"
-    all_days_processed_position_path = server_path + "\All_days_processed_position_M4.pkl"
-    plot_first_stop_days(all_days_processed_position_path, save_path, cummulative=True)
-    plot_first_stop_days(all_days_processed_position_path, save_path, cummulative=False)
 
-    #all_days_processed_position_path = server_path + "\All_days_processed_position_M2.pkl"
-    #plot_first_stop_days(all_days_processed_position_path, save_path, cummulative=True)
-    #plot_first_stop_days(all_days_processed_position_path, save_path, cummulative=False)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, cummulative=False)
 
+    plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, cummulative=False)
+
+    plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, cummulative=False)
+
+    plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, cummulative=False)
 
     print('-------------------------------------------------------------')
 

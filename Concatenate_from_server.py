@@ -44,9 +44,9 @@ def main():
 
     server_path = "Z:\ActiveProjects\Harry\MouseVR\data\Cue_conditioned_cohort1_190902"
     #load_processed_position_all_days(server_path, Mouse_paths.M2_paths(), mouse="M2")
-    load_processed_position_all_days(server_path, Mouse_paths.M3_paths(), mouse="M3")
-    #load_processed_position_all_days(server_path, Mouse_paths.M4_paths(), mouse="M4")
-    load_processed_position_all_days(server_path, Mouse_paths.M5_paths(), mouse="M5")
+    #load_processed_position_all_days(server_path, Mouse_paths.M3_paths(), mouse="M3")
+    load_processed_position_all_days(server_path, Mouse_paths.M4_paths(), mouse="M4")
+    #load_processed_position_all_days(server_path, Mouse_paths.M5_paths(), mouse="M5")
 
 
     print('-------------------------------------------------------------')
