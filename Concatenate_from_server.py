@@ -32,7 +32,11 @@ def load_processed_position_all_days(recordings_folder_path, paths, mouse):
                                         'first_series_trial_type': np.array(processed_position['first_series_trial_type']),
                                         'first_series_location_cm_postcue': np.array(processed_position['first_series_location_cm_postcue']),
                                         'first_series_trial_number_postcue': np.array(processed_position['first_series_trial_number_postcue']),
-                                        'first_series_trial_type_postcue': np.array(processed_position['first_series_trial_type_postcue'])}, ignore_index=True)
+                                        'first_series_trial_type_postcue': np.array(processed_position['first_series_trial_type_postcue']),
+                                        "cue_rewarded_positions": np.array(processed_position['cue_rewarded_positions']),
+                                        "cue_rewarded_trial_number": np.array(processed_position['cue_rewarded_trial_number']),
+                                        "cue_rewarded_trial_type": np.array(processed_position['cue_rewarded_trial_type'])}, ignore_index=True)
+
 
             print('Position data extracted from frame')
 
