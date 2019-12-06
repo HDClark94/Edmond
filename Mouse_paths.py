@@ -1,3 +1,32 @@
+def get_cue_days(mouse):
+    if mouse=="M2":
+        return M2_cue_days()
+    elif mouse=="M3":
+        return M3_cue_days()
+    elif mouse=="M4":
+        return M4_cue_days()
+    elif mouse=="M5":
+        return M5_cue_days()
+
+def cue_days_to_colors(cue_days):
+    colours = []
+    for i in cue_days:
+        if i == 0:
+            colours.append("k")
+        elif i == 1:
+            colours.append("r")
+    return colours
+
+def find_last2_control_days(cue_days):
+    last2_control_days = []
+    for i in range(len(cue_days)):
+        if cue_days[i]==1:
+            last2_control_days.append(i-1)
+            last2_control_days.append(i-2)
+
+    # return index of last 2 control days
+    return last2_control_days
+
 def M2_paths():
     paths = ["\M2_D1_2019-09-02_11-41-51",
              "\M2_D2_2019-09-03_11-10-45",
@@ -35,6 +64,13 @@ def M2_paths():
                 "\M2_D34_2019-10-16_10-02-20"]
     return paths
 
+def M2_cue_days():
+    cue_days = [0,0,0,0,0,0,0,1,1,1,
+                1,1,1,1,1,1,0,0,0,
+                0,1,1,1,1,1,1,1,1,1,
+                1,1,1,1]
+    return cue_days
+
 def M4_paths():
     paths = ['\M4_D1_2019-09-16_13-53-05',
              '\M4_D2_2019-09-17_13-50-21',
@@ -62,6 +98,12 @@ def M4_paths():
              '\M4_D24_2019-10-16_10-39-56']
     return paths
 
+def M4_cue_days():
+    cue_days = [0,0,0,0,0,0,0,0,0,0,
+                1,1,1,1,1,1,1,1,1,
+                1,1,1,1]
+    return cue_days
+
 def M3_paths():
     paths = ['\M3_D1_2019-09-16_13-21-28',
              '\M3_D2_2019-09-17_13-18-24',
@@ -88,6 +130,12 @@ def M3_paths():
              '\M3_D23_2019-10-15_13-37-58']
     return paths
 
+def M3_cue_days():
+    cue_days = [0,0,0,0,0,0,0,0,0,
+                0,0,0,0,0,1,1,1,1,
+                1,1,1]
+    return cue_days
+
 def M5_paths():
     paths = ['\M5_D1_2019-09-16_14-35-39,'
              '\M5_D2_2019-09-17_14-31-14',
@@ -110,3 +158,8 @@ def M5_paths():
              '\M5_D20_2019-10-12_14-29-19',
              '\M5_D21_2019-10-13_13-49-42']
     return paths
+
+def M5_cue_days():
+    cue_days = [0,0,0,0,0,0,0,0,0,0,
+                0,0,0,0,0,0,0,0,0,0]
+    return cue_days
