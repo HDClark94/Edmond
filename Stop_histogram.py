@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import plot_utility
 import Mouse_paths
 
+account_for_no_stop_runs = True
+remove_late_stops = False
+
 def get_n_stop_trial_types(trial_numbers, trial_types, goal_trial_numbers, goal_trial_types):
     trial_numbers = trial_numbers[~np.isnan(trial_numbers)]
     trial_types = trial_types[~np.isnan(trial_types)]
@@ -70,6 +73,7 @@ def plot_histogram(processed_position_path, save_path, stop_type, Mouse, cummula
     non_beaconed_stops_late = []
     b_proportion_late = []
     nb_proportion_late = []
+    n_trials = []
 
     n_days = len(all_days_processed_position)
 
@@ -90,6 +94,14 @@ def plot_histogram(processed_position_path, save_path, stop_type, Mouse, cummula
         n_beaconed_trials = all_days_processed_position.iloc[day]["beaconed_total_trial_number"][0]
         n_non_beaconed_trials = all_days_processed_position.iloc[day]["nonbeaconed_total_trial_number"][0]
 
+        '''
+        if Mouse =="M2" and day>23 and n_beaconed_trials+n_non_beaconed_trials<15:
+            print("not adding")
+        else:
+            n_trials.append(n_beaconed_trials+n_non_beaconed_trials)
+            #print("ran", n_beaconed_trials+n_non_beaconed_trials, " trials")
+        '''
+
         beaconed_stops = all_days_processed_position.iloc[day][stop_collumn][beaconed_idx]
         non_beaconed_stops = all_days_processed_position.iloc[day][stop_collumn][non_beaconed_idx]
 
@@ -99,12 +111,14 @@ def plot_histogram(processed_position_path, save_path, stop_type, Mouse, cummula
 
         b_proportion_stopped = n_trial_with_a_stop_b/n_beaconed_trials
         nb_proportion_stopped = n_trial_with_a_stop_nb/n_non_beaconed_trials
-        #b_proportion_stopped = 1   # comment these out to get the right
-        #nb_proportion_stopped = 1
+        if not account_for_no_stop_runs:
+            b_proportion_stopped = 1   # comment these out to get the right
+            nb_proportion_stopped = 1
 
         # remove stops 60 cm after reward zone
-        beaconed_stop_histogram[int(260/bin_size):] = 0
-        non_beaconed_stop_histogram[int(260/bin_size):] = 0
+        if remove_late_stops:
+            beaconed_stop_histogram[int(260/bin_size):] = 0
+            non_beaconed_stop_histogram[int(260/bin_size):] = 0
 
         beaconed_stop_histogram = beaconed_stop_histogram/np.sum(beaconed_stop_histogram)
         non_beaconed_stop_histogram = non_beaconed_stop_histogram/np.sum(non_beaconed_stop_histogram)
@@ -198,7 +212,7 @@ def plot_histogram(processed_position_path, save_path, stop_type, Mouse, cummula
                         avg_last_2_control_beaconed_stops-std_last_2_control_beaconed_stops,
                         avg_last_2_control_beaconed_stops+std_last_2_control_beaconed_stops, facecolor = 'green', alpha = 0.3)
     ax.set_xlim(-200,200)
-    ax.set_ylabel('First Stop Probability', fontsize=16, labelpad = 18)
+    ax.set_ylabel('Stop Probability', fontsize=16, labelpad = 18)
     plot_utility.style_vr_plot_offset(ax, max(avg_beaconed_stops_late))
     plot_utility.style_track_plot_cue_conditioned(ax, 300)
     ax.set_ylim(0, b_y_max+0.01)
@@ -229,6 +243,23 @@ def plot_histogram(processed_position_path, save_path, stop_type, Mouse, cummula
     fig.savefig(save_path,  dpi=200)
     plt.close()
 
+    '''
+    # plot trials completed over days
+    fig = plt.figure(figsize = (12,4))
+    days = np.arange(1,n_days+1)
+    ax = fig.add_subplot(1,2,1) #stops per trial
+    #ax.set_title('Completed Trials', fontsize=20, verticalalignment='bottom', style='italic')  # title
+    ax.plot(days,n_trials,color = 'black',label = 'First 5 days', linewidth = 2) #plot becaoned trials
+    #ax.set_xlim(-200,200)
+    ax.set_ylabel('Trials Completed', fontsize=16, labelpad = 18)
+    ax.set_xlabel('Training Day', fontsize=16, labelpad = 18)
+    #ax.set_ylim(0, b_y_max+0.01)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.6, left = 0.15, right = 0.82, top = 0.85)
+    fig.text(0.05, 0.94, Mouse, ha='center', fontsize=16)
+    plt.show()
+    #fig.savefig(save_path,  dpi=200)
+    plt.close()
+    '''
 
 def main():
 
@@ -239,27 +270,27 @@ def main():
 
     plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M2", cummulative=True)
     plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M2", cummulative=False)
-    #plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2", cummulative=True)
-    #plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2", cummulative=False)
-    #plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2", cummulative=True)
-    #plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2", cummulative=False)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2", cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2", cummulative=False)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2", cummulative=True)
+    plot_histogram(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2", cummulative=False)
 
-    plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M3", cummulative=True)
-    plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M3", cummulative=False)
+    #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M3", cummulative=True)
+    #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M3", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops", Mouse="M3", cummulative=True)
     #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops", Mouse="M3", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="all_stops", Mouse="M3", cummulative=True)
     #plot_histogram(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="all_stops", Mouse="M3", cummulative=False)
 
-    plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M4", cummulative=True)
-    plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M4", cummulative=False)
+    #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M4", cummulative=True)
+    #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M4", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops", Mouse="M4", cummulative=True)
     #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops", Mouse="M4", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="all_stops", Mouse="M4", cummulative=True)
     #plot_histogram(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="all_stops", Mouse="M4", cummulative=False)
 
-    plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M5", cummulative=True)
-    plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops_post_cue",  Mouse="M5", cummulative=False)
+    #plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M5", cummulative=True)
+    #plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops_post_cue",  Mouse="M5", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops", Mouse="M5", cummulative=True)
     #plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops", Mouse="M5", cummulative=False)
     #plot_histogram(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="all_stops", Mouse="M5", cummulative=True)

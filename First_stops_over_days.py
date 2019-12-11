@@ -65,10 +65,10 @@ def plot_first_stop_days(processed_position_path, stop_type, save_path, Mouse):
     ax = fig.add_subplot(1,2,1) #stops per trial
     ax.set_title('Beaconed', fontsize=20, verticalalignment='bottom', style='italic')  # title
     #ax.plot(days, beaconed_first_stop_means, 'o',color=cue_colours, label = 'Non reward zone score', linewidth = 2, markersize = 6, markeredgecolor = 'black')
-    #ax.errorbar(days,beaconed_first_stop_means,beaconed_first_stop_stds, fmt = 'o', color = '0.5', capsize = 1.5, markersize = 2, elinewidth = 1.5)
+    ax.errorbar(days,beaconed_first_stop_means,beaconed_first_stop_stds, fmt = 'o', color = '0.5', capsize = 1.5, markersize = 2, elinewidth = 1.5)
 
-    for day in days:
-        ax.scatter(np.ones(len(beaconed_all_stops_days[day-1]))*day, beaconed_all_stops_days[day-1], color='0.8', marker='o')
+    #for day in days:
+    #    ax.scatter(np.ones(len(beaconed_all_stops_days[day-1]))*day, beaconed_all_stops_days[day-1], color='0.8', marker='o')
     for i in range(len(days)):
         ax.scatter(days[i], beaconed_first_stop_means[i], marker='o', color=cue_colours[i])
 
@@ -82,10 +82,10 @@ def plot_first_stop_days(processed_position_path, stop_type, save_path, Mouse):
     ax = fig.add_subplot(1,2,2)
     ax.set_title('Non-Beaconed', fontsize=20, verticalalignment='bottom', style='italic')
     #ax.plot(days, non_beaconed_first_stops_means, 'o', color = cue_colours, label = 'Non reward zone score', linewidth = 2, markersize = 6, markeredgecolor = 'black')
-    #ax.errorbar(days,non_beaconed_first_stops_means,non_beaconed_first_stops_stds, fmt = 'o', color = '0.5', capsize = 1.5, markersize = 2, elinewidth = 1.5)
+    ax.errorbar(days,non_beaconed_first_stops_means,non_beaconed_first_stops_stds, fmt = 'o', color = '0.5', capsize = 1.5, markersize = 2, elinewidth = 1.5)
 
-    for day in days:
-        ax.scatter(np.ones(len(non_beaconed_all_stops_days[day-1]))*day, non_beaconed_all_stops_days[day-1], color='0.8', marker='o')
+    #for day in days:
+        #ax.scatter(np.ones(len(non_beaconed_all_stops_days[day-1]))*day, non_beaconed_all_stops_days[day-1], color='0.8', marker='o')
     for i in range(len(days)):
         ax.scatter(days[i], non_beaconed_first_stops_means[i], marker='o', color=cue_colours[i])
 

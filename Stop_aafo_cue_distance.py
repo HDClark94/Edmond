@@ -134,20 +134,20 @@ def main():
     save_path = server_path+ "\Summary"
 
     plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M2")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="first_stops", Mouse="M2")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M2.pkl", save_path, stop_type="all_stops", Mouse="M2")
 
     plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M3")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops", Mouse="M3")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="all_stops", Mouse="M3")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="first_stops", Mouse="M3")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M3.pkl", save_path, stop_type="all_stops", Mouse="M3")
 
     plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M4")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops", Mouse="M4")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="all_stops", Mouse="M4")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="first_stops", Mouse="M4")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M4.pkl", save_path, stop_type="all_stops", Mouse="M4")
 
     plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops_post_cue", Mouse="M5")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops", Mouse="M5")
-    plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="all_stops", Mouse="M5")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="first_stops", Mouse="M5")
+    #plot_cue_distance_vs_stops(server_path + "\All_days_processed_position_M5.pkl", save_path, stop_type="all_stops", Mouse="M5")
 
     print('-------------------------------------------------------------')
 
