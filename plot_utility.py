@@ -105,11 +105,16 @@ def style_vr_plot_offset(ax, x_max):
     return ax
 
 
-def style_track_plot(ax, n_bins):
-    divider = 300/n_bins
-    ax.axvspan(88/divider, (88+22)/divider, facecolor='DarkGreen', alpha=.25, linewidth =0)
-    ax.axvspan(0, 30/divider, facecolor='k', linewidth =0, alpha=.25) # black box
-    ax.axvspan((200-30)/divider, 200/divider, facecolor='k', linewidth =0, alpha=.25)# black box
+def style_track_plot(ax, n_bins, flipped=False):
+    divider = 200/n_bins
+    if flipped:
+        ax.axhspan(88/divider, (88+22)/divider, facecolor='DarkGreen', alpha=.25, linewidth =0)
+        ax.axhspan(0, 30/divider, facecolor='k', linewidth =0, alpha=.25) # black box
+        ax.axhspan((200-30)/divider, 200/divider, facecolor='k', linewidth =0, alpha=.25)# black box
+    else:
+        ax.axvspan(88/divider, (88+22)/divider, facecolor='DarkGreen', alpha=.25, linewidth =0)
+        ax.axvspan(0, 30/divider, facecolor='k', linewidth =0, alpha=.25) # black box
+        ax.axvspan((200-30)/divider, 200/divider, facecolor='k', linewidth =0, alpha=.25)# black box
 
 def style_track_plot_cue_conditioned(ax, n_bins, flipped=False):
     divider = 300 / n_bins
