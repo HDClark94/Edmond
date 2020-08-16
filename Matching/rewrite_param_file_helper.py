@@ -1,7 +1,9 @@
 import pandas as pd
 import os
+import traceback
+import sys
 
-def rewrite_param_file(vr_paths, of_paths):
+def rewrite_vr_param_file(vr_paths, of_paths):
 
     vr_recording_paths = [f.path for f in os.scandir(vr_paths) if f.is_dir()]
     of_recording_paths = [f.path for f in os.scandir(of_paths) if f.is_dir()]
@@ -38,10 +40,40 @@ def rewrite_param_file(vr_paths, of_paths):
                 with open(param_path, 'w') as file:
                     file.writelines(data)
 
-            print("Success with ", vr_recording_path)
+            #print("Success with ", vr_recording_path)
+            print(vr_recording_path.split("/mnt/datastore/")[-1])
         except:
             a=1
             #print("Failed with ", vr_recording_path)
+
+def rewrite_of_param_file(of_paths):
+    of_recording_paths = [f.path for f in os.scandir(of_paths) if f.is_dir()]
+
+    for of_recording_path in of_recording_paths:
+        try:
+            of_path_from_person = of_recording_path.split("/mnt/datastore/")[1]
+            param_path = of_recording_path + '/parameters.txt'
+
+            with open(param_path, 'r') as file:
+                # read a list of lines into data
+                data = file.readlines()
+
+                data[0] = data[0] # no change here
+                data[1] = of_path_from_person+"\n"
+                #data[1] = data[1].replace("\\", "/")
+
+                # and write everything back
+                with open(param_path, 'w') as file:
+                    file.writelines(data)
+
+            print("Success with ", of_recording_path)
+            #print(of_recording_path.split("/mnt/datastore/")[-1])
+        except Exception as ex:
+            print(ex)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_tb(exc_traceback)
+            print("Failed with ", of_recording_path)
+
 
 def main():
 
@@ -50,30 +82,39 @@ def main():
 
     #vr_paths = r"Z:\ActiveProjects\Harry\Mouse_data_for_sarah_paper\_cohort4\VirtualReality\M2_sorted"
     #of_paths = r"Z:\ActiveProjects\Harry\Mouse_data_for_sarah_paper\_cohort4\OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
     #vr_paths = r"Z:\ActiveProjects\Harry\Mouse_data_for_sarah_paper\_cohort4\VirtualReality\M3_sorted"
     #of_paths = r"Z:\ActiveProjects\Harry\Mouse_data_for_sarah_paper\_cohort4\OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
     #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M1_sorted"
     #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
     #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M2"
     #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
-    vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M3"
-    of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
-    rewrite_param_file(vr_paths, of_paths)
+    #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M3"
+    #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
     #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M4"
     #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
     #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M6_sorted"
     #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
-    #rewrite_param_file(vr_paths, of_paths)
+    #rewrite_vr_param_file(vr_paths, of_paths)
+
+    vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/VirtualReality/245_sorted"
+    of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/OpenField"
+    #rewrite_vr_param_file(vr_paths, of_paths)
+    rewrite_of_param_file(of_paths)
+
+    #vr_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/VirtualReality/1124_sorted"
+    #of_paths = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/OpenField"
+    #rewrite_vr_param_file(vr_paths, of_paths)
 
 
 if __name__ == '__main__':

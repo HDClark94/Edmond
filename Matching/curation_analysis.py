@@ -109,7 +109,6 @@ def main():
     # iterate over this list and pick out the spatial dataframes
     figs_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs"
 
-    '''
     # cohort 5
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/OpenField"
@@ -128,7 +127,6 @@ def main():
     run_curation_analysis(sorted_together_vr_dir_path, sorted_together_of_dir_path,
                           sorted_apart_vr_dir_path, sorted_apart_of_dir_path, save_path,
                   figs_path=figs_path, add_of_and_save=False, cohort_mouse="C5_M2")
-    '''
 
     # cohort 4
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/VirtualReality/M2_sorted"
@@ -148,21 +146,24 @@ def main():
     run_curation_analysis(sorted_together_vr_dir_path, sorted_together_of_dir_path,
                           sorted_apart_vr_dir_path, sorted_apart_of_dir_path, save_path,
                           figs_path=figs_path, add_of_and_save=False, cohort_mouse="C4_M3")
-
     '''
     # cohort 3 # not done yet
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M1_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
     sorted_apart_vr_dir_path =    "/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort3/VirtualReality/M1_sorted"
+    sorted_apart_of_dir_path =    "/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort3/OpenFeild"
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M1"
-    run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sorted_apart_vr_dir_path, 
+    run_curation_analysis(sorted_together_vr_dir_path, sorted_together_of_dir_path,
+                          sorted_apart_vr_dir_path, sorted_apart_of_dir_path,
                   save_path, figs_path=figs_path, add_of_and_save=False, cohort_mouse="C6_M1")
 
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M6_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
     sorted_apart_vr_dir_path =    "/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort3/VirtualReality/M6_sorted"
+    sorted_apart_of_dir_path =    "/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort3/OpenFeild"
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M6"
-    run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sorted_apart_vr_dir_path, save_path, 
+    run_curation_analysis(sorted_together_vr_dir_path, sorted_together_of_dir_path,
+                          sorted_apart_vr_dir_path, save_path, sorted_apart_of_dir_path,
                   figs_path=figs_path, add_of_and_save=False, cohort_mouse="C3_M6")
     print("look now")
     '''
