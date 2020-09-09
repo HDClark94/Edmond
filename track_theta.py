@@ -47,7 +47,7 @@ def track_theta(path_to_recording_list, theta_df):
 
             if len(spatial_firing)>0:
                 if "Theta_index" not in list(spatial_firing):
-                    test_params.set_output_path('/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/'+recording_path.split("OpenEphys/")[1]+"/MountainSort")
+                    test_params.set_output_path('/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/'+recording_path+"/MountainSort")
                     #test_params.set_output_path('/mnt/datastore/'+recording_path+"/MountainSort")
                     spatial_firing = calculate_theta_index(spatial_firing, test_params)
 
@@ -61,6 +61,7 @@ def track_theta(path_to_recording_list, theta_df):
                     row["tetrode"] =    [spatial_firing_cluster["tetrode"]]
                     row["ThetaIndex"] = [spatial_firing_cluster["ThetaIndex"]]
                     row["ThetaPower"] = [spatial_firing_cluster["ThetaPower"]]
+                    row["Boccara_theta_class"] = [spatial_firing_cluster["Boccara_theta_class"]]
                     row["session_id"] = [spatial_firing_cluster["session_id"]]
                     theta_df = pd.concat([row, theta_df], ignore_index=True)
 
@@ -85,7 +86,17 @@ def get_day(full_session_id):
 def get_cohort_mouse(full_session_id):
     session_id = full_session_id.split("/")[-1]
     mouse = session_id.split("_D")[0]
-    cohort = get_tidy_title(full_session_id.split("/")[-4])
+
+    if "Junji" in full_session_id:
+        cohort = "C6"
+    elif "Ian"  in full_session_id:
+        cohort = "C7"
+    elif ("Harry" in full_session_id) and ("2020" in full_session_id):
+        cohort = "C8"
+    elif ("Harry" in full_session_id) and ("2019" in full_session_id):
+        cohort = "C9"
+    else:
+        cohort = get_tidy_title(full_session_id.split("/")[-4])
     return cohort+"_"+mouse
 
 def plot_theta(theta_df, save_path):
@@ -310,7 +321,7 @@ def add_ramp_scores(theta_df, ramp_lm, ramp_scores, tetrode_locations):
 
         paired_ramp_lm = ramp_lm[((ramp_lm["session_id"] == session_id) & (ramp_lm["cluster_id"] == cluster_id))]
         paired_ramp_score = ramp_scores[((ramp_scores["session_id"] == session_id) & (ramp_scores["cluster_id"] == cluster_id))]
-        paired_location = tetrode_locations[(tetrode_locations["vr_Session_id"] == session_id)]
+        paired_location = tetrode_locations[(tetrode_locations["session_id"] == session_id)]
 
         for index_i, row_i in paired_ramp_score.iterrows():
             row_i =  row_i.to_frame().T.reset_index(drop=True)
@@ -327,8 +338,9 @@ def add_ramp_scores(theta_df, ramp_lm, ramp_scores, tetrode_locations):
             row_i["lm_result_nb_homebound"] = paired_ramp_lm["lm_result_nb_homebound"].iloc[0]
             row_i["lm_result_p_outbound"] = paired_ramp_lm["lm_result_p_outbound"].iloc[0]
             row_i["lm_result_p_homebound"] = paired_ramp_lm["lm_result_p_homebound"].iloc[0]
-            row_i["lmer_result_outbound"] = paired_ramp_lm["lmer_result_outbound"].iloc[0]
-            row_i["lmer_result_homebound"] = paired_ramp_lm["lmer_result_homebound"].iloc[0]
+            if "lmer_result_outbound" in list(paired_ramp_lm):
+                row_i["lmer_result_outbound"] = paired_ramp_lm["lmer_result_outbound"].iloc[0]
+                row_i["lmer_result_homebound"] = paired_ramp_lm["lmer_result_homebound"].iloc[0]
             row_i["recording_day"] = recording_day
             new = pd.concat([new, row_i], ignore_index=True)
 
@@ -523,16 +535,26 @@ def plot_theta_histogram(data, save_path):
 def main():
     test_params.set_sampling_rate(30000)
 
-    ramp_path_lm = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt"
+    ramp_path_lm = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel_trialtypes.txt"
     ramp_scores_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.csv"
     tetrode_location_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"
     ramp_scores = pd.read_csv(ramp_scores_path)
     ramp_lm = pd.read_csv(ramp_path_lm, sep = "\t")
     tetrode_locations = pd.read_csv(tetrode_location_path)
-
+                
     # VR cells
+    '''
 
     theta_df = pd.DataFrame()
+
+    # junjis 2019 cohort
+    theta_df = track_theta("/mnt/datastore/Junji/Data/2019cohort1/vr", theta_df)
+    theta_df = track_theta("/mnt/datastore/Junji/Data/2019cohort1/m1_part1", theta_df)
+    theta_df = track_theta("/mnt/datastore/Junji/Data/2019cohort1/m2_part1", theta_df)
+
+    # ians 2019 cohort
+    theta_df = track_theta("/mnt/datastore/Ian/Ephys/VR", theta_df)
+
     theta_df = track_theta("/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort5/VirtualReality/M1_sorted", theta_df)
     theta_df = track_theta("/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort5/VirtualReality/M2_sorted", theta_df)
 
@@ -544,10 +566,15 @@ def main():
 
     theta_df = track_theta("/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort2/VirtualReality/245_sorted", theta_df)
     theta_df = track_theta("/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort2/VirtualReality/1124_sorted", theta_df)
-    #theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
-    '''
 
+    theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    '''
+    theta_df = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    theta_df = track_theta("/mnt/datastore/Harry/Cohort6_july2020/vr", theta_df)
+    theta_df = track_theta("/mnt/datastore/Harry/MouseVR/data/Cue_conditioned_cohort1_190902", theta_df)
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+
     data = add_ramp_scores(theta_df_VR, ramp_lm, ramp_scores, tetrode_locations)
     plot_theta_histogram(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
     plot_lm_proportions(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", best_theta=False)
@@ -581,7 +608,7 @@ def main():
 
     theta_df = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df.pkl")
     plot_theta(theta_df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
-    '''
+
 
     print("look now")
 

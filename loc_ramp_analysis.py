@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 from matplotlib.patches import Patch
 import itertools
 import scipy
@@ -139,16 +140,20 @@ def analyse_ramp_driver(data, trialtypes_linear_model):
 
 def get_p_text(p, ns=False):
 
-    if p<0.0001:
-        return "****"
-    elif p<0.001:
-        return "***"
-    elif p<0.01:
-        return "**"
-    elif p<0.05:
-        return "*"
-    elif ns:
-        return "ns"
+    if p is not None:
+
+        if p<0.0001:
+            return "****"
+        elif p<0.001:
+            return "***"
+        elif p<0.01:
+            return "**"
+        elif p<0.05:
+            return "*"
+        elif ns:
+            return "ns"
+        else:
+            return " "
     else:
         return " "
 
@@ -341,25 +346,22 @@ def simple_bar(data, collumn, save_path=None, ramp_region=None, trial_type=None,
     p_str = get_p_text(p, ns=True)
     #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
-    PS = data[data.tetrode_location == "PS"]
-    MEC = data[data.tetrode_location == "MEC"]
-    UN = data[data.tetrode_location == "UN"]
-
-    objects = ("PS", "MEC", "UN")
+    objects = np.unique(data["tetrode_location"])
     x_pos = np.arange(len(objects))
 
-    ax.bar(x_pos, [np.mean(np.asarray(PS[collumn])), np.mean(np.asarray(MEC[collumn])), np.mean(np.asarray(UN[collumn]))],
-           yerr=  [stats.sem(np.asarray(PS[collumn])), stats.sem(np.asarray(MEC[collumn])), stats.sem(np.asarray(UN[collumn]))],
-           align='center',
-           alpha=0.5,
-           ecolor='black',
-           capsize=10,
-           color =['b', 'r', 'grey'])
+    for i in range(len(objects)):
+        y = data[(data["tetrode_location"] == objects[i])]
+        ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
 
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
-    plt.xticks(x_pos, objects, fontsize=15)
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
-    plt.xlim((-0.5,2.5))
+    plt.xlim((-0.5, len(objects)-0.5))
+    if collumn == "ramp_score":
+        plt.ylim(-0.6, 0.6)
+    elif collumn == "abs_ramp_score":
+        plt.ylim(0, 0.6)
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -398,7 +400,7 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
         groups = ["P", "S", "A", "PS", "PA", "SA", "PSA", "None"]
         groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
 
-    objects = ("PS", "MEC", "UN")
+    objects = np.unique(aggregated["tetrode_location"])
     x_pos = np.arange(len(objects))
 
     for object, x in zip(objects, x_pos):
@@ -417,9 +419,11 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
             bottom = bottom+percent
 
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
-    plt.xticks(x_pos, objects, fontsize=15)
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
     plt.ylabel("Percent of neurons",  fontsize=20)
-    plt.xlim((-0.5,2.5))
+
+    plt.xlim((-0.5, len(objects)-0.5))
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -444,6 +448,8 @@ def add_locations(ramp_scores_df, tetrode_locations_df):
     for index, row_ramp_score in ramp_scores_df.iterrows():
         row_ramp_score =  row_ramp_score.to_frame().T.reset_index(drop=True)
         session_id_short = row_ramp_score.session_id_short.iloc[0]
+
+        print("processing "+session_id_short)
 
         session_tetrode_info = tetrode_locations_df[(tetrode_locations_df.session_id_short == session_id_short)]
         row_ramp_score["tetrode_location"] = session_tetrode_info.estimated_location.iloc[0]
@@ -470,8 +476,10 @@ def add_theta(data, theta_df):
         cluster_id = row.cluster_id.iloc[0]
         thetaIdx = theta_df[(theta_df.session_id == session_id) & (theta_df.cluster_id == cluster_id)].iloc[0].ThetaIndex
         thetaPwr = theta_df[(theta_df.session_id == session_id) & (theta_df.cluster_id == cluster_id)].iloc[0].ThetaPower
+        Boccara_theta_class = theta_df[(theta_df.session_id == session_id) & (theta_df.cluster_id == cluster_id)].iloc[0].Boccara_theta_class
         row["ThetaIndex"] = thetaIdx
         row["ThetaPower"] = thetaPwr
+        row["Boccara_theta_class"] = Boccara_theta_class
         data_new = pd.concat([data_new, row], ignore_index=True)
     return data_new
 
@@ -518,16 +526,9 @@ def location_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="
     data = data[(data.trial_type == trial_type) &
                 (data.ramp_region == ramp_region)]
 
-    PS = data[data.tetrode_location == "PS"]
-    MEC = data[data.tetrode_location == "MEC"]
-    UN = data[data.tetrode_location == "UN"]
-
-    p_ks = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
-    p_st = stats.ttest_ind(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
-
-    simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=p_ks, filter_by_slope=filter_by_slope)
-    simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=p_st, filter_by_slope=filter_by_slope)
-    simple_bar(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=p_st, print_p=print_p, filter_by_slope=filter_by_slope)
+    #simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
+    #simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
+    simple_bar(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, print_p=print_p, filter_by_slope=filter_by_slope)
     return
 
 def location_slope(data, collumn, save_path, ramp_region="outbound", trial_type="beaconed", print_p=False):
@@ -536,10 +537,6 @@ def location_slope(data, collumn, save_path, ramp_region="outbound", trial_type=
     # only look at beacoend and outbound
     data = data[(data.trial_type == trial_type) &
                 (data.ramp_region == ramp_region)]
-
-    PS = data[data.tetrode_location == "PS"]
-    MEC = data[data.tetrode_location == "MEC"]
-    UN = data[data.tetrode_location == "UN"]
 
     simple_lm_stack(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None)
 
@@ -630,9 +627,328 @@ def cue_theta_location_bar(data, save_path):
     plt.show()
     plt.close()
 
+def get_day(full_session_id):
+    session_id = full_session_id.split("/")[-1]
+    training_day = session_id.split("_")[1]
+    training_day = training_day.split("D")[1]
+    return int(training_day)
+
+def get_cohort_mouse(full_session_id):
+    session_id = full_session_id.split("/")[-1]
+    mouse = session_id.split("_D")[0]
+    cohort = get_tidy_title(full_session_id.split("/")[-4])
+    return cohort+"_"+mouse
+
+def add_cohort_mouse_label(data):
+    cohort_mouse = []
+    for index, row in data.iterrows():
+        row =  row.to_frame().T.reset_index(drop=True)
+        cohort_mouse.append(get_cohort_mouse(row["full_session_id"].iloc[0]))
+    data["cohort_mouse"] = cohort_mouse
+    return data
+
+def add_recording_day(data):
+    recording_days = []
+    for index, row in data.iterrows():
+        row =  row.to_frame().T.reset_index(drop=True)
+        recording_days.append(get_day(row["session_id"].iloc[0]))
+    data["recording_day"] = recording_days
+    return data
+
+def get_recording_paths(path_list, folder_path):
+    list_of_recordings = [f.path for f in os.scandir(folder_path) if f.is_dir()]
+    for recording_path in list_of_recordings:
+        path_list.append(recording_path)
+    return path_list
+
+def add_full_session_id(data, all_recording_paths):
+    full_session_ids = []
+    for index, row in data.iterrows():
+        row =  row.to_frame().T.reset_index(drop=True)
+        session_id = row["session_id"].iloc[0]
+        full_session_id = [s for s in all_recording_paths if session_id in s]
+        full_session_ids.append(full_session_id[0])
+    data["full_session_id"] = full_session_ids
+    return data
+
+def ramp_histogram_by_mouse(data, save_path):
+
+    for cohort_mouse in np.unique(data["cohort_mouse"]):
+        for ramp_region in ["outbound", "homebound", "all"]:
+            for trial_type in ["all"]:
+
+                cohort_mouse_data = data[(data["cohort_mouse"] == cohort_mouse) &
+                                         (data["ramp_region"] == ramp_region) &
+                                         (data["trial_type"] == trial_type)]
+
+                fig, ax = plt.subplots(figsize=(6,6))
+                ax.set_title("rr="+ramp_region+",tt="+trial_type+",m="+cohort_mouse)
+                ax.hist(np.asarray(cohort_mouse_data["ramp_score"]), bins=50, alpha=0.7, color="r", density=False, cumulative=False, linewidth=4)
+                ax.set_ylabel("Count", fontsize=15)
+                ax.set_xlabel("Ramp Score", fontsize=15)
+                ax.set_xlim(left=-0.75, right=0.75)
+                ax.xaxis.set_major_locator(plt.MaxNLocator(3))
+                ax.tick_params(axis='both', which='major', labelsize=20)
+                plt.gca().spines['top'].set_visible(False)
+                plt.gca().spines['right'].set_visible(False)
+                plt.tight_layout()
+
+                if ramp_region=="outbound":
+                    collumn = "lm_result_ob"
+                elif ramp_region=="homebound":
+                    collumn = "lm_result_hb"
+
+
+                if ramp_region == "outbound" or ramp_region=="homebound":
+                    cohort_mouse_data = cohort_mouse_data[(cohort_mouse_data[collumn] == "None") |
+                                                          (cohort_mouse_data[collumn] == "NoSlope") |
+                                                          (cohort_mouse_data[collumn] == "Negative") |
+                                                          (cohort_mouse_data[collumn] == "Positive")]
+                    n_total= len(cohort_mouse_data)
+                    ax.text(0.75, 0.95, "None, n="+    str(len(cohort_mouse_data[cohort_mouse_data[collumn] == "None"]))+", "    +str(np.round((len(cohort_mouse_data[cohort_mouse_data[collumn] == "None"])/n_total)*100, decimals=0))+"%", transform=ax.transAxes, fontsize=8, verticalalignment='top')
+                    ax.text(0.75, 0.90, "No Slope, n="+str(len(cohort_mouse_data[cohort_mouse_data[collumn] == "NoSlope"]))+", " +str(np.round((len(cohort_mouse_data[cohort_mouse_data[collumn]== "NoSlope"])/n_total)*100, decimals=0))+"%", transform=ax.transAxes, fontsize=8, verticalalignment='top')
+                    ax.text(0.75, 0.85, "Negative, n="+str(len(cohort_mouse_data[cohort_mouse_data[collumn] == "Negative"]))+", "+str(np.round((len(cohort_mouse_data[cohort_mouse_data[collumn] == "Negative"])/n_total)*100, decimals=0))+"%", transform=ax.transAxes, fontsize=8, verticalalignment='top')
+                    ax.text(0.75, 0.80, "Positive, n="+str(len(cohort_mouse_data[cohort_mouse_data[collumn] == "Positive"]))+", "+str(np.round((len(cohort_mouse_data[cohort_mouse_data[collumn] == "Positive"])/n_total)*100, decimals=0))+"%", transform=ax.transAxes, fontsize=8, verticalalignment='top')
+
+                if save_path is not None:
+                    plt.savefig(save_path+"/bymouse_ramp_histo_m_"+cohort_mouse+"_tt_"+trial_type+"_rr_"+ramp_region+".png")
+
+                plt.show()
+                plt.close()
+
+    return
+
+
+def percentage_boccara(data,save_path, split="None", suffix=""):
+
+    fig, ax = plt.subplots(figsize=(12,6))
+
+    cohort_mice = np.unique(data["cohort_mouse"])
+    x_pos = np.arange(len(cohort_mice))
+
+    if "ramp_region" in list(data):
+        data = data[(data["ramp_region"] == "all") &
+                    (data["trial_type"] == "all")]
+
+    colors = ["C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9",
+              "C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9"]
+
+    for counter, cohort_mouse in enumerate(cohort_mice):
+        cohort_mouse_data = data[(data["cohort_mouse"] == cohort_mouse)]
+        boccara_t = len(cohort_mouse_data[(cohort_mouse_data["Boccara_theta_class"] == 1)])
+        n_total = len(cohort_mouse_data)
+
+        #split them into early and late sessions
+        max_recording_day = max(cohort_mouse_data.recording_day)
+        min_recording_day = min(cohort_mouse_data.recording_day)
+
+        if split == "two":
+            early_data = cohort_mouse_data[(cohort_mouse_data["recording_day"] < (max_recording_day+min_recording_day)/2)]
+            late_data =  cohort_mouse_data[(cohort_mouse_data["recording_day"] >= (max_recording_day+min_recording_day)/2)]
+
+            n_early_t = len(early_data[(early_data["Boccara_theta_class"] == 1)])
+            n_late_t = len(late_data[(late_data["Boccara_theta_class"] == 1)])
+            n_early =len(early_data)
+            n_late = len(late_data)
+
+            ax.bar([x_pos[counter]-0.2, x_pos[counter]+0.2], [n_early_t/n_early, n_late_t/n_late], align='center', alpha=0.5, width=0.4, color=colors[counter])
+
+        elif split == "daily":
+            n_days = len(np.unique(cohort_mouse_data["recording_day"]))
+
+            for day_counter, day in enumerate(np.unique(cohort_mouse_data["recording_day"])):
+                cohort_mouse_data_day = cohort_mouse_data[(cohort_mouse_data["recording_day"] == day)]
+                n_t = len(cohort_mouse_data_day[(cohort_mouse_data_day["Boccara_theta_class"] == 1)])
+                n_ =  len(cohort_mouse_data_day)
+
+                ax.bar(x_pos[counter]- 0.4+(day_counter*0.8/n_days), n_t/n_,
+                       align='center', alpha=0.5, width=0.8/n_days, color=colors[counter])
+
+        elif split == "None":
+            ax.bar(x_pos[counter], boccara_t/n_total, align='center', alpha=0.5, color=colors[counter])
+
+    plt.xticks(x_pos, cohort_mice, fontsize=15, rotation=-45)
+    plt.ylim([0,1])
+    plt.ylabel("Prop Theta Modulation",  fontsize=20)
+    #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
+    #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    if split == "two":
+        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_earlylate"+suffix+".png")
+    elif split == "None":
+        plt.savefig(save_path+"/Boccara_theta_cohort_mous"+suffix+".png")
+    elif split == "daily":
+        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_daily"+suffix+".png")
+
+    plt.show()
+    plt.close()
+
+
+def percentage_ramp(data, ramp_region, save_path, split="None", suffix=""):
+    suffix=ramp_region
+
+    fig, ax = plt.subplots(figsize=(12,6))
+
+    cohort_mice = np.unique(data["cohort_mouse"])
+    x_pos = np.arange(len(cohort_mice))
+
+    data = data[(data["ramp_region"] == ramp_region) & (data["trial_type"] == "all")]
+    if ramp_region=="outbound":
+        collumn ="lm_result_ob"
+    elif ramp_region=="homebound":
+        collumn ="lm_result_hb"
+
+    colors = ["C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9",
+              "C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9"]
+
+    for counter, cohort_mouse in enumerate(cohort_mice):
+        cohort_mouse_data = data[(data["cohort_mouse"] == cohort_mouse)]
+        #n_ramps = len(cohort_mouse_data[(cohort_mouse_data[collumn] == "Negative") |
+        #                                (cohort_mouse_data[collumn] == "Positive") ])
+        #n_total = len(cohort_mouse_data)
+
+        #split them into early and late sessions
+        #max_recording_day = max(cohort_mouse_data.recording_day)
+        #min_recording_day = min(cohort_mouse_data.recording_day)
+
+        if split == "two":
+            #split them into early and late sessions
+            max_recording_day = max(cohort_mouse_data.recording_day)
+            min_recording_day = min(cohort_mouse_data.recording_day)
+
+            early_data = cohort_mouse_data[(cohort_mouse_data["recording_day"] < (max_recording_day+min_recording_day)/2)]
+            late_data =  cohort_mouse_data[(cohort_mouse_data["recording_day"] >= (max_recording_day+min_recording_day)/2)]
+
+            n_early_t =  len(early_data[(early_data[collumn] == "Negative") |
+                                               (early_data[collumn] == "Positive") ])
+            n_late_t =  len(late_data[(late_data[collumn] == "Negative") |
+                                              (late_data[collumn] == "Positive") ])
+            n_early =len(early_data)
+            n_late = len(late_data)
+
+            ax.bar([x_pos[counter]-0.2, x_pos[counter]+0.2], [n_early_t/n_early, n_late_t/n_late], align='center', alpha=0.5, width=0.4, color=colors[counter])
+
+        elif split == "daily":
+            n_days = len(np.unique(cohort_mouse_data["recording_day"]))
+
+            for day_counter, day in enumerate(np.unique(cohort_mouse_data["recording_day"])):
+                cohort_mouse_data_day = cohort_mouse_data[(cohort_mouse_data["recording_day"] == day)]
+                n_t = len(cohort_mouse_data_day[(cohort_mouse_data_day[collumn] == "Negative") |
+                                    (cohort_mouse_data_day[collumn] == "Positive") ])
+                n_ =  len(cohort_mouse_data_day)
+
+                ax.bar(x_pos[counter]- 0.4+(day_counter*0.8/n_days), n_t/n_,
+                       align='center', alpha=0.5, width=0.8/n_days, color=colors[counter])
+
+        elif split == "None":
+            n_ramps = len(cohort_mouse_data[(cohort_mouse_data[collumn] == "Negative") |
+                                            (cohort_mouse_data[collumn] == "Positive") ])
+            n_total = len(cohort_mouse_data)
+
+            ax.bar(x_pos[counter], n_ramps/n_total, align='center', alpha=0.5, color=colors[counter])
+
+    plt.xticks(x_pos, cohort_mice, fontsize=15, rotation=-45)
+    plt.ylim([0,1])
+    plt.ylabel("Prop Ramp Cells",  fontsize=20)
+    #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
+    #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    if split == "two":
+        plt.savefig(save_path+"/prop_ramp_cohort_mouse_earlylate"+suffix+".png")
+    elif split == "None":
+        plt.savefig(save_path+"/prop_ramp_cohort_mous"+suffix+".png")
+    elif split == "daily":
+        plt.savefig(save_path+"/prop_ramp_cohort_mouse_daily"+suffix+".png")
+
+    plt.show()
+    plt.close()
+
+def percentage_ramp_rs(data, ramp_region, save_path, split="None", suffix=""):
+    suffix=ramp_region
+
+    fig, ax = plt.subplots(figsize=(12,6))
+
+    cohort_mice = np.unique(data["cohort_mouse"])
+    x_pos = np.arange(len(cohort_mice))
+
+    data = data[(data["ramp_region"] == ramp_region) & (data["trial_type"] == "all")]
+
+    colors = ["C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9",
+              "C0","C1","C2","C3", "C4","C5","C6", "C7", "C8", "C9"]
+
+    for counter, cohort_mouse in enumerate(cohort_mice):
+        cohort_mouse_data = data[(data["cohort_mouse"] == cohort_mouse)]
+
+        if split == "two":
+            #split them into early and late sessions
+            max_recording_day = max(cohort_mouse_data.recording_day)
+            min_recording_day = min(cohort_mouse_data.recording_day)
+
+            early_data = cohort_mouse_data[(cohort_mouse_data["recording_day"] < (max_recording_day+min_recording_day)/2)]
+            late_data =  cohort_mouse_data[(cohort_mouse_data["recording_day"] >= (max_recording_day+min_recording_day)/2)]
+
+            n_early_t =  len(early_data[(early_data["abs_ramp_score"] > 0.5)])
+            n_late_t =   len(late_data[(late_data["abs_ramp_score"] > 0.5)])
+            n_early =len(early_data)
+            n_late = len(late_data)
+
+            ax.bar([x_pos[counter]-0.2, x_pos[counter]+0.2], [n_early_t/n_early, n_late_t/n_late], align='center', alpha=0.5, width=0.4, color=colors[counter])
+
+        elif split == "daily":
+            n_days = len(np.unique(cohort_mouse_data["recording_day"]))
+
+            for day_counter, day in enumerate(np.unique(cohort_mouse_data["recording_day"])):
+                cohort_mouse_data_day = cohort_mouse_data[(cohort_mouse_data["recording_day"] == day)]
+                n_t = len(cohort_mouse_data_day[(cohort_mouse_data_day["abs_ramp_score"] > 0.5)])
+                n_ =  len(cohort_mouse_data_day)
+
+                ax.bar(x_pos[counter]- 0.4+(day_counter*0.8/n_days), n_t/n_,
+                       align='center', alpha=0.5, width=0.8/n_days, color=colors[counter])
+
+        elif split == "None":
+            n_ramps = len(cohort_mouse_data[(cohort_mouse_data["abs_ramp_score"] > 0.5)])
+            n_total = len(cohort_mouse_data)
+
+            ax.bar(x_pos[counter], n_ramps/n_total, align='center', alpha=0.5, color=colors[counter])
+
+    plt.xticks(x_pos, cohort_mice, fontsize=15, rotation=-45)
+    plt.ylim([0,1])
+    plt.ylabel("Prop Ramp Cells",  fontsize=20)
+    #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
+    #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    if split == "two":
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_earlylate"+suffix+".png")
+    elif split == "None":
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mous"+suffix+".png")
+    elif split == "daily":
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_daily"+suffix+".png")
+
+    plt.show()
+    plt.close()
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')#
+
+    all_paths = []
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/VirtualReality/245_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/VirtualReality/1124_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M1_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M6_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/VirtualReality/M2_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/VirtualReality/M3_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted")
+    all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M2_sorted")
 
     # type path name in here with similar structure to this r"Z:\ActiveProjects\Harry\OculusVR\vr_recordings_Emre"
     ramp_scores_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.csv"
@@ -644,6 +960,10 @@ def main():
     ramp_scores = pd.read_csv(ramp_scores_path)
     tetrode_locations = pd.read_csv(tetrode_location_path)
 
+    percentage_boccara(theta_df_VR, save_path, split="daily", suffix="_with_Ian_and_Junjis_mice")
+    percentage_boccara(theta_df_VR, save_path, split="two", suffix="_with_Ian_and_Junjis_mice")
+    percentage_boccara(theta_df_VR, save_path, split="None", suffix="_with_Ian_and_Junjis_mice")
+
     ramp_scores = add_short_session_id(ramp_scores)
     tetrode_locations = add_short_session_id(tetrode_locations)
     data = add_locations(ramp_scores, tetrode_locations)
@@ -651,18 +971,41 @@ def main():
     data = add_theta(data, theta_df_VR)
     data = add_lm(data, linear_model_path)
     data = analyse_ramp_driver(data, trialtypes_linear_model)
+    data = add_full_session_id(data, all_paths)
+    data = add_cohort_mouse_label(data)
+    data = add_recording_day(data)
 
+    percentage_boccara(data, save_path, split="daily")
+    percentage_boccara(data, save_path, split="two")
+    percentage_boccara(data, save_path, split="None")
+
+    percentage_ramp(data, "outbound", save_path, split="daily")
+    percentage_ramp(data, "outbound", save_path, split="two")
+    percentage_ramp(data, "outbound", save_path, split="None")
+    percentage_ramp(data, "homebound", save_path, split="daily")
+    percentage_ramp(data, "homebound", save_path, split="two")
+    percentage_ramp(data, "homebound", save_path, split="None")
+
+    percentage_ramp_rs(data, "outbound", save_path, split="daily")
+    percentage_ramp_rs(data, "outbound", save_path, split="two")
+    percentage_ramp_rs(data, "outbound", save_path, split="None")
+    percentage_ramp_rs(data, "homebound", save_path, split="daily")
+    percentage_ramp_rs(data, "homebound", save_path, split="two")
+    percentage_ramp_rs(data, "homebound", save_path, split="None")
+
+    ramp_histogram_by_mouse(data, save_path)
     # to analyse theta modulate between cue dependant and independant neurons
-    cue_theta_location_bar(data, save_path)
-    cue_theta_location_hist(data, save_path)
+
+    #cue_theta_location_bar(data, save_path)
+    #cue_theta_location_hist(data, save_path)
 
     # chi squared slope by region
     for trial_type in ["beaconed"]:
         for ramp_region in ["outbound", "homebound", "all"]:
-            location_slope(data, collumn="lm_result_ob", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
-            location_slope(data, collumn="lm_result_hb", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
-            location_slope(data, collumn="lmer_result_ob", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
-            location_slope(data, collumn="lmer_result_hb", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
+            location_slope(data, collumn ="lm_result_ob", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
+            location_slope(data, collumn ="lm_result_hb", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
+            location_slope(data, collumn ="lmer_result_ob", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
+            location_slope(data, collumn ="lmer_result_hb", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
 
     location_slope(data, collumn="ramp_driver", save_path=save_path, ramp_region="outbound", trial_type="all")
 

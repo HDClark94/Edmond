@@ -8,6 +8,8 @@ def print_folder_paths(foldeer_path):
         print(folder_list[i])
 
 def copy_dir_structure(path_to_folder_to_copy, path_to_copy_to):
+    # eg. copy_dir_structure(path_to_folder_to_copy = "/mnt/datastore/Junji/",
+    # path_to_copy_to = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Junji")
 
     inputpath = path_to_folder_to_copy
     outputpath = path_to_copy_to
@@ -17,15 +19,18 @@ def copy_dir_structure(path_to_folder_to_copy, path_to_copy_to):
         if not os.path.isdir(structure):
             os.mkdir(structure)
         else:
-            print("Folder does already exits!")
+            print("Folder does already exist!")
 
     print("I hope this worked")
     # this function actually works
 
-
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
+
+    copy_dir_structure("/mnt/datastore/Junji/", "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Junji")
+    copy_dir_structure("/mnt/datastore/Ian/",   "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Ian")
+    copy_dir_structure("/mnt/datastore/Sarah/", "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Sarah")
 
     processed_PATH = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted/M1_D8_2019-06-26_13-31-11/processed/sorted_df.pkl"
     processed_PATH = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted/M1_D8_2019-06-26_13-31-11/MountainSort/DataFrames/spatial_firing.pkl"
