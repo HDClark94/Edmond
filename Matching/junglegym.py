@@ -144,7 +144,7 @@ def main():
     figs_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs"
     agreement_thres=20
     window_allo=4
-    '''
+
     # cohort 5
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/OpenField"
@@ -154,7 +154,7 @@ def main():
     C5M1 = run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sorted_apart_vr_dir_path, sorted_apart_of_dir_path, save_path,
                   figs_path=figs_path, add_of_and_save=True, cohort_mouse="C5_M1", agreement_threshold=agreement_thres, autocorr_windowsize=window_allo)
 
-    
+
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M2_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/OpenField"
     sorted_apart_vr_dir_path =    "/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort5/VirtualReality/M2_sorted"
@@ -179,7 +179,7 @@ def main():
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M3"
     C4M3 = run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sorted_apart_vr_dir_path, sorted_apart_of_dir_path, save_path,
                   figs_path=figs_path, add_of_and_save=True, cohort_mouse="C4_M3", agreement_threshold=agreement_thres, autocorr_windowsize=window_allo)
-    
+
     # cohort 3
     sorted_together_vr_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/VirtualReality/M1_sorted"
     sorted_together_of_dir_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild"
@@ -214,13 +214,6 @@ def main():
     C2_1124 = run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sorted_apart_vr_dir_path, sorted_apart_of_dir_path,
                   save_path, figs_path=figs_path, add_of_and_save=True, cohort_mouse="C2_1124", agreement_threshold=agreement_thres, autocorr_windowsize=window_allo)
 
-    C4_C5 = pd.DataFrame()
-    C4_C5 = pd.concat([C4_C5, C5M1], ignore_index=True)
-    C4_C5 = pd.concat([C4_C5, C5M2], ignore_index=True)
-    C4_C5 = pd.concat([C4_C5, C4M2], ignore_index=True)
-    C4_C5 = pd.concat([C4_C5, C4M3], ignore_index=True)
-    plot_summary_stats(C4_C5, figs_path=figs_path, cohort_mouse="C4_C5")
-    '''
 
     C5_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M1_agreement_stats_AT20_WS4.pkl")
     C5_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M2_agreement_stats_AT20_WS4.pkl")
