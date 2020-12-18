@@ -14,7 +14,7 @@ import sys
 from PostSorting.theta_modulation import *
 from Edmond.ramp_cells_of import *
 import scipy
-
+from Edmond.loc_ramp_analysis import remove_mouse
 warnings.filterwarnings('ignore')
 
 test_params = PostSorting.parameters.Parameters()
@@ -129,7 +129,7 @@ def plot_theta(theta_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     #plt.tight_layout()
-    plt.savefig(save_path+"/tracked_theta_index.png")
+    plt.savefig(save_path+"/tracked_theta_index.png", dpi=300)
     plt.show()
 
     fig, ax = plt.subplots(figsize=(9,6))
@@ -159,7 +159,7 @@ def plot_theta(theta_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     #plt.tight_layout()
-    plt.savefig(save_path+"/tracked_theta_power.png")
+    plt.savefig(save_path+"/tracked_theta_power.png", dpi=300)
     plt.show()
 
 def plot_theta_at_max_rs(theta_df, save_path):
@@ -195,7 +195,7 @@ def plot_theta_at_max_rs(theta_df, save_path):
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=20)
     #plt.tight_layout()
-    plt.savefig(save_path+"/theta_at_max_rs.png")
+    plt.savefig(save_path+"/theta_at_max_rs.png", dpi=300)
     plt.show()
 
 def plot_max_rs_at_max_theta(theta_df, save_path):
@@ -235,7 +235,7 @@ def plot_max_rs_at_max_theta(theta_df, save_path):
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=20)
     #plt.tight_layout()
-    plt.savefig(save_path+"/max_rs_at_max_theta.png")
+    plt.savefig(save_path+"/max_rs_at_max_theta.png", dpi=300)
     plt.show()
 
 
@@ -268,7 +268,7 @@ def plot_max_ramp_vs_max_theta(theta_df, save_path):
     ax.legend()
     ax.tick_params(axis='both', which='major', labelsize=20)
     #plt.tight_layout()
-    plt.savefig(save_path+"/max_theta_vs_max_abs_rs.png")
+    plt.savefig(save_path+"/max_theta_vs_max_abs_rs.png", dpi=300)
     plt.show()
 
 def plot_max_ramp_score(theta_df, save_path):
@@ -307,7 +307,7 @@ def plot_max_ramp_score(theta_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     #plt.tight_layout()
-    plt.savefig(save_path+"/tracked_ramp_score.png")
+    plt.savefig(save_path+"/tracked_ramp_score.png", dpi=300)
     plt.show()
 
 def add_ramp_scores(theta_df, ramp_lm, ramp_scores, tetrode_locations):
@@ -410,9 +410,9 @@ def boxplot_theta(theta_df_VR, save_path, theta_threshold=0.07, best_theta=False
             plt.gca().spines['right'].set_visible(False)
             plt.tight_layout()
             if best_theta:
-                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_best_theta_boxplot.png")
+                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_best_theta_boxplot.png", dpi=300)
             else:
-                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_absolute_theta_boxplot.png")
+                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_absolute_theta_boxplot.png", dpi=300)
             plt.show()
 
 
@@ -431,9 +431,9 @@ def boxplot_theta(theta_df_VR, save_path, theta_threshold=0.07, best_theta=False
             plt.tight_layout()
 
             if best_theta:
-                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_best_theta_ramp_hist.png")
+                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_best_theta_ramp_hist.png", dpi=300)
             else:
-                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_absolute_theta_ramp_hist.png")
+                plt.savefig(save_path+"/"+trial_type+"_"+ramp_region+"_absolute_theta_ramp_hist.png", dpi=300)
             plt.show()
 
 def plot_lm_proportions(theta_df_VR, save_path, best_theta=False):
@@ -501,9 +501,9 @@ def plot_lm_proportions(theta_df_VR, save_path, best_theta=False):
         plt.gca().spines['right'].set_visible(False)
         plt.tight_layout()
         if best_theta:
-            plt.savefig(save_path+"/"+trial_type+"_"+collumn+"_best_theta_proportion.png")
+            plt.savefig(save_path+"/"+trial_type+"_"+collumn+"_best_theta_proportion.png", dpi=300)
         else:
-            plt.savefig(save_path+"/"+trial_type+"_"+collumn+"theta_proportion.png")
+            plt.savefig(save_path+"/"+trial_type+"_"+collumn+"theta_proportion.png", dpi=300)
         plt.show()
 
 
@@ -529,7 +529,7 @@ def plot_theta_histogram(data, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"/theta_histo.png")
+    plt.savefig(save_path+"/theta_histo.png", dpi=300)
     plt.show()
 
 def main():
@@ -568,14 +568,16 @@ def main():
     theta_df = track_theta("/mnt/datastore/Sarah/Data/PIProject_OptoEphys/Data/OpenEphys/_cohort2/VirtualReality/1124_sorted", theta_df)
 
     theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
-    '''
+    
     theta_df = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
     theta_df = track_theta("/mnt/datastore/Harry/Cohort6_july2020/vr", theta_df)
     theta_df = track_theta("/mnt/datastore/Harry/MouseVR/data/Cue_conditioned_cohort1_190902", theta_df)
+    '''
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
-    theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    #theta_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
 
     data = add_ramp_scores(theta_df_VR, ramp_lm, ramp_scores, tetrode_locations)
+    data = remove_mouse(data, cohort_mouse_list="C2_1124")
     plot_theta_histogram(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
     plot_lm_proportions(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", best_theta=False)
     plot_lm_proportions(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", best_theta=True)
@@ -587,6 +589,7 @@ def main():
     boxplot_theta(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", theta_threshold=0.07, best_theta=False)
     boxplot_theta(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", theta_threshold=0.07, best_theta=True)
 
+    '''
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs"
     correlation_save_path = save_path+"/rampscores_correlations/theta"
     for trial_type in ["beaconed", "non-beaconed", "probe", "all"]:
@@ -596,7 +599,7 @@ def main():
                     for label_collumn in ["cohort_mouse"]:
                         ramp_score_correleation(data, correlation_save_path, collumn_a=collumn_a, collumn_b=collumn_b, ramp_region=ramp_region, label_collumn=label_collumn, trial_type=trial_type, of_n_spike_thres=None, by_mouse=False)
     print("Finished Correlation plots")
-
+    '''
     
     # OF + VR cells
     theta_df = pd.DataFrame()

@@ -24,13 +24,31 @@ def copy_dir_structure(path_to_folder_to_copy, path_to_copy_to):
     print("I hope this worked")
     # this function actually works
 
+def delete_files_with_extension(path_to_folder, extension1, extension2):
+    # eg. delete_files_with_extension(path_to_folder = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/",
+    # path_to_copy_to = ".continuous"
+    inputpath = path_to_folder
+
+    for dirpath, dirnames, filenames in os.walk(inputpath):
+        for name in filenames:
+            if os.path.join(dirpath, name).endswith(extension1):
+                print("I want to delete this file:, " +os.path.join(dirpath, name))
+                os.remove(os.path.join(dirpath, name))
+            elif os.path.join(dirpath, name).endswith(extension2):
+                print("I want to delete this file:, " +os.path.join(dirpath, name))
+                os.remove(os.path.join(dirpath, name))
+
+    print("I hope this worked")
+    # this function actually works
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
+    delete_files_with_extension("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/", extension1=".continuous", extension2=".spikes")
+    '''
+    tmp2 = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D9_2020-11-08_14-37-47/MountainSort/DataFrames/processed_position_data.pkl")
 
-    copy_dir_structure("/mnt/datastore/Junji/", "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Junji")
-    copy_dir_structure("/mnt/datastore/Ian/",   "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Ian")
-    copy_dir_structure("/mnt/datastore/Sarah/", "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/theta_index_figs/Sarah")
+    tmp = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_other_users/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild/M6_D15_2018-10-25_12-48-39_of/MountainSort/DataFrames/lfp_data.pkl")
 
     processed_PATH = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted/M1_D8_2019-06-26_13-31-11/processed/sorted_df.pkl"
     processed_PATH = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/VirtualReality/M1_sorted/M1_D8_2019-06-26_13-31-11/MountainSort/DataFrames/spatial_firing.pkl"
@@ -60,7 +78,9 @@ def main():
     #spatial_firing1 = pd.read_pickle(path1)
     #spatial_firing2 = pd.read_pickle(path2)
     #print_folder_paths(r"/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/VirtualReality/M3_sorted/")
+    '''
     print("look now")
+
 
 if __name__ == '__main__':
     main()

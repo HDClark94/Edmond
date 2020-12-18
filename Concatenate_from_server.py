@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import Mouse_paths
 import traceback
 import warnings
 import sys
@@ -11,6 +10,7 @@ import PostSorting.parameters
 import PostSorting.open_field_grid_cells
 import PostSorting.open_field_firing_maps
 import PostSorting.theta_modulation
+import PostSorting.vr_grid_cells
 
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
@@ -21,6 +21,7 @@ def get_recording_paths(path_list, folder_path):
     list_of_recordings = [f.path for f in os.scandir(folder_path) if f.is_dir()]
     for recording_path in list_of_recordings:
         path_list.append(recording_path)
+        print(recording_path.split("/datastore/")[-1])
     return path_list
 
 def add_full_session_id(spatial_firing, full_path):
@@ -33,7 +34,73 @@ def add_full_session_id(spatial_firing, full_path):
     return spatial_firing
 
 
-def load_open_field_spatial_firing(all_days_df, recording_paths, save_path, suffix=""):
+def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="", prm=None):
+    spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
+    spatial_path = "/MountainSort/DataFrames/position_data.pkl"
+    processed_path = "/MountainSort/DataFrames/processed_position_data.pkl"
+
+    for path in recording_paths:
+        data_frame_path = path+spatial_firing_path
+        spatial_df_path = path+spatial_path
+        processed_position_path = path+processed_path
+
+        print('Processing ' + data_frame_path)
+
+        if os.path.exists(data_frame_path):
+            try:
+                print('I found a spatial data frame, processing ' + data_frame_path)
+                spatial_firing = pd.read_pickle(data_frame_path)
+
+                if "Curated" in list(spatial_firing):
+                    spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
+
+                spatial_firing = add_full_session_id(spatial_firing, path)
+
+                if ("fields_com" not in list(spatial_firing)) and (len(spatial_firing) > 0):
+                    positional_data = pd.read_pickle(spatial_df_path)
+                    processed_position_data = pd.read_pickle(processed_position_path)
+                    spatial_firing = PostSorting.vr_grid_cells.process_vr_grid(spatial_firing, positional_data, prm.get_vr_grid_analysis_bin_size(), prm)
+                    spatial_firing = PostSorting.vr_grid_cells.process_vr_field_stats(spatial_firing, processed_position_data, prm)
+                    spatial_firing = PostSorting.vr_grid_cells.process_vr_field_distances(spatial_firing, processed_position_data, prm)
+                if len(spatial_firing) > 0:
+
+                    spatial_firing=spatial_firing[["session_id",
+                                                   "cluster_id",
+                                                   "tetrode",
+                                                   "primary_channel",
+                                                   "fields_com",
+                                                   "fields_com_trial_number",
+                                                   "fields_com_trial_type",
+                                                   "n_beaconed_fields_per_trial",
+                                                   "n_nonbeaconed_fields_per_trial",
+                                                   "n_probe_fields_per_trial",
+                                                   "distance_between_fields",
+                                                   "fields_com_next_trial_type",
+                                                   "minimum_distance_to_field_in_next_trial"]]
+
+                    all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
+                    print('spatial firing data extracted from frame successfully')
+
+                else:
+                    print("There wasn't any cells to add")
+
+            except Exception as ex:
+                print('This is what Python says happened:')
+                print(ex)
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                traceback.print_tb(exc_traceback)
+                print('something went wrong, the recording might be missing dataframes!')
+
+        else:
+            print("I couldn't find a spatial firing dataframe")
+    if save_path is not None:
+        all_days_df.to_pickle(save_path+"/All_mice_of_"+suffix+".pkl")
+    print("completed all in list")
+    return all_days_df
+
+
+
+def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="", prm=None):
     spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
     spatial_path = "/MountainSort/DataFrames/position.pkl"
 
@@ -74,9 +141,11 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path, suff
                                                    "primary_channel",
                                                    "hd_score",
                                                    "grid_score",
+                                                   "grid_spacing",
                                                    "full_session_id",
                                                    "ThetaIndex",
-                                                   "Boccara_theta_class"]]
+                                                   "Boccara_theta_class",
+                                                   "rate_map_correlation_first_vs_second_half"]]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -94,8 +163,38 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path, suff
         else:
             print("I couldn't find a spatial firing dataframe")
 
-    all_days_df.to_pickle(save_path+"/All_mice_of_"+suffix+".pkl")
+    if save_path is not None:
+        all_days_df.to_pickle(save_path+"/All_mice_of_"+suffix+".pkl")
     print("completed all in list")
+    return all_days_df
+
+def combine_of_vr_dataframes(of_dataframe, vr_dataframe):
+    # combine and return of and vr matches with same session day, mouse id and cluster id
+    combined_df = pd.DataFrame()
+
+    for index, cluster_of_series in of_dataframe.iterrows():
+        cluster_id = cluster_of_series["cluster_id"]
+        date=cluster_of_series["date"]
+        mouse=cluster_of_series["mouse"]
+        training_day=cluster_of_series["training_day"]
+
+        cluster_of_df = of_dataframe[(of_dataframe.cluster_id == cluster_id) &
+                                     (of_dataframe.date == date) &
+                                     (of_dataframe.mouse == mouse)]
+
+        cluster_vr_df = vr_dataframe[(vr_dataframe.cluster_id == cluster_id) &
+                                     (vr_dataframe.date == date) &
+                                     (vr_dataframe.mouse == mouse)]
+
+        combined_cluster = cluster_of_df.copy()
+        if len(cluster_vr_df) == 1:
+            collumns_to_add = np.setdiff1d(list(cluster_vr_df), list(cluster_of_df)) # finds collumns in 1 list that are not in the other
+            for i in range(len(collumns_to_add)):
+                combined_cluster[collumns_to_add[i]] = [cluster_vr_df[collumns_to_add[i]].iloc[0]]
+
+            combined_df = pd.concat([combined_df, combined_cluster], ignore_index=True)
+
+    return combined_df
 
 def load_processed_position_all_days(recordings_folder_path, paths, mouse):
     processed_position_path = "\MountainSort\DataFrames\processed_position_data.pkl"
@@ -139,14 +238,6 @@ def main():
 
     print('-------------------------------------------------------------')
 
-    server_path = "Z:\ActiveProjects\Harry\MouseVR\data\Cue_conditioned_cohort1_190902"
-    #load_processed_position_all_days(server_path, Mouse_paths.M2_paths(), mouse="M2")
-    #load_processed_position_all_days(server_path, Mouse_paths.M3_paths(), mouse="M3")
-    #load_processed_position_all_days(server_path, Mouse_paths.M4_paths(), mouse="M4")
-    #load_processed_position_all_days(server_path, Mouse_paths.M5_paths(), mouse="M5")
-
-    server_path = ""
-
     # ------------------------------------ collect and or calculate all grid scores, hd scores and theta modulation across all recorded open field experiments -----------------------------
     c2 = get_recording_paths([], "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/OpenField")
     c3 = get_recording_paths([], "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/OpenFeild")
@@ -158,6 +249,7 @@ def main():
     c9 = get_recording_paths([], "/mnt/datastore/Harry/MouseOF/data/Cue_conditioned_cohort1_190902")
     c10 = get_recording_paths([], "/mnt/datastore/Bri/sim1cre_invivo")
     c11 = get_recording_paths([], "/mnt/datastore/Klara/Open_field_opto_tagging_p038")
+    c12 = get_recording_paths([], "/mnt/datastore/Harry/Cohort7_october2020/of")
 
     all_days_df = pd.DataFrame()
     #load_open_field_spatial_firing(all_days_df, c2, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C2")
@@ -166,10 +258,11 @@ def main():
     #load_open_field_spatial_firing(all_days_df, c5, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C5")
     #load_open_field_spatial_firing(all_days_df, c6, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C6")
     #load_open_field_spatial_firing(all_days_df, c7, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C7")
-    load_open_field_spatial_firing(all_days_df, c8, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C8")
-    load_open_field_spatial_firing(all_days_df, c9, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C9")
-    load_open_field_spatial_firing(all_days_df, c10, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C10")
-    load_open_field_spatial_firing(all_days_df, c11, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C11")
+    #_ = load_open_field_spatial_firing(all_days_df, c8, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C8")
+    #_ = load_open_field_spatial_firing(all_days_df, c9, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C9")
+    #_ = load_open_field_spatial_firing(all_days_df, c10, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C10")
+    #_ = load_open_field_spatial_firing(all_days_df, c11, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C11")
+    _ = load_open_field_spatial_firing(all_days_df, c12, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper", suffix="C12")
 
     #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

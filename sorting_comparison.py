@@ -18,6 +18,10 @@ def get_theta(cluster_id, spatial_firing, type):
     elif type == "index":
         return cluster_spatial_firing["ThetaIndex"].iloc[0]
 
+def get_fr(cluster_id, spatial_firing):
+    cluster_spatial_firing = spatial_firing[spatial_firing["cluster_id"] == cluster_id]
+    return cluster_spatial_firing["mean_firing_rate"].iloc[0]
+
 def find_set(a,b):
     return set(a) & set(b)
 
@@ -132,8 +136,8 @@ def correlation(sorted_together_vr_path, sorted_seperately_vr_path,
     correlation_matrix_vr = np.zeros((n_clusters_i, n_clusters_j))
 
     # vr
-    for i in range(n_clusters_i):
-        for j in range(n_clusters_j):
+    for i in range(n_clusters_i): # sorted together
+        for j in range(n_clusters_j): # sorted apart
             cluster_id_i = sorted_together_vr["cluster_id"].iloc[i]
             cluster_id_j = sorted_seperately_vr["cluster_id"].iloc[j]
             cluster_tetrode_i = sorted_together_vr["tetrode"].iloc[i]
@@ -155,8 +159,8 @@ def correlation(sorted_together_vr_path, sorted_seperately_vr_path,
                 full_session_ids_vr.append([full_session_id_vr])
 
     # of
-    for m in range(n_clusters_m):
-        for n in range(n_clusters_n):
+    for m in range(n_clusters_m): # sorted together
+        for n in range(n_clusters_n): # sorted apart
             cluster_id_m = sorted_together_of["cluster_id"].iloc[m]
             cluster_id_n = sorted_seperately_of["cluster_id"].iloc[n]
             cluster_tetrode_m = sorted_together_of["tetrode"].iloc[m]
@@ -226,9 +230,12 @@ def correlation(sorted_together_vr_path, sorted_seperately_vr_path,
     n_spikes_vr = []
     n_spikes_of = []
     n_spikes_vr_original = []
+    fr_vr_original = []
     split_cluster = []
     theta_vr = []
     thetaP_vr = []
+
+
     if len(putative_matches_vr)>0:
 
         agreement['session_id'] = np.array(session_ids_vr)[:,0]
@@ -237,10 +244,12 @@ def correlation(sorted_together_vr_path, sorted_seperately_vr_path,
         agreement['sorted_seperately_vr_cluster_ids'] = np.array(putative_matches_vr)[:,1]
         for match in putative_matches_vr:
             n_spikes_vr_original.append(get_n_spikes(match[1], sorted_seperately_vr))
+            fr_vr_original.append(get_fr(match[1], sorted_seperately_vr))
             n_spikes_of.append(get_n_spikes(match[0], sorted_together_of))
             n_spikes_vr.append(get_n_spikes(match[0], sorted_together_vr))
             theta_vr.append(get_theta(match[0], sorted_together_vr, type="index"))
             thetaP_vr.append(get_theta(match[0], sorted_together_vr, type="power"))
+
             agreements.append(autocorrelogram(match, sorted_together_vr, sorted_seperately_vr, title_tag="VR",
                                               plot=True, figs_path=figs_path, session_id=session_id_vr,
                                               autocorr_window_size=autocorr_windowsize))
@@ -250,6 +259,7 @@ def correlation(sorted_together_vr_path, sorted_seperately_vr_path,
         agreement["n_spikes_vr_original"] = n_spikes_vr_original
         agreement["ThetaIndex_vr"] = theta_vr
         agreement["ThetaPower_vr"] = thetaP_vr
+        agreement["mean_firing_rate_vr"] = fr_vr_original
         agreement["agreement_vr"] = agreements
         agreement["split_cluster"] = split_cluster
 

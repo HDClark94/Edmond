@@ -9,6 +9,8 @@ import warnings
 from Edmond.ramp_cells_of import *
 warnings.filterwarnings('ignore')
 
+''' this code is old and depreceated now'''
+
 def tetrode_depth_correlation(data, collumn_a, label_collumn, trial_type, save_path, of_n_spike_thres=1000):
     data = data[(data["trial_type"]==trial_type)]
     data = data.dropna(subset=["tetrode_location"])

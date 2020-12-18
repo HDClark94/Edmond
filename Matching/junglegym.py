@@ -109,6 +109,7 @@ def run_agreement(sorted_together_vr_dir_path, sorted_together_of_dir_path, sort
         concat_agreement.to_pickle(save_path+"_sorting_stats_AT"+str(agreement_threshold)+"_WS"+str(autocorr_windowsize)+".pkl")
         concat_agreement_stats.to_pickle(save_path+"_agreement_stats_AT"+str(agreement_threshold)+"_WS"+str(autocorr_windowsize)+".pkl")
 
+    print("I have finished finding agreements")
     return concat_agreement_stats
 
 def plot_summary_stats(agreement_statistics, figs_path, cohort_mouse):
@@ -141,7 +142,7 @@ def main():
 
     # take a list of paths of sorted vr_recordings from Sarah's server space
     # iterate over this list and pick out the spatial dataframes
-    figs_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs"
+    figs_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/auco_matches"
     agreement_thres=20
     window_allo=4
 

@@ -1,4 +1,5 @@
 import pandas as pd
+import pickle5 as pkl5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -9,6 +10,7 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 import warnings
 warnings.filterwarnings('ignore')
+from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
 
 def split_data_by_recording_day(data):
     #split them into early and late sessions
@@ -169,21 +171,21 @@ def get_p_text(p, ns=False):
 
 def lmer_result_color(lmer_result):
     if lmer_result=="PA":
-        return "orchid"
+        return ((211.0/255,118.0/255,255.0/255))
     elif lmer_result=="PS":
-        return "indianred"
+        return ((255.0/255,176.0/255,100.0/255))
     elif lmer_result=="A":
-        return "lightskyblue"
+        return ((111.0/255, 172.0/255, 243.0/255))
     elif lmer_result=="S":
-        return "salmon"
+        return ((255.0/255,226.0/255,101.0/255))
     elif lmer_result=="P":
-        return "deeppink"
+        return ((255.0/255,115.0/255,121.0/255))
     elif lmer_result=="PSA":
-        return "forestgreen"
+        return ((120.0/255,138.0/255,138.0/255))
     elif lmer_result=="SA":
-        return "mediumaquamarine"
+        return ((153.0/255,220.0/255,97.0/255))
     elif lmer_result=="None":
-        return "grey"
+        return ((216.0/255,216.0/255,216.0/255))
 
 def lm_result_color(lm_result):
     if lm_result=="None":
@@ -252,17 +254,17 @@ def label_collumn2color(data, label_collumn):
 
 def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, filter_by_slope=False):
     fig, ax = plt.subplots(figsize=(6,6))
-    p_str = get_p_text(p, ns=True)
-    #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
-    ax.set_title(p_str, fontsize=12)
 
     PS = data[data.tetrode_location == "PS"]
     MEC = data[data.tetrode_location == "MEC"]
     UN = data[data.tetrode_location == "UN"]
 
+    p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
+    p_str = get_p_text(p, ns=True)
+
     #ax.hist(np.asarray(UN[collumn]), bins=50, alpha=0.2, color="k", label="Unclassified", histtype="step", density=True)
-    ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="step", density=True, cumulative=True, linewidth=4)
-    ax.hist(np.asarray(PS[collumn]), bins=50, alpha=0.5, color="b", label="PS", histtype="step", density=True, cumulative=True, linewidth=4)
+    ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
+    ax.hist(np.asarray(PS[collumn]), bins=50, alpha=0.5, color="b", label="PS", histtype="bar", density=True, cumulative=False, linewidth=4)
 
     ax.set_ylabel("Cumulative Density", fontsize=15)
     ax.set_xlabel(get_tidy_title(collumn), fontsize=15)
@@ -277,26 +279,33 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
     #plt.subplots_adjust(left=0.2, right=0.6, top=0.8, bottom=0.2)
     #ax.legend(loc="upper right")
     #ax.set_xlim(left=0)
+    #plt.subplots_adjust(top=0.8)
+
+    ax.text(0.1, 0.9, p_str, ha='center', va='center', transform=ax.transAxes, fontsize=12)
     if save_path is not None:
         if filter_by_slope:
-            plt.savefig(save_path+"/FBS_location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/FBS_location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
         else:
-            plt.savefig(save_path+"/location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
+
 
     plt.show()
     plt.close()
     return
 
 def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, filter_by_slope=False):
-    ig, ax = plt.subplots(figsize=(6,3))
-    p_str = get_p_text(p, ns=True)
-    ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
-    ax.set_title(p_str, fontsize=20)
+    fig, ax = plt.subplots(figsize=(6,3))
+
 
     PS = data[data.tetrode_location == "PS"]
     MEC = data[data.tetrode_location == "MEC"]
     UN = data[data.tetrode_location == "UN"]
 
+    p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
+    p_str = get_p_text(p, ns=True)
+    #ax.text(0.1, 0.9, p_str, ha='center', va='center', transform=ax.transAxes, fontsize=12)
+    ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
+    ax.set_title(p_str, fontsize=20)
     objects = ("PS", "MEC", "UN")
     objects = ("PS", "MEC")
     y_pos = np.arange(len(objects))
@@ -334,7 +343,7 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
     plt.ylim((-1,3))
     plt.ylim((-0.75,1.5))
     if collumn == "ramp_score":
-        ax.set_xlim(left=-0.75, right=0.75)
+        ax.set_xlim(left=-1, right=1)
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -345,33 +354,46 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
     plt.tight_layout()
     if save_path is not None:
         if filter_by_slope:
-            plt.savefig(save_path+"/FBS_location_boxplot_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/FBS_location_boxplot_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
         else:
-            plt.savefig(save_path+"/location_boxplot_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/location_boxplot_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
 
 def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False, filter_by_slope=False):
-    fig, ax = plt.subplots(figsize=(3,6))
+    fig, ax = plt.subplots(figsize=(4.5,6))
     p_str = get_p_text(p, ns=True)
     #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
     objects = np.unique(data["cohort_mouse"])
     x_pos = np.arange(len(objects))
 
+    use_color_cycle=True
+    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
     for i in range(len(objects)):
         y = data[(data["cohort_mouse"] == objects[i])]
-        ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
+
+        if use_color_cycle:
+            ax.errorbar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), ecolor=cycle_colors[i], capsize=10, fmt="o", color=cycle_colors[i])
+            ax.scatter(x_pos[i]*np.ones(len(np.asarray(y[collumn]))), np.asarray(y[collumn]), edgecolor=cycle_colors[i], marker="o", facecolors='none')
+
+        else:
+            ax.errorbar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), ecolor='black', capsize=10, fmt="o", color="black")
+            ax.scatter(x_pos[i]*np.ones(len(np.asarray(y[collumn]))), np.asarray(y[collumn]), edgecolor="black", marker="o", facecolors='none')
+            #ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
+
+        #ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
 
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
-    if collumn == "ramp_score":
-        plt.ylim(-0.6, 0.6)
-    elif collumn == "abs_ramp_score":
-        plt.ylim(0, 0.6)
+    #if collumn == "ramp_score":
+    #    plt.ylim(-0.6, 0.6)
+    #elif collumn == "abs_ramp_score":
+    #    plt.ylim(0, 0.6)
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -386,9 +408,9 @@ def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type
     plt.tight_layout()
     if save_path is not None:
         if filter_by_slope:
-            plt.savefig(save_path+"/FBS_mouse_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/FBS_mouse_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
         else:
-            plt.savefig(save_path+"/mouse_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/mouse_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
 
@@ -402,17 +424,19 @@ def simple_bar_location(data, collumn, save_path=None, ramp_region=None, trial_t
 
     for i in range(len(objects)):
         y = data[(data["tetrode_location"] == objects[i])]
-        ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
+        ax.errorbar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), ecolor='black', capsize=10, fmt="o", color="black")
+        ax.scatter(x_pos[i]*np.ones(len(np.asarray(y[collumn]))), np.asarray(y[collumn]), edgecolor="black", marker="o", facecolors='none')
+        #ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
 
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
-    if collumn == "ramp_score":
-        plt.ylim(-0.6, 0.6)
-    elif collumn == "abs_ramp_score":
-        plt.ylim(0, 0.6)
+    #if collumn == "ramp_score":
+    #    plt.ylim(-0.6, 0.6)
+    #elif collumn == "abs_ramp_score":
+    #    plt.ylim(0, 0.6)
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -427,9 +451,9 @@ def simple_bar_location(data, collumn, save_path=None, ramp_region=None, trial_t
     plt.tight_layout()
     if save_path is not None:
         if filter_by_slope:
-            plt.savefig(save_path+"/FBS_location_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/FBS_location_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
         else:
-            plt.savefig(save_path+"/location_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+            plt.savefig(save_path+"/location_bar_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
 
@@ -440,7 +464,7 @@ def simple_lm_stack_mouse(data, collumn, save_path=None, ramp_region=None, trial
 
     aggregated = data.groupby([collumn, "cohort_mouse"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = ["pink", "black", "grey", "green"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
         groups = ["Negative", "None", "NoSlope", "Positive"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
@@ -488,19 +512,21 @@ def simple_lm_stack_mouse(data, collumn, save_path=None, ramp_region=None, trial
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if save_path is not None:
-        plt.savefig(save_path+"/mouse_slope_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+        plt.savefig(save_path+"/mouse_slope_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
 
 
 def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False):
     fig, ax = plt.subplots(figsize=(3,6))
+    data = data[(data["tetrode_location"] != "V1")]
+
     #p_str = get_p_text(p, ns=True)
     #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
     aggregated = data.groupby([collumn, "tetrode_location"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = ["pink", "black", "grey", "green"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
         groups = ["Negative", "None", "NoSlope", "Positive"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
@@ -510,6 +536,7 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
                      "cornflowerblue", "yellow", "lightcoral"]
         groups = ["P", "S", "A", "PS", "PA", "SA", "PSA", "None"]
         groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
+        colors_lm = [lmer_result_color(c) for c in groups]
 
     objects = np.unique(aggregated["tetrode_location"])
     x_pos = np.arange(len(objects))
@@ -548,10 +575,79 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if save_path is not None:
-        plt.savefig(save_path+"/location_slope_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png")
+        plt.savefig(save_path+"/location_slope_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
 
+def add_theta_modulated_marker(data, threshold=0.07):
+    ThetaIndexLabel = []
+
+    for index, row in data.iterrows():
+        row =  row.to_frame().T.reset_index(drop=True)
+        ThetaIndex = row["ThetaIndex"].iloc[0]
+
+        if ThetaIndex> threshold:
+            binary = "TR"
+        else:
+            binary = "NR"
+
+        ThetaIndexLabel.append(binary)
+
+    data["ThetaIndexLabel"] = ThetaIndexLabel
+    return data
+
+def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False):
+    fig, ax = plt.subplots(figsize=(3,6))
+    data = data[(data["tetrode_location"] != "V1")]
+    data = add_theta_modulated_marker(data)
+
+    aggregated = data.groupby([collumn, "ThetaIndexLabel"]).count().reset_index()
+    if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
+        groups = ["Negative", "None", "NoSlope", "Positive"]
+    elif (collumn == "ramp_driver"):
+        colors_lm = ["grey", "green", "yellow"]
+        groups = [ "None", "PI", "Cue"]
+    else:
+        groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
+        colors_lm = [lmer_result_color(c) for c in groups]
+
+    objects = np.unique(aggregated["ThetaIndexLabel"])
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        ThetaIndexLabel = aggregated[aggregated["ThetaIndexLabel"] == object]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = ThetaIndexLabel[(ThetaIndexLabel[collumn] == group)]["Unnamed: 0"]
+            if len(count)==0:
+                count = 0
+            else:
+                count = int(count)
+
+            percent = (count/np.sum(ThetaIndexLabel["Unnamed: 0"]))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            bottom = bottom+percent
+
+    #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
+    plt.xticks(x_pos, objects, fontsize=8)
+    #plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+
+    if print_p:
+        print(p)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path+"/ThetaIndexLabel_stack_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
+    plt.show()
+    plt.close()
 
 def add_locations(ramp_scores_df, tetrode_locations_df):
 
@@ -599,7 +695,10 @@ def add_lm(data, linear_model_df):
     for index, row in data.iterrows():
         row =  row.to_frame().T.reset_index(drop=True)
         session_id = row.session_id.iloc[0]
-        cluster_id = row.cluster_id.iloc[0]
+        if "cluster_id" in list(row):
+            cluster_id = row.cluster_id.iloc[0]
+        elif "sorted_seperately_vr_cluster_ids" in list(row):
+            cluster_id = row.sorted_seperately_vr_cluster_ids.iloc[0]
 
         if len(linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)])>0:
             lm_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_homebound
@@ -633,7 +732,7 @@ def mouse_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="bea
     # only look at beacoend and outbound
     data = data[(data.trial_type == trial_type) &
                 (data.ramp_region == ramp_region)]
-    #simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
+    simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
     #simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
     simple_bar_mouse(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, print_p=print_p, filter_by_slope=filter_by_slope)
     return
@@ -653,8 +752,8 @@ def location_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="
     data = data[(data.trial_type == trial_type) &
                 (data.ramp_region == ramp_region)]
 
-    #simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
-    #simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
+    simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
+    simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
     simple_bar_location(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, print_p=print_p, filter_by_slope=filter_by_slope)
     return
 
@@ -697,7 +796,7 @@ def cue_theta_location_hist(data, save_path):
     plt.tight_layout()
     #plt.subplots_adjust(left=0.2, right=0.6, top=0.8, bottom=0.2)
     #ax.legend(loc="upper right")
-    plt.savefig(save_path+"/cue_theta_location_hist_PS.png")
+    plt.savefig(save_path+"/cue_theta_location_hist_PS.png", dpi=300)
     plt.show()
     plt.close()
     print("PS p= ", stats.ks_2samp(np.asarray(PS_cue_d["ThetaIndex"]), np.asarray(PS_cue_i["ThetaIndex"]))[1])
@@ -715,7 +814,7 @@ def cue_theta_location_hist(data, save_path):
     plt.tight_layout()
     #plt.subplots_adjust(left=0.2, right=0.6, top=0.8, bottom=0.2)
     #ax.legend(loc="upper right")
-    plt.savefig(save_path+"/cue_theta_location_hist_MEC.png")
+    plt.savefig(save_path+"/cue_theta_location_hist_MEC.png", dpi=300)
     plt.show()
     plt.close()
     print("MEC, p= ", stats.ks_2samp(np.asarray(MEC_d["ThetaIndex"]), np.asarray(MEC_i["ThetaIndex"]))[1])
@@ -760,7 +859,7 @@ def cue_theta_location_bar(data, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"/theta_cue_location.png")
+    plt.savefig(save_path+"/theta_cue_location.png", dpi=300)
     plt.show()
     plt.close()
 
@@ -795,6 +894,8 @@ def get_cohort(full_session_id):
         return "I"
     if "Cohort6_july2020" in full_session_id:
         return "H2"
+    if "Cohort7_october2020" in full_session_id:
+        return "H3"
     if "Cue_conditioned_cohort1_190902" in full_session_id:
         return "H1"
 
@@ -886,7 +987,7 @@ def ramp_histogram_by_mouse(data, save_path):
                     ax.text(0.75, 0.80, "Positive, n="+str(len(cohort_mouse_data[cohort_mouse_data[collumn] == "Positive"]))+", "+str(np.round((len(cohort_mouse_data[cohort_mouse_data[collumn] == "Positive"])/n_total)*100, decimals=0))+"%", transform=ax.transAxes, fontsize=8, verticalalignment='top')
 
                 if save_path is not None:
-                    plt.savefig(save_path+"/bymouse_ramp_histo_m_"+cohort_mouse+"_tt_"+trial_type+"_rr_"+ramp_region+".png")
+                    plt.savefig(save_path+"/bymouse_ramp_histo_m_"+cohort_mouse+"_tt_"+trial_type+"_rr_"+ramp_region+".png", dpi=300)
 
                 plt.show()
                 plt.close()
@@ -970,11 +1071,11 @@ def percentage_boccara(data,save_path, split="None", suffix=""):
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/Boccara_theta_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/Boccara_theta_cohort_mous"+suffix+".png", dpi=300)
     elif split == "daily":
-        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_daily"+suffix+".png")
+        plt.savefig(save_path+"/Boccara_theta_cohort_mouse_daily"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1055,11 +1156,11 @@ def percentage_gc(data,save_path, split="None", suffix="", threshold=0.4):
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/grid_score_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/grid_score_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/grid_score_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/grid_score_cohort_mous"+suffix+".png", dpi=300)
     elif split == "daily":
-        plt.savefig(save_path+"/grid_score_cohort_mouse_daily"+suffix+".png")
+        plt.savefig(save_path+"/grid_score_cohort_mouse_daily"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1134,11 +1235,11 @@ def percentage_hd(data,save_path, split="None", suffix="", threshold=0.4):
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/hd_score_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/hd_score_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/hd_score_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/hd_score_cohort_mous"+suffix+".png", dpi=300)
     elif split == "daily":
-        plt.savefig(save_path+"/hd_score_cohort_mouse_daily"+suffix+".png")
+        plt.savefig(save_path+"/hd_score_cohort_mouse_daily"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1190,9 +1291,9 @@ def percentage_encoding(data, lmer_result, ramp_region, save_path, split="None",
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/prop_"+lmer_result+"_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/prop_"+lmer_result+"_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/prop_"+lmer_result+"_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/prop_"+lmer_result+"_cohort_mous"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1270,11 +1371,11 @@ def percentage_ramp(data, ramp_region, save_path, split="None", suffix=""):
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/prop_ramp_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/prop_ramp_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_cohort_mous"+suffix+".png", dpi=300)
     elif split == "daily":
-        plt.savefig(save_path+"/prop_ramp_cohort_mouse_daily"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_cohort_mouse_daily"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1337,11 +1438,11 @@ def percentage_ramp_rs(data, ramp_region, save_path, split="None", suffix=""):
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
     if split == "two":
-        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_earlylate"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_earlylate"+suffix+".png", dpi=300)
     elif split == "None":
-        plt.savefig(save_path+"/prop_ramp_rs_cohort_mous"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mous"+suffix+".png", dpi=300)
     elif split == "daily":
-        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_daily"+suffix+".png")
+        plt.savefig(save_path+"/prop_ramp_rs_cohort_mouse_daily"+suffix+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -1356,13 +1457,374 @@ def gc_per_mouse(new, save_path, threshold=0.4):
     percentage_gc(new, save_path, split="two", threshold=threshold)
     percentage_gc(new, save_path, split="None", threshold=threshold)
 
+def add_ramp_scores_to_matched_cluster(mice_df, ramp_scores_df):
+    new=pd.DataFrame()
+
+    for index_j, row_ramp_score in ramp_scores_df.iterrows():
+        row_ramp_score =  row_ramp_score.to_frame().T.reset_index(drop=True)
+        session_id = row_ramp_score["session_id"].iloc[0]
+        cluster_id = row_ramp_score["cluster_id"].iloc[0]
+
+        paired_cluster = mice_df[((mice_df["session_id"] == session_id) & (mice_df["sorted_seperately_vr_cluster_ids"] == cluster_id))]
+
+        if len(paired_cluster)==1:
+            paired_cluster["trial_type"] = [row_ramp_score['trial_type'].iloc[0]]
+            paired_cluster['ramp_score'] = [row_ramp_score['ramp_score'].iloc[0]]
+            paired_cluster['ramp_region'] = [row_ramp_score['ramp_region'].iloc[0]]
+            paired_cluster['fr_range'] = [row_ramp_score['fr_range'].iloc[0]]
+            paired_cluster['breakpoint'] = [row_ramp_score['breakpoint'].iloc[0]]
+            paired_cluster['fr_smooth'] = [row_ramp_score['fr_smooth'].iloc[0]]
+            paired_cluster['pos_bin'] = [row_ramp_score['pos_bin'].iloc[0]]
+            paired_cluster['ramp_span'] = [row_ramp_score['ramp_span'].iloc[0]]
+            paired_cluster['is_shuffled'] = [row_ramp_score['is_shuffled'].iloc[0]]
+
+            if row_ramp_score['is_shuffled'].iloc[0] == 0:
+                new = pd.concat([new, paired_cluster], ignore_index=True)
+
+    #new = correct_datatypes(new, ignore_of=ignore_of)
+    #new = analyse_ramp_driver(new)
+    #new = get_best_ramp_score(new)
+    return new
+
+def correlate_vr_vs_of(mice_df, save_path, ramp_region, trial_type, collumn=""):
+
+    dffdf_tmp = mice_df[(mice_df["trial_type"] == "all") &
+                        ((mice_df["ramp_region"] == "outbound") |
+                         (mice_df["ramp_region"] == "homebound"))]
+
+    dffdf_tmp = dffdf_tmp[(dffdf_tmp["n_spikes_of"] > 50)]
+
+    fig, ax = plt.subplots()
+    ax.set_title("tt="+get_tidy_title(trial_type)+", rr="+ramp_region, fontsize=15)
+
+    ramp_region_tt_mice = mice_df[(mice_df["ramp_region"] == ramp_region) & (mice_df["trial_type"] == trial_type)]
+    if ramp_region == "outbound":
+        lm_collumn = "lm_result_ob"
+        lmer_collumn = "lmer_result_ob"
+    elif ramp_region == "homebound":
+        lm_collumn = "lm_result_hb"
+        lmer_collumn = "lmer_result_hb"
+
+    else:
+        ax.scatter(ramp_region_tt_mice["ramp_score"], ramp_region_tt_mice[collumn], edgecolor="black", marker="o", facecolors='none')
+
+    if ramp_region=="outbound" or ramp_region=="homebound":
+        #None_group = ramp_region_tt_mice[(ramp_region_tt_mice[lm_collumn] == "NoSlope")]
+        #Unclass = ramp_region_tt_mice[(ramp_region_tt_mice[lm_collumn] == "None")]
+        #Neg_group = ramp_region_tt_mice[(ramp_region_tt_mice[lm_collumn] == "Negative")]
+        #Pos_group = ramp_region_tt_mice[(ramp_region_tt_mice[lm_collumn] == "Positive")]
+        #ax.scatter(None_group["ramp_score"], None_group[collumn], edgecolor="black", marker="o", facecolors='none')
+        #ax.scatter(Unclass["ramp_score"], Unclass[collumn], edgecolor="grey", marker="o", facecolors='none')
+        #ax.scatter(Neg_group["ramp_score"], Neg_group[collumn], edgecolor="blue", marker="o", facecolors='none')
+        #ax.scatter(Pos_group["ramp_score"], Pos_group[collumn], edgecolor="red", marker="o", facecolors='none')
+
+        for lmer_result in np.unique(ramp_region_tt_mice[lmer_collumn]):
+            lmer_result_stats = ramp_region_tt_mice[(ramp_region_tt_mice[lmer_collumn] == lmer_result)]
+            c = lmer_result_color(lmer_result)
+            ax.scatter(lmer_result_stats["ramp_score"], lmer_result_stats[collumn],  facecolor=c, edgecolor=c, marker="o", facecolors='none')
+
+        lmer_result_P = ramp_region_tt_mice[((ramp_region_tt_mice[lmer_collumn] == "P") |
+                                            (ramp_region_tt_mice[lmer_collumn] == "PS") |
+                                            (ramp_region_tt_mice[lmer_collumn] == "PA") |
+                                            (ramp_region_tt_mice[lmer_collumn] == "PSA"))]
+        #lmer_result_P = ramp_region_tt_mice[(ramp_region_tt_mice[lmer_collumn] == "P")]
+
+        lmer_result_A = ramp_region_tt_mice[((ramp_region_tt_mice[lmer_collumn] == "A") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "SA") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PA") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PSA"))]
+        #lmer_result_A = ramp_region_tt_mice[(ramp_region_tt_mice[lmer_collumn] == "A")]
+
+        lmer_result_S = ramp_region_tt_mice[((ramp_region_tt_mice[lmer_collumn] == "S") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PS") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "SA") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PSA"))]
+        #lmer_result_S = ramp_region_tt_mice[(ramp_region_tt_mice[lmer_collumn] == "S")]
+
+        ##ax.scatter(np.mean(lmer_result_P["ramp_score"]), np.mean(lmer_result_P[collumn]), facecolor="r", marker="x")
+        #ax.scatter(np.mean(lmer_result_A["ramp_score"]), np.mean(lmer_result_A[collumn]), facecolor="b", marker="x")
+        #ax.scatter(np.mean(lmer_result_S["ramp_score"]), np.mean(lmer_result_S[collumn]), facecolor="y", marker="x")
+
+    plt.xlabel("Ramp Score", fontsize=20, labelpad=10)
+    plt.xlim([-1,1])
+    plt.ylabel(get_tidy_title(collumn), fontsize=20, labelpad=10)
+    plt.tick_params(labelsize=20)
+    plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path+"/ramp_score_vs_"+collumn+"_"+ramp_region+"_tt_"+trial_type+".png", dpi=300)
+    print("plotted depth correlation")
+
+def lfp_vs_trial_number(all_mice_lfp_data, save_path):
+
+    for cohort_mouse in np.unique(all_mice_lfp_data.cohort_mouse):
+        fig, ax = plt.subplots()
+        cohort_mouse_lfp_data = all_mice_lfp_data[(all_mice_lfp_data["cohort_mouse"] == cohort_mouse)]
+
+        tetrode1 = cohort_mouse_lfp_data[(cohort_mouse_lfp_data["tetrode"] == 1)]
+        tetrode2 = cohort_mouse_lfp_data[(cohort_mouse_lfp_data["tetrode"] == 2)]
+        tetrode3 = cohort_mouse_lfp_data[(cohort_mouse_lfp_data["tetrode"] == 3)]
+        tetrode4 = cohort_mouse_lfp_data[(cohort_mouse_lfp_data["tetrode"] == 4)]
+
+        ax.scatter(tetrode1["trial_numbers"], tetrode1["theta_lfp_pwr"], marker="o", label=cohort_mouse, color="k")
+        ax.scatter(tetrode2["trial_numbers"], tetrode2["theta_lfp_pwr"], marker="o", label=cohort_mouse, color="r")
+        ax.scatter(tetrode3["trial_numbers"], tetrode3["theta_lfp_pwr"], marker="o", label=cohort_mouse, color="b")
+        ax.scatter(tetrode4["trial_numbers"], tetrode4["theta_lfp_pwr"], marker="o", label=cohort_mouse, color="g")
+
+        #ax.scatter(cohort_mouse_lfp_data["trial_numbers"], cohort_mouse_lfp_data["theta_lfp_pwr"], marker="o", label=cohort_mouse, color="k")
+        #ax.set_title("tt=, rr=", fontsize=15)
+        plt.xlabel("Total trial per Session", fontsize=20, labelpad=10)
+        plt.ylabel("Theta LFP Power", fontsize=20, labelpad=10)
+        plt.ylim(0, 2500)
+        plt.tick_params(labelsize=20)
+        #plt.legend()
+        plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.savefig(save_path+"/lfp_theta_vs_trials_"+cohort_mouse+".png", dpi=300)
+        plt.close()
+        print("plotted depth correlation")
+
+def add_lfp_theta_power(all_mice_lfp_data):
+    theta_lfp_power = []
+
+    for i, row in all_mice_lfp_data.iterrows():
+        row = row.to_frame().T.reset_index(drop=True)
+        freqs = row["freqs"].iloc[0]
+        pwrs = row["pwr_specs"].iloc[0]
+        theta_pwr = np.mean(pwrs[(freqs>=6) & (freqs<=10)])
+        theta_lfp_power.append(theta_pwr)
+
+    all_mice_lfp_data["theta_lfp_pwr"] = theta_lfp_power
+    return all_mice_lfp_data
+
+
+def plot_all_ramps(all_mice, save_path, trial_types):
+
+    for i, row in all_mice.iterrows():
+        fig, ax = plt.subplots()
+        row = row.to_frame().T.reset_index(drop=True)
+        pos_bin = row["pos_bin"].iloc[0]
+        fr_smooth = row["fr_smooth"].iloc[0]
+        breakpoints = row["breakpoint"].iloc[0]
+        trial_type = row["trial_type"].iloc[0]
+
+        if trial_type in trial_types:
+            ramp_region = row["ramp_region"].iloc[0]
+            session_id = row["session_id"].iloc[0]
+            cluster_id_st = row["sorted_together_vr_cluster_ids"].iloc[0]
+            cluster_id_ss = row["sorted_seperately_vr_cluster_ids"].iloc[0]
+            ramp_score = row["ramp_score"].iloc[0]
+            ax.plot(pos_bin, fr_smooth, color="r")
+            ax.scatter(breakpoints[0], fr_smooth[pos_bin==breakpoints[0]], marker="o", color="k")
+            ax.scatter(breakpoints[1], fr_smooth[pos_bin==breakpoints[1]], marker="o", color="k")
+            ax.plot(breakpoints, [max(fr_smooth), max(fr_smooth)], color="k")
+
+            plt.title("rs: "+str(np.round(ramp_score, decimals=2)), fontsize=20)
+            plt.xlabel("cm", fontsize=20, labelpad=10)
+            plt.xlim([min(pos_bin),max(pos_bin)])
+            plt.yticks([np.round(min(fr_smooth), decimals=1),np.round(max(fr_smooth), decimals=1)])
+            plt.xticks([min(pos_bin), max(pos_bin)])
+            plt.ylabel("Hz", fontsize=20, labelpad=10)
+            plt.tick_params(labelsize=20)
+            plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+            plt.savefig(save_path+"/"+session_id+"ssID"+str(cluster_id_ss)+"_stID"+str(cluster_id_st)+
+                        "_rr_"+ramp_region+"_tt_"+trial_type+".png", dpi=300)
+        plt.close()
+
+    print("done pltting")
+
+
+
+def get_lmer_colours(lmer_results):
+    tmp=[]
+    for lmer_result in lmer_results:
+        tmp.append(lmer_result_color(lmer_result))
+    return tmp
+
+def firing_rate_vr_vs_of(all_mice, save_path, ramp_region, trial_type):
+
+    df_regionx = all_mice[(all_mice["ramp_region"] == ramp_region) &
+                           (all_mice["trial_type"] == trial_type)]
+
+    df_regionx["mean_firing_rate_vr"] = pd.to_numeric(df_regionx["mean_firing_rate_vr"])
+    df_regionx["mean_firing_rate"] = pd.to_numeric(df_regionx["mean_firing_rate"])
+
+    if ramp_region == "outbound":
+        lmer_collumn = "lmer_result_ob"
+    elif ramp_region == "homebound":
+        lmer_collumn = "lmer_result_hb"
+
+    mean_fr_vr = df_regionx.groupby([lmer_collumn])["mean_firing_rate_vr"].mean().reset_index()
+    mean_fr_of = df_regionx.groupby([lmer_collumn])["mean_firing_rate"].mean().reset_index()
+    sem_fr_vr = df_regionx.groupby([lmer_collumn])["mean_firing_rate_vr"].sem().reset_index()
+    sem_fr_of = df_regionx.groupby([lmer_collumn])["mean_firing_rate"].sem().reset_index()
+
+    fig, ax = plt.subplots()
+    #plt.title("rs: "+str(np.round(ramp_score, decimals=2)), fontsize=20)
+    plt.xlabel("Cell Types", fontsize=20, labelpad=10)
+    plt.ylim([0, 30])
+    plt.xticks(np.arange(0, len(mean_fr_of)), labels=mean_fr_of[lmer_collumn], fontsize=10)
+    plt.ylabel("Mean Firing Rate", fontsize=20, labelpad=10)
+    ax.bar(x=np.arange(0, len(mean_fr_of))-0.15, height=np.asarray(mean_fr_vr["mean_firing_rate_vr"]), color=get_lmer_colours(mean_fr_of[lmer_collumn]), width=0.3, yerr=np.asarray(sem_fr_vr["mean_firing_rate_vr"]), ecolor='black', capsize=10)
+    ax.bar(x=np.arange(0, len(mean_fr_of))+0.15, height=np.asarray(mean_fr_of["mean_firing_rate"]), color=get_lmer_colours(mean_fr_of[lmer_collumn]), hatch="//",width=0.3,  yerr=np.asarray(sem_fr_of["mean_firing_rate"]), ecolor='black', capsize=10)
+    #ax.errorbar(x=np.arange(0, len(mean_fr_of))-0.15, y=np.asarray(mean_fr_vr["mean_firing_rate_vr"]), yerr=np.asarray(sem_fr_vr["mean_firing_rate_vr"]), color="k", linewidth=0, capsize=0.1)
+    #ax.errorbar(x=np.arange(0, len(mean_fr_of))+0.15, y=np.asarray(mean_fr_of["mean_firing_rate"]), yerr=np.asarray(sem_fr_of["mean_firing_rate"]), color="k", linewidth=0, capsize=0.1)
+    plt.tick_params(labelsize=20)
+    plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path+"/fr_comparision_lmer"+ramp_region+".png", dpi=300)
+    plt.close()
+
+    print("finished with tis ghrng ")
+
+def remove_mouse(data, cohort_mouse_list):
+
+    for cohort_mouse in cohort_mouse_list:
+        data = data[(data["cohort_mouse"] != cohort_mouse)]
+
+    return data
+
+def plot_theta_histogram(data, save_path):
+    trial_type_theta_df = data[(data.trial_type == "beaconed")]
+    trial_type_theta_df = trial_type_theta_df[(trial_type_theta_df.ramp_region == "outbound")]
+
+    rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] > 0.07)]
+    no_rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] < 0.07)]
+
+    fig, ax = plt.subplots(figsize=(3,6))
+    ax.hist(np.asarray(rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="k")
+    ax.hist(np.asarray(no_rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="r")
+    plt.xlabel("Theta Index",  fontsize=15)
+    plt.ylabel("Number of Cells",  fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/theta_histo.png", dpi=300)
+    plt.show()
+
+def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
+
+    theta_df_VR = theta_df_VR[(theta_df_VR["trial_type"] == "all")]
+    theta_df_VR = theta_df_VR[(theta_df_VR["ramp_region"] == ramp_region)]
+    if ramp_region == "outbound":
+        collumn = "lm_result_ob"
+    elif ramp_region == "homebound":
+        collumn = "lm_result_hb"
+
+    rythmic = theta_df_VR[(theta_df_VR.ThetaIndex > 0.07)]
+    no_rythmic = theta_df_VR[(theta_df_VR.ThetaIndex < 0.07)]
+
+    fig, ax = plt.subplots(figsize=(3,6))
+
+    pos_rythimc = len(rythmic[rythmic[collumn] == "Positive"])*100/len(rythmic)
+    neg_rythmic = len(rythmic[rythmic[collumn] == "Negative"])*100/len(rythmic)
+    non_rythmic = len(rythmic[rythmic[collumn] == "None"])*100/len(rythmic)
+
+    pos_norythimc = len(no_rythmic[no_rythmic[collumn] == "Positive"])*100/len(no_rythmic)
+    neg_norythmic = len(no_rythmic[no_rythmic[collumn] == "Negative"])*100/len(no_rythmic)
+    non_norythmic = len(no_rythmic[no_rythmic[collumn] == "None"])*100/len(no_rythmic)
+
+    ax.bar(x=1, height=neg_rythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
+    ax.bar(x=1, height=non_rythmic, bottom=neg_rythmic, color="black")
+    ax.bar(x=1, height=pos_rythimc, bottom=non_rythmic+ neg_rythmic, color=((102.0/255,205.0/255,0.0/255)))
+
+    ax.bar(x=0, height=neg_norythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
+    ax.bar(x=0, height=non_norythmic, bottom=neg_norythmic, color="black")
+    ax.bar(x=0, height=pos_norythimc, bottom=non_norythmic+ neg_norythmic, color=((102.0/255,205.0/255,0.0/255)))
+
+    #ax.text(x=1 , y=0+0.05, s=str(len(rythmic[rythmic[collumn] == "Negative"])), color="white", fontsize=12, horizontalalignment='center')
+    #ax.text(x=1 , y=neg_rythmic+0.05, s=str(len(rythmic[rythmic[collumn] == "None"])), color="white", fontsize=12, horizontalalignment='center')
+    #ax.text(x=1 , y=non_rythmic+ neg_rythmic+0.05, s=str(len(rythmic[rythmic[collumn] == "Positive"])), color="white", fontsize=12, horizontalalignment='center')
+
+    #ax.text(x=0 , y=0+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "Negative"])), color="white", fontsize=12, horizontalalignment='center')
+    #ax.text(x=0 , y=neg_norythmic+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "None"])), color="white", fontsize=12, horizontalalignment='center')
+    #ax.text(x=0 , y=non_norythmic+ neg_norythmic+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "Positive"])), color="white", fontsize=12, horizontalalignment='center')
+
+    #ax.text(x=1 , y=103.05, s=str(np.round((len(rythmic)/(len(rythmic)+len(no_rythmic)))*100, decimals=0))+"%", color="black", fontsize=12, horizontalalignment='center')
+    #ax.text(x=0 , y=103.05, s=str(np.round((len(no_rythmic)/(len(rythmic)+len(no_rythmic)))*100, decimals=0))+"%", color="black", fontsize=12, horizontalalignment='center')
+
+    objects = ('NR', 'TR')
+    x_pos = np.arange(len(objects))
+    plt.xticks(x_pos, objects, fontsize=15)
+    plt.ylabel("Percent of neurons",  fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
+    #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/"+collumn+"_theta_proportion.png", dpi=300)
+    plt.show()
+
+def plot_theta(theta_df, save_path):
+
+    fig, ax = plt.subplots(figsize=(9,6))
+
+    for mouse in np.unique(theta_df["cohort_mouse"]):
+        mouse_df = theta_df[theta_df["cohort_mouse"] == mouse]
+        mouse_df = mouse_df.dropna()
+        mean = mouse_df.groupby('recording_day')["ThetaIndex"].mean().reset_index()
+        sem = mouse_df.groupby('recording_day')["ThetaIndex"].sem().reset_index()
+        max_by_day = mouse_df.groupby('recording_day')["ThetaIndex"].max().reset_index()
+        mean = mean.fillna(0)
+        sem = sem.fillna(0)
+        max_by_day = max_by_day.fillna(0)
+
+        gauss_kernel = Gaussian1DKernel(2) # 2 days
+        smoothed_max_theta = convolve(max_by_day["ThetaIndex"], gauss_kernel)
+
+        plt.plot(max_by_day["recording_day"], smoothed_max_theta, label=mouse)
+        #plt.plot(max_by_day["recording_day"], max_by_day["ThetaIndex"], label=mouse)
+        #plt.fill_between(mean["recording_day"], mean["ThetaIndex"]-sem["ThetaIndex"], mean["ThetaIndex"]+sem["ThetaIndex"], alpha=0.5)
+
+    ax.hlines(y=0.07, xmin=0, xmax=max(theta_df["recording_day"]), linestyles="--") # threshold specified for rythmic cells Kornienko et al.
+    ax.set_xlabel("Training day", fontsize=15)
+    ax.set_ylabel("Maximum Theta Index", fontsize=15)
+    ax.legend()
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    #plt.tight_layout()
+    plt.savefig(save_path+"/tracked_theta_index.png", dpi=300)
+    plt.show()
+
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
+    #all_mice_lfp_data = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_mice_lfp_data.pkl")
+    #all_mice_lfp_data = add_lfp_theta_power(all_mice_lfp_data)
+    #lfp_vs_trial_number(all_mice_lfp_data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/")
+
+    ramp_scores_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.csv"
+    ramp_score_path2 = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.pkl"
+    tetrode_location_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"
+    save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/vr_vs_of"
+    theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")
+    trialtypes_linear_model = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel_trialtypes.txt", sep="\t")
+    ramp_scores = pd.read_csv(ramp_scores_path)
+    tetrode_locations = pd.read_csv(tetrode_location_path)
+    ramp_scores_2 = pd.read_pickle(ramp_score_path2)
+
+
+    '''
     #------------------------------------------------------------------------------------------------#
     # for looking a head directional proportion of cells in each mouse
-    '''
+
     new = pd.DataFrame()
     new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C2.pkl")], ignore_index=True)
     new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C3.pkl")], ignore_index=True)
@@ -1374,6 +1836,7 @@ def main():
     new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C9.pkl")], ignore_index=True)
     new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C10.pkl")], ignore_index=True)
     new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C11.pkl")], ignore_index=True)
+    new = pd.concat([new, pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/All_mice_of_C12.pkl")], ignore_index=True)
     new = add_cohort_mouse_label(new)
     new = add_recording_day(new)
     hd_per_mouse(new, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs", threshold=0.4)
@@ -1381,8 +1844,54 @@ def main():
     percentage_boccara(new, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs", split="daily", suffix="")
     percentage_boccara(new, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs", split="two", suffix="")
     percentage_boccara(new, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs", split="None", suffix="")
-    '''
+
     #=================================================================================================#
+    '''
+
+    C5_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M1_sorting_stats_AT20_WS4.pkl")
+    C5_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M2_sorting_stats_AT20_WS4.pkl")
+    C4_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M2_sorting_stats_AT20_WS4.pkl")
+    C4_M3 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M3_sorting_stats_AT20_WS4.pkl")
+    C3_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M1_sorting_stats_AT20_WS4.pkl")
+    C3_M6 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M6_sorting_stats_AT20_WS4.pkl")
+    C2_245 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/245_sorting_stats_AT20_WS4.pkl")
+    C2_1124 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/1124_sorting_stats_AT20_WS4.pkl")
+
+    all_mice = pd.DataFrame()
+    all_mice = pd.concat([all_mice, C5_M1], ignore_index=True)
+    all_mice = pd.concat([all_mice, C5_M2], ignore_index=True)
+    all_mice = pd.concat([all_mice, C4_M2], ignore_index=True)
+    all_mice = pd.concat([all_mice, C4_M3], ignore_index=True)
+    all_mice = pd.concat([all_mice, C3_M1], ignore_index=True)
+    all_mice = pd.concat([all_mice, C3_M6], ignore_index=True)
+    all_mice = pd.concat([all_mice, C2_245], ignore_index=True)
+    #all_mice = pd.concat([all_mice, C2_1124], ignore_index=True)
+    #all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores)
+    all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores_2)
+    all_mice = absolute_ramp_score(all_mice)
+    all_mice = add_lm(all_mice, linear_model_path)
+
+    '''
+    plot_all_ramps(all_mice, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/all_ramps", trial_types=["all"])
+
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="hd_score")
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="homebound", trial_type="all", collumn="hd_score")
+
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="speed_score")
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="homebound", trial_type="all", collumn="speed_score")
+
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="rate_map_correlation_first_vs_second_half")
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="homebound", trial_type="all", collumn="rate_map_correlation_first_vs_second_half")
+
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="border_score")
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="homebound", trial_type="all", collumn="border_score")
+
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="grid_score")
+    correlate_vr_vs_of(all_mice, save_path, ramp_region="homebound", trial_type="all", collumn="grid_score")
+
+    firing_rate_vr_vs_of(all_mice, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/vr_vs_of", ramp_region="outbound", trial_type="all")
+    firing_rate_vr_vs_of(all_mice, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/vr_vs_of", ramp_region="homebound", trial_type="all")
+    '''
 
     all_paths = []
     all_paths = get_recording_paths(all_paths, "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/VirtualReality/245_sorted")
@@ -1400,6 +1909,9 @@ def main():
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs"
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
     linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")
+    linear_model_path['lm_result_homebound'] = linear_model_path['lm_result_homebound'].replace(["NoSlope"],"None")
+    linear_model_path['lm_result_outbound'] = linear_model_path['lm_result_outbound'].replace(["NoSlope"],"None")
+
     trialtypes_linear_model = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel_trialtypes.txt", sep="\t")
     ramp_scores = pd.read_csv(ramp_scores_path)
     tetrode_locations = pd.read_csv(tetrode_location_path)
@@ -1414,6 +1926,8 @@ def main():
     data = add_full_session_id(data, all_paths)
     data = add_cohort_mouse_label(data)
     data = add_recording_day(data)
+    data = remove_mouse(data, cohort_mouse_list=["C2_1124"])
+
 
     percentage_encoding(data, lmer_result="P", ramp_region="outbound", save_path=save_path, split="two")
     percentage_encoding(data, lmer_result="P", ramp_region="outbound", save_path=save_path, split="None")
@@ -1434,7 +1948,8 @@ def main():
     percentage_ramp_rs(data, "homebound", save_path, split="daily")
     percentage_ramp_rs(data, "homebound", save_path, split="two")
     percentage_ramp_rs(data, "homebound", save_path, split="None")
-
+    
+    
     ramp_histogram_by_mouse(data, save_path)
     # to analyse theta modulate between cue dependant and independant neurons
 
@@ -1442,7 +1957,7 @@ def main():
     #cue_theta_location_hist(data, save_path)
 
     # chi squared slope by region
-    for trial_type in ["beaconed"]:
+    for trial_type in ["beaconed", "all", "non_beaconed"]:
         for ramp_region in ["outbound", "homebound", "all"]:
             location_slope(data, collumn ="lm_result_ob", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
             location_slope(data, collumn ="lm_result_hb", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type)
@@ -1457,21 +1972,31 @@ def main():
     location_slope(data, collumn="ramp_driver", save_path=save_path, ramp_region="outbound", trial_type="all")
     mouse_slope(data, collumn="ramp_driver", save_path=save_path, ramp_region="outbound", trial_type="all")
 
+
     for filter_by_slope in [True, False]:
-        for trial_type in ["beaconed"]:
+        for trial_type in ["beaconed", "all"]:
             for ramp_region in ["outbound", "homebound", "all"]:
-                location_ramp(data, collumn="ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
-                location_ramp(data, collumn="abs_ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
+                location_ramp(data, collumn="ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs/cumhists", ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
+                location_ramp(data, collumn="abs_ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs/cumhists", ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
 
                 mouse_ramp(data, collumn="ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
                 mouse_ramp(data, collumn="abs_ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
 
     # theta comparison by region
-    location_ramp(data, collumn="ThetaIndex", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    location_ramp(data, collumn="ThetaPower", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    mouse_ramp(data, collumn="ThetaIndex", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    mouse_ramp(data, collumn="ThetaPower", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, print_p=True)
+    location_ramp(data, collumn="ThetaIndex", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
+    location_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
+    mouse_ramp(data, collumn="ThetaIndex", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
+    mouse_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
 
+    theta_df_VR = remove_mouse(theta_df_VR, cohort_mouse_list=["C2_1124", "C6_M1", "C6_M2", "C7_M1", "C7_M2",
+                                                               "C8_M1", "C8_M2", "C9_M1", "C9_M2", "C9_M3",
+                                                               "C9_M4", "C9_M5"])
+    plot_theta(theta_df_VR, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    plot_theta_histogram(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    plot_lm_proportions(data, ramp_region="outbound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    plot_lm_proportions(data, ramp_region="homebound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    simple_lm_stack_theta(data, collumn="lmer_result_ob", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="outbound", trial_type="all", p=None)
+    simple_lm_stack_theta(data, collumn="lmer_result_hb", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="homebound", trial_type="all", p=None)
     print("look now")
 
 if __name__ == '__main__':
