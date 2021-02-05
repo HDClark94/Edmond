@@ -263,22 +263,25 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
     p_str = get_p_text(p, ns=True)
 
     #ax.hist(np.asarray(UN[collumn]), bins=50, alpha=0.2, color="k", label="Unclassified", histtype="step", density=True)
-    ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
-    ax.hist(np.asarray(PS[collumn]), bins=50, alpha=0.5, color="b", label="PS", histtype="bar", density=True, cumulative=False, linewidth=4)
+    ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=False, cumulative=False, linewidth=4)
+    ax.hist(np.asarray(PS[collumn]), bins=50, alpha=0.5, color="b", label="PS", histtype="bar", density=False, cumulative=False, linewidth=4)
 
-    ax.set_ylabel("Cumulative Density", fontsize=15)
-    ax.set_xlabel(get_tidy_title(collumn), fontsize=15)
+    ax.set_ylabel("Counts", fontsize=25)
+    ax.set_xlabel(get_tidy_title(collumn), fontsize=25)
     if collumn == "ramp_score":
         ax.set_xlim(left=-0.75, right=0.75)
         ax.xaxis.set_major_locator(plt.MaxNLocator(3))
 
-    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=25)
+    ax.set_xlim(left=-1, right=1)
+    ax.set_xticks([-1, -0.5, 0, 0.5, 1])
+    plt.locator_params(axis='x', nbins=5)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    #plt.subplots_adjust(left=0.2, right=0.6, top=0.8, bottom=0.2)
+    plt.subplots_adjust(left=0.2)
     #ax.legend(loc="upper right")
-    #ax.set_xlim(left=0)
+    ax.set_xlim(left=-1, right=1)
     #plt.subplots_adjust(top=0.8)
 
     ax.text(0.1, 0.9, p_str, ha='center', va='center', transform=ax.transAxes, fontsize=12)
@@ -338,8 +341,8 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
         i+=1
 
     #ax.text(0.95, 1.25, "p= "+str(np.round(p, decimals=4)), ha='right', va='top', transform=ax.transAxes, fontsize=20)
-    plt.yticks(y_pos, objects, fontsize=20)
-    plt.xlabel(get_tidy_title(collumn),  fontsize=20)
+    plt.yticks(y_pos, objects, fontsize=25)
+    plt.xlabel(get_tidy_title(collumn),  fontsize=25)
     plt.ylim((-1,3))
     plt.ylim((-0.75,1.5))
     if collumn == "ramp_score":
@@ -348,7 +351,7 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
     #ax.legend()
-    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=25)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -361,7 +364,7 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
     plt.close()
 
 def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False, filter_by_slope=False):
-    fig, ax = plt.subplots(figsize=(4.5,6))
+    fig, ax = plt.subplots(figsize=(5, 4.2))
     p_str = get_p_text(p, ns=True)
     #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
@@ -388,6 +391,7 @@ def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
+    plt.locator_params(axis='y', nbins=4)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
     #if collumn == "ramp_score":
@@ -415,7 +419,7 @@ def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type
     plt.close()
 
 def simple_bar_location(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False, filter_by_slope=False):
-    fig, ax = plt.subplots(figsize=(3,6))
+    fig, ax = plt.subplots(figsize=(3,6.5))
     p_str = get_p_text(p, ns=True)
     #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
@@ -432,6 +436,7 @@ def simple_bar_location(data, collumn, save_path=None, ramp_region=None, trial_t
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
+    plt.locator_params(axis='y', nbins=4)
     plt.xlim((-0.5, len(objects)-0.5))
     #if collumn == "ramp_score":
     #    plt.ylim(-0.6, 0.6)
@@ -631,16 +636,16 @@ def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial
             bottom = bottom+percent
 
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
-    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(x_pos, objects, fontsize=15)
     #plt.xticks(rotation=-45)
-    plt.ylabel("Percent of neurons",  fontsize=20)
+    plt.ylabel("Percent of neurons",  fontsize=25)
     plt.xlim((-0.5, len(objects)-0.5))
     plt.ylim((0,100))
 
     if print_p:
         print(p)
 
-    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=25)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -1688,7 +1693,12 @@ def remove_mouse(data, cohort_mouse_list):
 
     for cohort_mouse in cohort_mouse_list:
         data = data[(data["cohort_mouse"] != cohort_mouse)]
+    return data
 
+def remove_location_classification(data, locations):
+
+    for location in locations:
+        data = data[(data["tetrode_location"]) != location]
     return data
 
 def plot_theta_histogram(data, save_path):
@@ -1698,7 +1708,7 @@ def plot_theta_histogram(data, save_path):
     rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] > 0.07)]
     no_rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] < 0.07)]
 
-    fig, ax = plt.subplots(figsize=(3,6))
+    fig, ax = plt.subplots(figsize=(3,4))
     ax.hist(np.asarray(rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="k")
     ax.hist(np.asarray(no_rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="r")
     plt.xlabel("Theta Index",  fontsize=15)
@@ -1754,12 +1764,12 @@ def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
     objects = ('NR', 'TR')
     x_pos = np.arange(len(objects))
     plt.xticks(x_pos, objects, fontsize=15)
-    plt.ylabel("Percent of neurons",  fontsize=20)
+    plt.ylabel("Percent of neurons",  fontsize=25)
     plt.xlim((-0.5, len(objects)-0.5))
     plt.ylim((0,100))
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
-    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=25)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -1927,6 +1937,7 @@ def main():
     data = add_cohort_mouse_label(data)
     data = add_recording_day(data)
     data = remove_mouse(data, cohort_mouse_list=["C2_1124"])
+    data = remove_location_classification(data, locations=["UN"])
 
 
     percentage_encoding(data, lmer_result="P", ramp_region="outbound", save_path=save_path, split="two")
