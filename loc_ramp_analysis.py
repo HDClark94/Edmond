@@ -261,6 +261,7 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
 
     p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
     p_str = get_p_text(p, ns=True)
+    print("p=", p)
 
     #ax.hist(np.asarray(UN[collumn]), bins=50, alpha=0.2, color="k", label="Unclassified", histtype="step", density=True)
     ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=False, cumulative=False, linewidth=4)
@@ -469,8 +470,8 @@ def simple_lm_stack_mouse(data, collumn, save_path=None, ramp_region=None, trial
 
     aggregated = data.groupby([collumn, "cohort_mouse"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
-        groups = ["Negative", "None", "NoSlope", "Positive"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black", "grey"]
+        groups = ["Negative", "Positive", "None", "NoSlope"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
         groups = [ "None", "PI", "Cue"]
@@ -531,8 +532,8 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
 
     aggregated = data.groupby([collumn, "tetrode_location"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
-        groups = ["Negative", "None", "NoSlope", "Positive"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black", "grey"]
+        groups = ["Negative", "Positive", "None", "NoSlope"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
         groups = [ "None", "PI", "Cue"]
@@ -567,6 +568,7 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
     plt.ylabel("Percent of neurons",  fontsize=20)
 
     plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
     #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
     #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
     #plt.title('Programming language usage')
@@ -602,14 +604,22 @@ def add_theta_modulated_marker(data, threshold=0.07):
     return data
 
 def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False):
+
+    # were only interested in the postive and negative sloping neurons when looking at the proportions of lmer neurons
+    if (collumn == "lmer_result_ob"):
+        data = data[(data["lm_result_ob"] == "Positive") | (data["lm_result_ob"] == "Negative")]
+    elif (collumn == "lmer_result_hb"):
+        data = data[(data["lm_result_hb"] == "Positive") | (data["lm_result_hb"] == "Negative")]
+
+
     fig, ax = plt.subplots(figsize=(3,6))
     data = data[(data["tetrode_location"] != "V1")]
     data = add_theta_modulated_marker(data)
 
     aggregated = data.groupby([collumn, "ThetaIndexLabel"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = [((238.0/255,58.0/255,140.0/255)), "black", "grey", ((102.0/255,205.0/255,0.0/255))]
-        groups = ["Negative", "None", "NoSlope", "Positive"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black", "grey"]
+        groups = ["Negative", "Positive", "None", "NoSlope"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
         groups = [ "None", "PI", "Cue"]
@@ -743,6 +753,7 @@ def mouse_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="bea
     return
 
 def location_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="beaconed", print_p=False, filter_by_slope=False):
+    print("running location_ramp")
 
     if filter_by_slope:
         if ramp_region == "outbound":
@@ -774,6 +785,12 @@ def mouse_slope(data, collumn, save_path, ramp_region="outbound", trial_type="be
 
 def location_slope(data, collumn, save_path, ramp_region="outbound", trial_type="beaconed", print_p=False):
     data = data[(data[collumn] != np.nan)]
+
+    # were only interested in the postive and negative sloping neurons when looking at the proportions of lmer neurons
+    if (collumn == "lmer_result_ob"):
+        data = data[(data["lm_result_ob"] == "Positive") | (data["lm_result_ob"] == "Negative")]
+    elif (collumn == "lmer_result_hb"):
+        data = data[(data["lm_result_hb"] == "Positive") | (data["lm_result_hb"] == "Negative")]
 
     # only look at beacoend and outbound
     data = data[(data.trial_type == trial_type) &
@@ -1339,9 +1356,9 @@ def percentage_ramp(data, ramp_region, save_path, split="None", suffix=""):
             late_data =  cohort_mouse_data[(cohort_mouse_data["recording_day"] >= (max_recording_day+min_recording_day)/2)]
 
             n_early_t =  len(early_data[(early_data[collumn] == "Negative") |
-                                               (early_data[collumn] == "Positive") ])
+                                        (early_data[collumn] == "Positive") ])
             n_late_t =  len(late_data[(late_data[collumn] == "Negative") |
-                                              (late_data[collumn] == "Positive") ])
+                                      (late_data[collumn] == "Positive") ])
             n_early =len(early_data)
             n_late = len(late_data)
 
@@ -1353,7 +1370,7 @@ def percentage_ramp(data, ramp_region, save_path, split="None", suffix=""):
             for day_counter, day in enumerate(np.unique(cohort_mouse_data["recording_day"])):
                 cohort_mouse_data_day = cohort_mouse_data[(cohort_mouse_data["recording_day"] == day)]
                 n_t = len(cohort_mouse_data_day[(cohort_mouse_data_day[collumn] == "Negative") |
-                                    (cohort_mouse_data_day[collumn] == "Positive") ])
+                                                (cohort_mouse_data_day[collumn] == "Positive") ])
                 n_ =  len(cohort_mouse_data_day)
 
                 ax.bar(x_pos[counter]- 0.4+(day_counter*0.8/n_days), n_t/n_,
@@ -1529,9 +1546,9 @@ def correlate_vr_vs_of(mice_df, save_path, ramp_region, trial_type, collumn=""):
             ax.scatter(lmer_result_stats["ramp_score"], lmer_result_stats[collumn],  facecolor=c, edgecolor=c, marker="o", facecolors='none')
 
         lmer_result_P = ramp_region_tt_mice[((ramp_region_tt_mice[lmer_collumn] == "P") |
-                                            (ramp_region_tt_mice[lmer_collumn] == "PS") |
-                                            (ramp_region_tt_mice[lmer_collumn] == "PA") |
-                                            (ramp_region_tt_mice[lmer_collumn] == "PSA"))]
+                                             (ramp_region_tt_mice[lmer_collumn] == "PS") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PA") |
+                                             (ramp_region_tt_mice[lmer_collumn] == "PSA"))]
         #lmer_result_P = ramp_region_tt_mice[(ramp_region_tt_mice[lmer_collumn] == "P")]
 
         lmer_result_A = ramp_region_tt_mice[((ramp_region_tt_mice[lmer_collumn] == "A") |
@@ -1654,7 +1671,7 @@ def get_lmer_colours(lmer_results):
 def firing_rate_vr_vs_of(all_mice, save_path, ramp_region, trial_type):
 
     df_regionx = all_mice[(all_mice["ramp_region"] == ramp_region) &
-                           (all_mice["trial_type"] == trial_type)]
+                          (all_mice["trial_type"] == trial_type)]
 
     df_regionx["mean_firing_rate_vr"] = pd.to_numeric(df_regionx["mean_firing_rate_vr"])
     df_regionx["mean_firing_rate"] = pd.to_numeric(df_regionx["mean_firing_rate"])
@@ -1743,12 +1760,12 @@ def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
     non_norythmic = len(no_rythmic[no_rythmic[collumn] == "None"])*100/len(no_rythmic)
 
     ax.bar(x=1, height=neg_rythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
-    ax.bar(x=1, height=non_rythmic, bottom=neg_rythmic, color="black")
-    ax.bar(x=1, height=pos_rythimc, bottom=non_rythmic+ neg_rythmic, color=((102.0/255,205.0/255,0.0/255)))
+    ax.bar(x=1, height=pos_rythimc, bottom=neg_rythmic, color=((102.0/255,205.0/255,0.0/255)))
+    ax.bar(x=1, height=non_rythmic, bottom=pos_rythimc+ neg_rythmic, color="black")
 
     ax.bar(x=0, height=neg_norythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
-    ax.bar(x=0, height=non_norythmic, bottom=neg_norythmic, color="black")
-    ax.bar(x=0, height=pos_norythimc, bottom=non_norythmic+ neg_norythmic, color=((102.0/255,205.0/255,0.0/255)))
+    ax.bar(x=0, height=pos_norythimc, bottom=neg_norythmic, color=((102.0/255,205.0/255,0.0/255)))
+    ax.bar(x=0, height=non_norythmic, bottom=pos_norythimc+ neg_norythmic, color="black")
 
     #ax.text(x=1 , y=0+0.05, s=str(len(rythmic[rythmic[collumn] == "Negative"])), color="white", fontsize=12, horizontalalignment='center')
     #ax.text(x=1 , y=neg_rythmic+0.05, s=str(len(rythmic[rythmic[collumn] == "None"])), color="white", fontsize=12, horizontalalignment='center')
@@ -1959,8 +1976,8 @@ def main():
     percentage_ramp_rs(data, "homebound", save_path, split="daily")
     percentage_ramp_rs(data, "homebound", save_path, split="two")
     percentage_ramp_rs(data, "homebound", save_path, split="None")
-    
-    
+
+
     ramp_histogram_by_mouse(data, save_path)
     # to analyse theta modulate between cue dependant and independant neurons
 
@@ -1985,8 +2002,11 @@ def main():
 
 
     for filter_by_slope in [True, False]:
+        print("filter_by_slope=", filter_by_slope)
         for trial_type in ["beaconed", "all"]:
+            print("trial_type=", trial_type)
             for ramp_region in ["outbound", "homebound", "all"]:
+                print("ramp_region=", ramp_region)
                 location_ramp(data, collumn="ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs/cumhists", ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
                 location_ramp(data, collumn="abs_ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs/cumhists", ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
 
@@ -2012,5 +2032,8 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
 
 
