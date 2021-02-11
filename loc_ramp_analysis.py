@@ -1726,8 +1726,8 @@ def plot_theta_histogram(data, save_path):
     no_rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] < 0.07)]
 
     fig, ax = plt.subplots(figsize=(3,4))
-    ax.hist(np.asarray(rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="k")
-    ax.hist(np.asarray(no_rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="r")
+    ax.hist(np.asarray(rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="r")
+    ax.hist(np.asarray(no_rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="k")
     plt.xlabel("Theta Index",  fontsize=15)
     plt.ylabel("Number of Cells",  fontsize=20)
     ax.tick_params(axis='both', which='major', labelsize=20)
