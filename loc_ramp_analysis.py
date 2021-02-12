@@ -259,9 +259,20 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
     MEC = data[data.tetrode_location == "MEC"]
     UN = data[data.tetrode_location == "UN"]
 
+    PS_neg = PS[PS.ramp_score < 0]
+    MEC_neg = MEC[MEC.ramp_score < 0]
+    PS_pos = PS[PS.ramp_score > 0]
+    MEC_pos = MEC[MEC.ramp_score > 0]
+
+    if trial_type == "all" and filter_by_slope==True:
+        p = stats.ks_2samp(np.asarray(PS_neg[collumn]), np.asarray(MEC_neg[collumn]))[1]
+        print("p =",p, "for negative slopes")
+        p = stats.ks_2samp(np.asarray(PS_pos[collumn]), np.asarray(MEC_pos[collumn]))[1]
+        print("p =",p, "for positive slopes")
+
     p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
     p_str = get_p_text(p, ns=True)
-    print("p=", p)
+    #print("p=", p)
 
     #ax.hist(np.asarray(UN[collumn]), bins=50, alpha=0.2, color="k", label="Unclassified", histtype="step", density=True)
     ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=False, cumulative=False, linewidth=4)
