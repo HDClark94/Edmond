@@ -7,6 +7,7 @@ from matplotlib.patches import Patch
 import itertools
 import scipy
 from scipy import stats
+from scipy.stats import kde
 from sklearn.linear_model import LinearRegression
 import warnings
 warnings.filterwarnings('ignore')
@@ -266,19 +267,38 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
 
     if trial_type == "all" and filter_by_slope==True:
         p = stats.ks_2samp(np.asarray(PS_neg[collumn]), np.asarray(MEC_neg[collumn]))[1]
-        print("p =",p, "for negative slopes")
+        print("p =",p, "for negative slopes, ", get_p_text(p))
         p = stats.ks_2samp(np.asarray(PS_pos[collumn]), np.asarray(MEC_pos[collumn]))[1]
-        print("p =",p, "for positive slopes")
+        print("p =",p, "for positive slopes, ", get_p_text(p))
 
     p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
     p_str = get_p_text(p, ns=True)
     #print("p=", p)
 
-    #ax.hist(np.asarray(UN[collumn]), bins=50, alpha=0.2, color="k", label="Unclassified", histtype="step", density=True)
-    ax.hist(np.asarray(MEC[collumn]), bins=50, alpha=0.5, color="r", label="MEC", histtype="bar", density=False, cumulative=False, linewidth=4)
-    ax.hist(np.asarray(PS[collumn]), bins=50, alpha=0.5, color="b", label="PS", histtype="bar", density=False, cumulative=False, linewidth=4)
+    #density_PS = kde.gaussian_kde(np.asarray(PS[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS(x); ax.plot(x,y, color="b");
+    #density_MEC = kde.gaussian_kde(np.asarray(MEC[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC(x); ax.plot(x,y, color="r");
 
-    ax.set_ylabel("Counts", fontsize=25)
+    #PS_bw = density_PS.covariance_factor()*np.asarray(PS[collumn]).astype(float).std()
+    #MEC_bw = density_MEC.covariance_factor()*np.asarray(MEC[collumn]).astype(float).std()
+    #print("bandwidth for PS = ", PS_bw)
+    #print("bandwidth for MEC = ", MEC_bw)
+
+    ax.hist(np.asarray(PS_neg[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="b", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
+    density_PS_neg = kde.gaussian_kde(np.asarray(PS_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_neg(x); ax.plot(x,y, color="b");
+
+    ax.hist(np.asarray(MEC_neg[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
+    density_MEC_neg = kde.gaussian_kde(np.asarray(MEC_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_neg(x); ax.plot(x,y, color="r");
+
+
+    ax.hist(np.asarray(PS_pos[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="b", label="PS", histtype="bar", density=True, cumulative=False, linewidth=4)
+    density_PS_pos = kde.gaussian_kde(np.asarray(PS_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_pos(x); ax.plot(x,y, color="b");
+
+    ax.hist(np.asarray(MEC_pos[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
+    density_MEC_pos = kde.gaussian_kde(np.asarray(MEC_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_pos(x); ax.plot(x,y, color="r");
+
+
+
+    ax.set_ylabel("Density", fontsize=25)
     ax.set_xlabel(get_tidy_title(collumn), fontsize=25)
     if collumn == "ramp_score":
         ax.set_xlim(left=-0.75, right=0.75)
@@ -288,6 +308,7 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
     ax.set_xlim(left=-1, right=1)
     ax.set_xticks([-1, -0.5, 0, 0.5, 1])
     plt.locator_params(axis='x', nbins=5)
+    plt.locator_params(axis='y', nbins=4)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -543,8 +564,8 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
 
     aggregated = data.groupby([collumn, "tetrode_location"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black", "grey"]
-        groups = ["Negative", "Positive", "None", "NoSlope"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black"]
+        groups = ["Negative", "Positive", "Unclassified"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
         groups = [ "None", "PI", "Cue"]
@@ -576,7 +597,7 @@ def simple_lm_stack(data, collumn, save_path=None, ramp_region=None, trial_type=
     #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
-    plt.ylabel("Percent of neurons",  fontsize=20)
+    plt.ylabel("Percent of neurons",  fontsize=25)
 
     plt.xlim((-0.5, len(objects)-0.5))
     plt.ylim((0,100))
@@ -624,13 +645,12 @@ def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial
 
 
     fig, ax = plt.subplots(figsize=(3,6))
-    data = data[(data["tetrode_location"] != "V1")]
     data = add_theta_modulated_marker(data)
 
     aggregated = data.groupby([collumn, "ThetaIndexLabel"]).count().reset_index()
     if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
-        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black", "grey"]
-        groups = ["Negative", "Positive", "None", "NoSlope"]
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black"]
+        groups = ["Negative", "Positive", "Unclassified"]
     elif (collumn == "ramp_driver"):
         colors_lm = ["grey", "green", "yellow"]
         groups = [ "None", "PI", "Cue"]
@@ -646,13 +666,15 @@ def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial
 
         bottom=0
         for color, group in zip(colors_lm, groups):
-            count = ThetaIndexLabel[(ThetaIndexLabel[collumn] == group)]["Unnamed: 0"]
+            count = ThetaIndexLabel[(ThetaIndexLabel[collumn] == group)]["ThetaIndex"]
             if len(count)==0:
                 count = 0
             else:
                 count = int(count)
 
-            percent = (count/np.sum(ThetaIndexLabel["Unnamed: 0"]))*100
+            print("stack_theta, ramp_region=", ramp_region, " , group=", group, ", theta=", object, "count=", count)
+
+            percent = (count/np.sum(ThetaIndexLabel["ThetaIndex"]))*100
             ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
             bottom = bottom+percent
 
@@ -674,6 +696,70 @@ def simple_lm_stack_theta(data, collumn, save_path=None, ramp_region=None, trial
         plt.savefig(save_path+"/ThetaIndexLabel_stack_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
     plt.show()
     plt.close()
+
+
+def simple_lm_stack_negpos(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False):
+
+    # were only interested in the postive and negative sloping neurons when looking at the proportions of lmer neurons
+    if (collumn == "lmer_result_ob"):
+        data = data[(data["lm_result_ob"] == "Positive") | (data["lm_result_ob"] == "Negative")]
+        lm_collumn = "lm_result_ob"
+    elif (collumn == "lmer_result_hb"):
+        data = data[(data["lm_result_hb"] == "Positive") | (data["lm_result_hb"] == "Negative")]
+        lm_collumn = "lm_result_hb"
+
+    fig, ax = plt.subplots(figsize=(3,6))
+    aggregated = data.groupby([collumn, lm_collumn]).count().reset_index()
+    if (collumn == "lm_result_hb") or (collumn == "lm_result_ob"):
+        colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black"]
+        groups = ["Negative", "Positive", "Unclassified"]
+    elif (collumn == "ramp_driver"):
+        colors_lm = ["grey", "green", "yellow"]
+        groups = [ "None", "PI", "Cue"]
+    else:
+        groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
+        colors_lm = [lmer_result_color(c) for c in groups]
+
+    objects = np.unique(aggregated[lm_collumn])
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        ThetaIndexLabel = aggregated[aggregated[lm_collumn] == object]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = ThetaIndexLabel[(ThetaIndexLabel[collumn] == group)]["ThetaIndex"]
+            if len(count)==0:
+                count = 0
+            else:
+                count = int(count)
+
+            print("stack_theta, ramp_region=", ramp_region, " , group=", group, ", theta=", object, "count=", count)
+
+            percent = (count/np.sum(ThetaIndexLabel["ThetaIndex"]))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            ax.text(x,bottom, str(count), color="k", fontsize=10)
+            bottom = bottom+percent
+
+    #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
+    plt.xticks(x_pos, objects, fontsize=15)
+    #plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+
+    if print_p:
+        print(p)
+
+    ax.tick_params(axis='both', which='major', labelsize=25)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    if save_path is not None:
+        plt.savefig(save_path+"/negpos_stack_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
+    plt.show()
+    plt.close()
+
 
 def add_locations(ramp_scores_df, tetrode_locations_df):
 
@@ -714,6 +800,8 @@ def add_theta(data, theta_df):
         row["ThetaPower"] = thetaPwr
         row["Boccara_theta_class"] = Boccara_theta_class
         data_new = pd.concat([data_new, row], ignore_index=True)
+
+    print("I matched ", len(data_new)/len(data)*100, "% of cells with a theta index")
     return data_new
 
 def add_lm(data, linear_model_df):
@@ -727,10 +815,10 @@ def add_lm(data, linear_model_df):
             cluster_id = row.sorted_seperately_vr_cluster_ids.iloc[0]
 
         if len(linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)])>0:
-            lm_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_homebound
-            lm_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_outbound
-            lmer_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_outbound
-            lmer_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_homebound
+            lm_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_hb
+            lm_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_ob
+            lmer_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_ob
+            lmer_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_hb
         else:
             lm_result_hb = np.nan
             lm_result_ob = np.nan
@@ -1730,16 +1818,15 @@ def remove_location_classification(data, locations):
     return data
 
 def plot_theta_histogram(data, save_path):
-    trial_type_theta_df = data[(data.trial_type == "beaconed")]
-    trial_type_theta_df = trial_type_theta_df[(trial_type_theta_df.ramp_region == "outbound")]
 
-    rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] > 0.07)]
-    no_rythmic = trial_type_theta_df[(trial_type_theta_df["ThetaIndex"] < 0.07)]
+    rythmic = data[(data["ThetaIndex"] > 0.07)]
+    no_rythmic = data[(data["ThetaIndex"] < 0.07)]
 
     fig, ax = plt.subplots(figsize=(3,4))
     ax.hist(np.asarray(rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="r")
     ax.hist(np.asarray(no_rythmic["ThetaIndex"]), bins=20, alpha=0.5, color="k")
     plt.xlabel("Theta Index",  fontsize=15)
+    plt.xticks([0, 0.5])
     plt.ylabel("Number of Cells",  fontsize=20)
     ax.tick_params(axis='both', which='major', labelsize=20)
     plt.gca().spines['top'].set_visible(False)
@@ -1749,9 +1836,6 @@ def plot_theta_histogram(data, save_path):
     plt.show()
 
 def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
-
-    theta_df_VR = theta_df_VR[(theta_df_VR["trial_type"] == "all")]
-    theta_df_VR = theta_df_VR[(theta_df_VR["ramp_region"] == ramp_region)]
     if ramp_region == "outbound":
         collumn = "lm_result_ob"
     elif ramp_region == "homebound":
@@ -1764,11 +1848,11 @@ def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
 
     pos_rythimc = len(rythmic[rythmic[collumn] == "Positive"])*100/len(rythmic)
     neg_rythmic = len(rythmic[rythmic[collumn] == "Negative"])*100/len(rythmic)
-    non_rythmic = len(rythmic[rythmic[collumn] == "None"])*100/len(rythmic)
+    non_rythmic = len(rythmic[rythmic[collumn] == "Unclassified"])*100/len(rythmic)
 
     pos_norythimc = len(no_rythmic[no_rythmic[collumn] == "Positive"])*100/len(no_rythmic)
     neg_norythmic = len(no_rythmic[no_rythmic[collumn] == "Negative"])*100/len(no_rythmic)
-    non_norythmic = len(no_rythmic[no_rythmic[collumn] == "None"])*100/len(no_rythmic)
+    non_norythmic = len(no_rythmic[no_rythmic[collumn] == "Unclassified"])*100/len(no_rythmic)
 
     ax.bar(x=1, height=neg_rythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
     ax.bar(x=1, height=pos_rythimc, bottom=neg_rythmic, color=((102.0/255,205.0/255,0.0/255)))
@@ -1777,17 +1861,6 @@ def plot_lm_proportions(theta_df_VR, ramp_region, save_path):
     ax.bar(x=0, height=neg_norythmic, bottom=0, color=((238.0/255,58.0/255,140.0/255)))
     ax.bar(x=0, height=pos_norythimc, bottom=neg_norythmic, color=((102.0/255,205.0/255,0.0/255)))
     ax.bar(x=0, height=non_norythmic, bottom=pos_norythimc+ neg_norythmic, color="black")
-
-    #ax.text(x=1 , y=0+0.05, s=str(len(rythmic[rythmic[collumn] == "Negative"])), color="white", fontsize=12, horizontalalignment='center')
-    #ax.text(x=1 , y=neg_rythmic+0.05, s=str(len(rythmic[rythmic[collumn] == "None"])), color="white", fontsize=12, horizontalalignment='center')
-    #ax.text(x=1 , y=non_rythmic+ neg_rythmic+0.05, s=str(len(rythmic[rythmic[collumn] == "Positive"])), color="white", fontsize=12, horizontalalignment='center')
-
-    #ax.text(x=0 , y=0+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "Negative"])), color="white", fontsize=12, horizontalalignment='center')
-    #ax.text(x=0 , y=neg_norythmic+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "None"])), color="white", fontsize=12, horizontalalignment='center')
-    #ax.text(x=0 , y=non_norythmic+ neg_norythmic+0.05, s=str(len(no_rythmic[no_rythmic[collumn] == "Positive"])), color="white", fontsize=12, horizontalalignment='center')
-
-    #ax.text(x=1 , y=103.05, s=str(np.round((len(rythmic)/(len(rythmic)+len(no_rythmic)))*100, decimals=0))+"%", color="black", fontsize=12, horizontalalignment='center')
-    #ax.text(x=0 , y=103.05, s=str(np.round((len(no_rythmic)/(len(rythmic)+len(no_rythmic)))*100, decimals=0))+"%", color="black", fontsize=12, horizontalalignment='center')
 
     objects = ('NR', 'TR')
     x_pos = np.arange(len(objects))
@@ -1852,8 +1925,32 @@ def main():
     tetrode_location_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/vr_vs_of"
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
-    linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")
-    trialtypes_linear_model = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel_trialtypes.txt", sep="\t")
+    #linear_model_path_old = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")
+    linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.csv", sep=";")
+    linear_model_path.rename(columns={'lm_group_b': 'lm_result_ob',
+                                      'lm_group_b_h': 'lm_result_hb',
+                                      'final_model_h_b': 'lmer_result_hb',
+                                      'final_model_o_b': 'lmer_result_ob'}, inplace=True)
+
+    print("lm_result_ob that are positive =", len(linear_model_path[linear_model_path["lm_result_ob"]=="Positive"]))
+    print("lm_result_ob that are negaitve = ", len(linear_model_path[linear_model_path["lm_result_ob"]=="Negative"]))
+    print("lm_result_hb that are postive = ", len(linear_model_path[linear_model_path["lm_result_hb"]=="Positive"]))
+    print("lm_result_hb that are negative = ", len(linear_model_path[linear_model_path["lm_result_hb"]=="Negative"]))
+
+    #  theta comparisons ------------------------------------------------------------------------------------------#
+    theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
+    linear_model_path = add_theta(linear_model_path, theta_df_VR)
+    plot_theta_histogram(linear_model_path, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    plot_lm_proportions(linear_model_path, ramp_region="outbound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    plot_lm_proportions(linear_model_path, ramp_region="homebound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
+    simple_lm_stack_theta(linear_model_path, collumn="lmer_result_ob", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="outbound", trial_type="all", p=None)
+    simple_lm_stack_theta(linear_model_path, collumn="lmer_result_hb", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="homebound", trial_type="all", p=None)
+    # this is purely for comparing results with sarch
+    simple_lm_stack_negpos(linear_model_path, collumn="lmer_result_ob", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="outbound", trial_type="all", p=None)
+    simple_lm_stack_negpos(linear_model_path, collumn="lmer_result_hb", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="homebound", trial_type="all", p=None)
+
+    print("look now")
+
     ramp_scores = pd.read_csv(ramp_scores_path)
     tetrode_locations = pd.read_csv(tetrode_location_path)
     ramp_scores_2 = pd.read_pickle(ramp_score_path2)
@@ -1886,30 +1983,31 @@ def main():
     #=================================================================================================#
     '''
 
-    C5_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M1_sorting_stats_AT20_WS4.pkl")
-    C5_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M2_sorting_stats_AT20_WS4.pkl")
-    C4_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M2_sorting_stats_AT20_WS4.pkl")
-    C4_M3 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M3_sorting_stats_AT20_WS4.pkl")
-    C3_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M1_sorting_stats_AT20_WS4.pkl")
-    C3_M6 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M6_sorting_stats_AT20_WS4.pkl")
-    C2_245 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/245_sorting_stats_AT20_WS4.pkl")
-    C2_1124 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/1124_sorting_stats_AT20_WS4.pkl")
-
-    all_mice = pd.DataFrame()
-    all_mice = pd.concat([all_mice, C5_M1], ignore_index=True)
-    all_mice = pd.concat([all_mice, C5_M2], ignore_index=True)
-    all_mice = pd.concat([all_mice, C4_M2], ignore_index=True)
-    all_mice = pd.concat([all_mice, C4_M3], ignore_index=True)
-    all_mice = pd.concat([all_mice, C3_M1], ignore_index=True)
-    all_mice = pd.concat([all_mice, C3_M6], ignore_index=True)
-    all_mice = pd.concat([all_mice, C2_245], ignore_index=True)
-    #all_mice = pd.concat([all_mice, C2_1124], ignore_index=True)
-    #all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores)
-    all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores_2)
-    all_mice = absolute_ramp_score(all_mice)
-    all_mice = add_lm(all_mice, linear_model_path)
-
     '''
+   C5_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M1_sorting_stats_AT20_WS4.pkl")
+   C5_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort5/M2_sorting_stats_AT20_WS4.pkl")
+   C4_M2 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M2_sorting_stats_AT20_WS4.pkl")
+   C4_M3 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort4/M3_sorting_stats_AT20_WS4.pkl")
+   C3_M1 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M1_sorting_stats_AT20_WS4.pkl")
+   C3_M6 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort3/M6_sorting_stats_AT20_WS4.pkl")
+   C2_245 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/245_sorting_stats_AT20_WS4.pkl")
+   C2_1124 = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/1124_sorting_stats_AT20_WS4.pkl")
+
+   all_mice = pd.DataFrame()
+   all_mice = pd.concat([all_mice, C5_M1], ignore_index=True)
+   all_mice = pd.concat([all_mice, C5_M2], ignore_index=True)
+   all_mice = pd.concat([all_mice, C4_M2], ignore_index=True)
+   all_mice = pd.concat([all_mice, C4_M3], ignore_index=True)
+   all_mice = pd.concat([all_mice, C3_M1], ignore_index=True)
+   all_mice = pd.concat([all_mice, C3_M6], ignore_index=True)
+   all_mice = pd.concat([all_mice, C2_245], ignore_index=True)
+   #all_mice = pd.concat([all_mice, C2_1124], ignore_index=True)
+   #all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores)
+   all_mice = add_ramp_scores_to_matched_cluster(all_mice, ramp_scores_2)
+   all_mice = absolute_ramp_score(all_mice)
+   all_mice = add_lm(all_mice, linear_model_path)
+
+  
     plot_all_ramps(all_mice, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/all_ramps", trial_types=["all"])
 
     correlate_vr_vs_of(all_mice, save_path, ramp_region="outbound", trial_type="all", collumn="hd_score")
@@ -1946,9 +2044,11 @@ def main():
     tetrode_location_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/Ramp_figs"
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
-    linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")
-    linear_model_path['lm_result_homebound'] = linear_model_path['lm_result_homebound'].replace(["NoSlope"],"None")
-    linear_model_path['lm_result_outbound'] = linear_model_path['lm_result_outbound'].replace(["NoSlope"],"None")
+    linear_model_path = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.csv", sep=";")
+    linear_model_path.rename(columns={'lm_group_b': 'lm_result_ob',
+                                      'lm_group_b_h': 'lm_result_hb',
+                                      'final_model_h_b': 'lmer_result_hb',
+                                      'final_model_o_b': 'lmer_result_ob'}, inplace=True)
 
     trialtypes_linear_model = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel_trialtypes.txt", sep="\t")
     ramp_scores = pd.read_csv(ramp_scores_path)
@@ -1989,7 +2089,7 @@ def main():
     percentage_ramp_rs(data, "homebound", save_path, split="None")
 
 
-    ramp_histogram_by_mouse(data, save_path)
+    #ramp_histogram_by_mouse(data, save_path)
     # to analyse theta modulate between cue dependant and independant neurons
 
     #cue_theta_location_bar(data, save_path)
@@ -2014,7 +2114,7 @@ def main():
 
     for filter_by_slope in [True, False]:
         print("filter_by_slope=", filter_by_slope)
-        for trial_type in ["beaconed", "all"]:
+        for trial_type in ["all"]:
             print("trial_type=", trial_type)
             for ramp_region in ["outbound", "homebound", "all"]:
                 print("ramp_region=", ramp_region)
@@ -2024,26 +2124,19 @@ def main():
                 mouse_ramp(data, collumn="ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
                 mouse_ramp(data, collumn="abs_ramp_score", save_path=save_path, ramp_region=ramp_region, trial_type=trial_type, filter_by_slope=filter_by_slope)
 
-    # theta comparison by region
-    location_ramp(data, collumn="ThetaIndex", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    location_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    mouse_ramp(data, collumn="ThetaIndex", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
-    mouse_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True)
+
+   # location_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True, filter_by_slope=True)
+    mouse_ramp(data, collumn="ThetaIndex", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True, filter_by_slope=True)
+    mouse_ramp(data, collumn="ThetaPower", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region=ramp_region, trial_type=trial_type, print_p=True, filter_by_slope=True)
 
     theta_df_VR = remove_mouse(theta_df_VR, cohort_mouse_list=["C2_1124", "C6_M1", "C6_M2", "C7_M1", "C7_M2",
                                                                "C8_M1", "C8_M2", "C9_M1", "C9_M2", "C9_M3",
                                                                "C9_M4", "C9_M5"])
     plot_theta(theta_df_VR, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
-    plot_theta_histogram(data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
-    plot_lm_proportions(data, ramp_region="outbound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
-    plot_lm_proportions(data, ramp_region="homebound", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta")
-    simple_lm_stack_theta(data, collumn="lmer_result_ob", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="outbound", trial_type="all", p=None)
-    simple_lm_stack_theta(data, collumn="lmer_result_hb", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta", ramp_region="homebound", trial_type="all", p=None)
     print("look now")
 
 if __name__ == '__main__':
     main()
-
 
 
 
