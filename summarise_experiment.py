@@ -119,7 +119,7 @@ def add_recording_day(data):
     recording_days = []
     for index, row in data.iterrows():
         row =  row.to_frame().T.reset_index(drop=True)
-        recording_days.append(get_suedo_day(row["session_id"].iloc[0]))
+        recording_days.append(get_day(row["session_id"].iloc[0]))
     data["recording_day"] = recording_days
     return data
 
@@ -168,6 +168,47 @@ def plot_summary(days_data, save_path=None):
     :return: summary plots
     '''
 
+def plot_stat_across_days(mouse_all_days, collumn="", save_path=None):
+    if collumn in list(mouse_all_days):
+
+        fig, ax = plt.subplots(figsize=(6,6))
+
+        plt.scatter(mouse_all_days["recording_day"], mouse_all_days[collumn], alpha=0.3, color="b", marker="o")
+
+        for day in np.unique(mouse_all_days["recording_day"]):
+            day_data = mouse_all_days[(mouse_all_days["recording_day"] == day)]
+            mean = np.nanmean(day_data[collumn])
+            plt.plot(day, mean, color="k", alpha=1, marker="_")
+
+        mouse = mouse_all_days["mouse"].iloc[0]
+        plt.xlabel("Day",  fontsize=20)
+        plt.ylabel(get_tidy_title(collumn),  fontsize=20)
+        plt.title(mouse, fontsize=20)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        plt.gca().spines['top'].set_visible(False)
+        plt.gca().spines['right'].set_visible(False)
+        plt.tight_layout()
+        plt.subplots_adjust(left=0.28, top=0.8, bottom=0.2)
+
+        plt.savefig(save_path+mouse+"_"+collumn+".png", dpi=300)
+        plt.show()
+
+def plot_summary_per_mouse(days_data, save_path=None):
+    '''
+    :param days_data: a pandas dataframe of spatial firing from all days of recording for all mice for one experiment
+    :param save_path:
+    :return: summary plots
+    '''
+
+    for mouse in np.unique(days_data["mouse"]):
+        mouse_all_days = days_data[(days_data["mouse"] == mouse)]
+        plot_stat_across_days(mouse_all_days, collumn="ThetaIndex", save_path=save_path)
+        plot_stat_across_days(mouse_all_days, collumn="rate_map_correlation_first_vs_second_half", save_path=save_path)
+        plot_stat_across_days(mouse_all_days, collumn="grid_score", save_path=save_path)
+        plot_stat_across_days(mouse_all_days, collumn="hd_score", save_path=save_path)
+        plot_stat_across_days(mouse_all_days, collumn="grid_spacing", save_path=save_path)
+        plot_stat_across_days(mouse_all_days, collumn="Boccara_theta_class", save_path=save_path)
+
 
 def main():
     print("============================================")#
@@ -180,16 +221,23 @@ def main():
 
     # =================== for concatenation ====================================== #
     save_path = "/mnt/datastore/Harry/Cohort7_october2020/summary/"
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path=save_path, prm=prm)
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path=save_path, prm=prm)
+    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path=save_path, prm=prm)
+    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path=save_path, prm=prm)
 
+    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
+    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     # ============= for loading from concatenated dataframe ====================== #
 
     #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
     #of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
-    #plot_summary(vr_data, save_path=save_path)
-    #plot_summary(of_data, save_path=save_path)
+    #plot_summary_per_mouse(of_data, save_path=save_path)
+    #plot_summary_per_mouse(vr_data, save_path=save_path)
 
+
+    #vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
+    #of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
+    #plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    #plot_summary_per_mouse(vr_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
 
     print("============================================")#
     print("============================================")
