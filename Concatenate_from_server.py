@@ -94,7 +94,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
         else:
             print("I couldn't find a spatial firing dataframe")
     if save_path is not None:
-        all_days_df.to_pickle(save_path+"/All_mice_of_"+suffix+".pkl")
+        all_days_df.to_pickle(save_path+"/All_mice_vr_"+suffix+".pkl")
     print("completed all in list")
     return all_days_df
 
