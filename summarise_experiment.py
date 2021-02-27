@@ -151,15 +151,53 @@ def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, pr
     elif suffix == "of":
         all_days_df = load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="of", prm=prm)
 
-    all_days_df = add_recording_day(all_days_df)
+    #all_days_df = add_recording_day(all_days_df)
     all_days_df = add_full_session_id(all_days_df, recording_paths)
-    all_days_df = add_mouse_label(all_days_df)
-
-
+    #all_days_df = add_mouse_label(all_days_df)
+    all_days_df = add_session_identifiers(all_days_df)
 
     if save_path is not None:
         all_days_df.to_pickle(save_path+"/All_mice_"+suffix+".pkl")
     return
+
+def check_structure_session_id(session_id):
+    # looks at string of session id and returns the correct structure if extra bits are added
+    # eg M1_D1_2020-08-03_16-11-14vr should be M1_D1_2020-08-03_16-11-14
+
+    ending = session_id.split("-")[-1]
+    corrected_ending = ''.join(filter(str.isdigit, ending))
+
+    if corrected_ending == ending:
+        return session_id
+    else:
+        return session_id.split(ending)[0]+corrected_ending
+
+def add_session_identifiers(all_days_df):
+    timestamp_list = []
+    date_list = []
+    mouse_list = []
+    training_day_list = []
+
+    for index, cluster_df in all_days_df.iterrows():
+        session_id = cluster_df["session_id"]
+
+        session_id = check_structure_session_id(session_id)
+        timestamp_string = session_id.split("_")[-1][0:8]  # eg 14-49-23  time = 14:49, 23rd second
+        date_string = session_id.split("_")[-2]
+        mouse = session_id.split("_")[0]
+        training_day = session_id.split("_")[1]
+
+        timestamp_list.append(timestamp_string)
+        date_list.append(date_string)
+        mouse_list.append(mouse)
+        training_day_list.append(training_day)
+
+    all_days_df["timestamp"] = timestamp_list
+    all_days_df["date"] = date_list
+    all_days_df["mouse"] = mouse_list
+    all_days_df["recording_day"] = training_day_list
+
+    return all_days_df
 
 def plot_summary(days_data, save_path=None):
     '''
@@ -221,23 +259,23 @@ def main():
 
     # =================== for concatenation ====================================== #
     save_path = "/mnt/datastore/Harry/Cohort7_october2020/summary/"
-    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path=save_path, prm=prm)
-    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path=save_path, prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path=save_path, prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path=save_path, prm=prm)
 
-    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
-    #summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     # ============= for loading from concatenated dataframe ====================== #
 
-    #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
-    #of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
-    #plot_summary_per_mouse(of_data, save_path=save_path)
-    #plot_summary_per_mouse(vr_data, save_path=save_path)
+    vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
+    of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
+    plot_summary_per_mouse(of_data, save_path=save_path)
+    plot_summary_per_mouse(vr_data, save_path=save_path)
 
 
-    #vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
-    #of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
-    #plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
-    #plot_summary_per_mouse(vr_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
+    of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
+    plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    plot_summary_per_mouse(vr_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
 
     print("============================================")#
     print("============================================")

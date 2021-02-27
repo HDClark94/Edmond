@@ -62,8 +62,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing = PostSorting.vr_grid_cells.process_vr_grid(spatial_firing, positional_data, prm.get_vr_grid_analysis_bin_size(), prm)
                     spatial_firing = PostSorting.vr_grid_cells.process_vr_field_stats(spatial_firing, processed_position_data, prm)
                     spatial_firing = PostSorting.vr_grid_cells.process_vr_field_distances(spatial_firing, processed_position_data, prm)
-                if len(spatial_firing) > 0:
 
+                if len(spatial_firing) > 0:
                     spatial_firing=spatial_firing[["session_id",
                                                    "cluster_id",
                                                    "tetrode",
@@ -176,7 +176,7 @@ def combine_of_vr_dataframes(of_dataframe, vr_dataframe):
         cluster_id = cluster_of_series["cluster_id"]
         date=cluster_of_series["date"]
         mouse=cluster_of_series["mouse"]
-        training_day=cluster_of_series["training_day"]
+        training_day=cluster_of_series["recording_day"]
 
         cluster_of_df = of_dataframe[(of_dataframe.cluster_id == cluster_id) &
                                      (of_dataframe.date == date) &
