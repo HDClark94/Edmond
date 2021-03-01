@@ -151,9 +151,7 @@ def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, pr
     elif suffix == "of":
         all_days_df = load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="of", prm=prm)
 
-    #all_days_df = add_recording_day(all_days_df)
     all_days_df = add_full_session_id(all_days_df, recording_paths)
-    #all_days_df = add_mouse_label(all_days_df)
     all_days_df = add_session_identifiers(all_days_df)
 
     if save_path is not None:
@@ -206,21 +204,40 @@ def plot_summary(days_data, save_path=None):
     :return: summary plots
     '''
 
+def to_days(days_strings):
+    days_int= []
+    for i in range(len(days_strings)):
+        try:
+            days_int.append(int(days_strings[i].split("D")[-1]))
+        except Exception as ex:
+            days_int.append(np.nan)
+
+    return np.array(days_int)
+
 def plot_stat_across_days(mouse_all_days, collumn="", save_path=None):
     if collumn in list(mouse_all_days):
 
         fig, ax = plt.subplots(figsize=(6,6))
-
-        plt.scatter(mouse_all_days["recording_day"], mouse_all_days[collumn], alpha=0.3, color="b", marker="o")
-
+        plt.scatter(to_days(np.asarray(mouse_all_days["recording_day"])), mouse_all_days[collumn], alpha=0.3, color="b", marker="o")
+        max_day = 0
         for day in np.unique(mouse_all_days["recording_day"]):
-            day_data = mouse_all_days[(mouse_all_days["recording_day"] == day)]
-            mean = np.nanmean(day_data[collumn])
-            plt.plot(day, mean, color="k", alpha=1, marker="_")
+            try:
+                day_data = mouse_all_days[(mouse_all_days["recording_day"] == day)]
+                day = int(day.split("D")[-1])
+                mean = np.nanmean(day_data[collumn])
+                plt.scatter(day, mean, color="k", alpha=1, marker="_")
+
+                if day>max_day:
+                    max_day=day
+
+            except Exception as ex:
+                print("there was an error with this day")
 
         mouse = mouse_all_days["mouse"].iloc[0]
         plt.xlabel("Day",  fontsize=20)
         plt.ylabel(get_tidy_title(collumn),  fontsize=20)
+        plt.xlim([0,max_day])
+        plt.ylim(get_y_lim(collumn))
         plt.title(mouse, fontsize=20)
         ax.tick_params(axis='both', which='major', labelsize=20)
         plt.gca().spines['top'].set_visible(False)
@@ -231,6 +248,57 @@ def plot_stat_across_days(mouse_all_days, collumn="", save_path=None):
         plt.savefig(save_path+mouse+"_"+collumn+".png", dpi=300)
         plt.show()
 
+def get_y_lim(collumn):
+    if collumn == "ThetaIndex":
+        return [-0.1, 0.7]
+    elif collumn == "rate_map_correlation_first_vs_second_half":
+        return [-1,1]
+    elif collumn =="grid_score":
+        return [-0.75, 1]
+    elif collumn =="hd_score":
+        return [0, 1]
+    elif collumn =="grid_spacing":
+        return [-0.1, 0.6]
+    elif collumn =="Boccara_theta_class":
+        return [-0.05, 1.05]
+
+
+def plot_cell_counts_across_days(mouse_all_days, save_path=None):
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    max_day =0
+    for day in np.unique(mouse_all_days["recording_day"]):
+        try:
+            day_data = mouse_all_days[(mouse_all_days["recording_day"] == day)]
+            day = int(day.split("D")[-1])
+            count = len(day_data)
+            if count == 1:
+                # check if the 1 row corresponds to a placeholder for having no cells in the session
+                if np.isnan(day_data.cluster_id.iloc[0]):
+                    count=0
+
+            if day>max_day:
+                max_day=day
+
+            plt.scatter(day, count, color="k", alpha=1, marker="_")
+        except Exception as ex:
+            print("There was an error with a day")
+
+
+    mouse = mouse_all_days["mouse"].iloc[0]
+    plt.xlabel("Day",  fontsize=20)
+    plt.ylabel("Cell Count",  fontsize=20)
+    plt.xlim([0,max_day])
+    plt.title(mouse, fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.28, top=0.8, bottom=0.2)
+    plt.savefig(save_path+mouse+"_cel_count.png", dpi=300)
+    plt.show()
+
 def plot_summary_per_mouse(days_data, save_path=None):
     '''
     :param days_data: a pandas dataframe of spatial firing from all days of recording for all mice for one experiment
@@ -240,37 +308,37 @@ def plot_summary_per_mouse(days_data, save_path=None):
 
     for mouse in np.unique(days_data["mouse"]):
         mouse_all_days = days_data[(days_data["mouse"] == mouse)]
+        plot_cell_counts_across_days(mouse_all_days, save_path)
         plot_stat_across_days(mouse_all_days, collumn="ThetaIndex", save_path=save_path)
         plot_stat_across_days(mouse_all_days, collumn="rate_map_correlation_first_vs_second_half", save_path=save_path)
         plot_stat_across_days(mouse_all_days, collumn="grid_score", save_path=save_path)
         plot_stat_across_days(mouse_all_days, collumn="hd_score", save_path=save_path)
-        plot_stat_across_days(mouse_all_days, collumn="grid_spacing", save_path=save_path)
         plot_stat_across_days(mouse_all_days, collumn="Boccara_theta_class", save_path=save_path)
 
 
+
 def main():
-    print("============================================")#
+    print("============================================")
     print("============================================")
 
     prm = PostSorting.parameters.Parameters()
     prm.set_sampling_rate(30000)
     prm.set_pixel_ratio(440)
     prm.set_vr_grid_analysis_bin_size(20)
-
+    '''
     # =================== for concatenation ====================================== #
-    save_path = "/mnt/datastore/Harry/Cohort7_october2020/summary/"
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path=save_path, prm=prm)
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path=save_path, prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
+    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
 
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     # ============= for loading from concatenated dataframe ====================== #
+    '''
 
     vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
     of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
-    plot_summary_per_mouse(of_data, save_path=save_path)
-    plot_summary_per_mouse(vr_data, save_path=save_path)
-
+    plot_summary_per_mouse(of_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    plot_summary_per_mouse(vr_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
 
     vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
     of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
