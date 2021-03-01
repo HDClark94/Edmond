@@ -45,7 +45,6 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
         processed_position_path = path+processed_path
 
         print('Processing ' + data_frame_path)
-
         if os.path.exists(data_frame_path):
             try:
                 print('I found a spatial data frame, processing ' + data_frame_path)
@@ -83,6 +82,11 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
 
                 else:
                     print("There wasn't any cells to add")
+                    # make an empty row for the recording day to show no cells were found
+                    session_id = path.split("/")[-1]
+                    data = {'session_id': [session_id]}
+                    spatial_firing = pd.DataFrame(data)
+                    all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
 
             except Exception as ex:
                 print('This is what Python says happened:')
@@ -152,6 +156,11 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
 
                 else:
                     print("There wasn't any cells to add")
+                    # make an empty row for the recording day to show no cells were found
+                    session_id = path.split("/")[-1]
+                    data = {'session_id': [session_id]}
+                    spatial_firing = pd.DataFrame(data)
+                    all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
 
             except Exception as ex:
                 print('This is what Python says happened:')
