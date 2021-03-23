@@ -156,6 +156,7 @@ def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, pr
 
     if save_path is not None:
         all_days_df.to_pickle(save_path+"/All_mice_"+suffix+".pkl")
+        all_days_df.to_csv(save_path+"/All_mice_"+suffix+".csv")
     return
 
 def check_structure_session_id(session_id):
@@ -325,7 +326,7 @@ def main():
     prm.set_sampling_rate(30000)
     prm.set_pixel_ratio(440)
     prm.set_vr_grid_analysis_bin_size(20)
-    '''
+
     # =================== for concatenation ====================================== #
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
@@ -333,7 +334,7 @@ def main():
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
     # ============= for loading from concatenated dataframe ====================== #
-    '''
+
 
     vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
     of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
