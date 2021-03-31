@@ -36,7 +36,7 @@ def main():
     prm=None
 
     for ADC_string in ["ADC6", "ADC7", "ADC8"]:
-        ADC = open_ephys_IO.get_data_continuous(prm, recording_to_sort+"/100_"+ADC_string+".continuous")
+        ADC = open_ephys_IO.get_data_continuous(recording_to_sort+"/100_"+ADC_string+".continuous")
         plt.plot(ADC)
         plt.savefig(recording_to_sort + '/Figures/'+ADC_string+'.png')
         plt.close()
