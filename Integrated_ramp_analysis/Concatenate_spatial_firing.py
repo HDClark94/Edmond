@@ -121,41 +121,40 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, b
             if os.path.exists(spatial_dataframe_path):
                 processed_position_data = pd.read_pickle(spatial_dataframe_path)
 
-                # load mouse id
-                spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data))
-
-                # drop any heavy collumns in the dataframe for housekeeping
-
-                columns_to_drop = ['firing_times', 'trial_number', 'trial_type',
-                                   'all_snippets', 'random_snippets', 'speed_per200ms',
-                                   'x_position_cm', 'beaconed_position_cm', 'beaconed_trial_number',
-                                   'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
-                                   'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
-                                   'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
-                                   'probe_firing_rate_map_sem', 'tetrode', 'primary_channel', 'isolation', 'noise_overlap',
-                                   'peak_snr','peak_amp', 'number_of_spikes', 'mean_firing_rate', 'mean_firing_rate_local',
-                                   'ThetaPower', 'ThetaIndex', 'Boccara_theta_class']
-
-                for column in columns_to_drop:
-                    if column in list(spike_data):
-                        del spike_data[column]
-                spike_data = delete_other_binning_collumn(spike_data, binning)
-
                 # look for key collumns needs for ramp amalysis
                 if ("fr_time_binned" in list(spike_data)) or ("fr_binned_in_space" in list(spike_data)):
+
+                    # load mouse id
+                    spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data))
+
+                    # drop any heavy collumns in the dataframe for housekeeping
+
+                    columns_to_drop = ['firing_times', 'trial_number', 'trial_type',
+                                       'all_snippets', 'random_snippets', 'speed_per200ms',
+                                       'x_position_cm', 'beaconed_position_cm', 'beaconed_trial_number',
+                                       'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
+                                       'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
+                                       'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
+                                       'probe_firing_rate_map_sem', 'tetrode', 'primary_channel', 'isolation', 'noise_overlap',
+                                       'peak_snr','peak_amp', 'number_of_spikes', 'mean_firing_rate', 'mean_firing_rate_local',
+                                       'ThetaPower', 'ThetaIndex', 'Boccara_theta_class']
+
+                    for column in columns_to_drop:
+                        if column in list(spike_data):
+                            del spike_data[column]
+                    spike_data = delete_other_binning_collumn(spike_data, binning)
 
                     # create longform dataframe
                     spike_data_long_form = make_longform(spike_data, processed_position_data, binning=binning)
                     concatenated_spike_data = pd.concat([concatenated_spike_data, spike_data_long_form], ignore_index=True)
+                else:
+                    if (len(spike_data)==0):
+                        print("this recording has no units, ", recording.split("/")[-1])
+                    else:
+                        print("could not find correct binned collumn in recording ", recording.split("/")[-1])
 
             else:
-                print("couldn't find processed_position for ", recording)
-
-        # this is just for testing, it will stop after only the first recording
-        if save_path is not None:
-            concatenated_spike_data.to_pickle(save_path+binning+"_binned_concatenated_spike_data.pkl")
-            concatenated_spike_data.to_csv(save_path+binning+"_binned_concatenated_spike_data.csv")
-            return concatenated_spike_data
+                print("couldn't find processed_position for ", recording.split("/")[-1])
 
     if save_path is not None:
         concatenated_spike_data.to_pickle(save_path+binning+"_binned_concatenated_spike_data.pkl")
@@ -171,9 +170,12 @@ def main():
     spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
                              save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/", binning="time")
 
+    print("wve done one")
     spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
                              save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/", binning="space")
 
+
+    spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/time_binned_concatenated_spike_data.pkl")
     print("were done for now ")
 
 if __name__ == '__main__':

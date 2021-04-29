@@ -6,11 +6,19 @@ output: html_document
 ---
 
 ## Fit linear models of position to firing rate
+
+pull libraries and install dependencies if not done already
 ```{r}
+# dependencies
+# install.packages('reticulate')
+# install.packages('dplyr')
+# install.packages('broom')
+# py_install("pandas")
+
 library(dplyr)
 library(broom)
+library(reticulate)
 ```
-
 
 1. Make function to run linear model
 ```{r}
@@ -119,14 +127,17 @@ Function for running all data in space_binned_data and adding classifications to
 ```{r, warning=FALSE}
 
 process_data <- function(space_binned_data, classification_df, TT, track_region){
+  print("procressing, TT= , track_region=")
+  print(TT)
+  print(track_region)
     
   # run for all session_ids and cluster ids within those sessions seperately
   session_ids = unique(space_binned_data$session_id)
   
-  for (session_id in session_ids) {
+  for (sess_id in session_ids) {
     
     # get data from a single session
-    session_data <- subset(space_binned_data, session_id == session_id)
+    session_data <- subset(space_binned_data, session_id == sess_id)
     
     # get cluster ids from the session data
     cluster_ids = unique(session_data$cluster_id)
@@ -162,7 +173,7 @@ process_data <- function(space_binned_data, classification_df, TT, track_region)
         classification = NaN
       }
       
-      cluster_classification_df <- data.frame(cluster_id=c(id), session_id=c(session_id), trial_type=c(TT), track_region=c(track_region),
+      cluster_classification_df <- data.frame(cluster_id=c(id), session_id=c(sess_id), trial_type=c(TT), track_region=c(track_region),
                                               intercept=c(intercept), slope=c(slope), classification=c(classification))
       
       # add classifation to results df
@@ -203,13 +214,14 @@ shuffle_rates <- function(df, shuffles=10) {
 ```
 
 
-1. load work space where concatenated time binned data is found and load data into R
+1. load concatenated space binned data into R
 ```{r}
-# set the working directory where the data is
-setwd("Z:/ActiveProjects/Harry/Ramp_cells_open_field_paper/")
+# set the working directory for loading the pickle reader (where this is)
+setwd("C:/Users/44756/PycharmProjects/in_vivo_ephys_openephys/Edmond/Integrated_ramp_analysis/")
+source_python("read_pickle.py")
 
-# load the time binned data here
-space_binned_data = read.csv("space_binned_concatenated_spike_data.csv", header = TRUE)
+# load the space binned data here
+space_binned_data <- read_pickle_file("Z:/ActiveProjects/Harry/Ramp_cells_open_field_paper/space_binned_concatenated_spike_data.pkl")
 
 # remove outliers
 #TODO
