@@ -6,6 +6,7 @@ from control_sorting_analysis import get_session_type
 import PostSorting
 import numpy as np
 import settings
+import sys
 
 prm = PostSorting.parameters.Parameters()
 
@@ -139,17 +140,17 @@ def run_shuffle_analysis_vr(recording, n_shuffles, prm):
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
-
     #n_shuffles = 1000
 
     # get list of all recordings in the recordings folder
     of_recording_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort8_may2021/of/") if f.is_dir()]
 
     #run_shuffle_analysis(of_recording_list, n_shuffles, prm)
+    recording_path = sys.argv[1:][0]
+    shuffle_id = int(sys.argv[1:][1])
 
-
-    recording_path = '/mnt/datastore/Harry/Cohort8_may2021/of/M13_D5_2021-05-14_11-34-47'
-    shuffle_id = 1
+    #recording_path = '/mnt/datastore/Harry/Cohort8_may2021/of/M13_D5_2021-05-14_11-34-47'
+    #shuffle_id = 1
     run_shuffle_parallel(recording_path, shuffle_id)
 
     print("dfdf")
