@@ -86,9 +86,12 @@ def write_param_file(primary_paths, paired_paths, recording_type, parameter_help
             parameters_to_add.append("session_type_paired="+paired_recording_type)
 
         for collumn in list(parameter_helper_mouse_day):
-            if (collumn not in ["mouse_id", "training_day"]) and (recording_type=="vr"):
-                if collumn == "track_length":
-                    parameters_to_add.append(collumn+"="+str(int(parameter_helper_mouse_day[collumn].iloc[0])))
+            if (collumn not in ["mouse_id", "training_day"]):
+                if recording_type=="vr":
+                    if collumn == "track_length":
+                        parameters_to_add.append(collumn+"="+str(int(parameter_helper_mouse_day[collumn].iloc[0])))
+                    else:
+                        parameters_to_add.append(collumn+"="+str(parameter_helper_mouse_day[collumn].iloc[0]))
                 else:
                     parameters_to_add.append(collumn+"="+str(parameter_helper_mouse_day[collumn].iloc[0]))
 
@@ -124,7 +127,9 @@ def write_recording_list_tmp_file(primary_paths, save_path_full, save_path_tmp):
         path_to_add = primary_path.split("datastore/")[-1]
         if path_to_add not in path_already_in_list:
             file.write(path_to_add+"\n")
+
     file.close()
+
 
 def write_recording_list_file(primary_paths, save_path):
 

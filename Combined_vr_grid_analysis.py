@@ -15,44 +15,6 @@ from scipy import stats
 
 import matplotlib.pyplot as plt
 
-def check_structure_session_id(session_id):
-    # looks at string of session id and returns the correct structure if extra bits are added
-    # eg M1_D1_2020-08-03_16-11-14vr should be M1_D1_2020-08-03_16-11-14
-
-    ending = session_id.split("-")[-1]
-    corrected_ending = ''.join(filter(str.isdigit, ending))
-
-    if corrected_ending == ending:
-        return session_id
-    else:
-        return session_id.split(ending)[0]+corrected_ending
-
-def add_session_identifiers(all_days_df):
-    timestamp_list = []
-    date_list = []
-    mouse_list = []
-    training_day_list = []
-
-    for index, cluster_df in all_days_df.iterrows():
-        session_id = cluster_df["session_id"]
-
-        session_id = check_structure_session_id(session_id)
-        timestamp_string = session_id.split("_")[-1][0:8]  # eg 14-49-23  time = 14:49, 23rd second
-        date_string = session_id.split("_")[-2]
-        mouse = session_id.split("_")[0]
-        training_day = session_id.split("_")[1]
-
-        timestamp_list.append(timestamp_string)
-        date_list.append(date_string)
-        mouse_list.append(mouse)
-        training_day_list.append(training_day)
-
-    all_days_df["timestamp"] = timestamp_list
-    all_days_df["date"] = date_list
-    all_days_df["mouse"] = mouse_list
-    all_days_df["training_day"] = training_day_list
-
-    return all_days_df
 
 def next_trial_jitter_test(grid_cells, save_path):
     grid_cells = grid_cells.dropna(subset=['n_beaconed_fields_per_trial',
@@ -102,7 +64,7 @@ def next_trial_jitter_test(grid_cells, save_path):
                 yerr=[stats.sem(same_all),
                       stats.sem(not_same_all)], color="black", marker="o")
 
-    p= stats.ttest_rel(same_all,not_same_all)[1]
+    p= stats.ttest_rel(same_all,not_same_all, nan_policy="omit")[1]
     print("p="+str(p))
 
     plt.xticks(x_pos, trial_types, fontsize=20, rotation=0)
@@ -139,7 +101,7 @@ def grids_trial_type_paired_t_test(grid_cells, save_path):
                 yerr=[stats.sem(n_beaconed_fields_per_trial),
                       stats.sem(n_nonbeaconed_fields_per_trial)], color="black", marker="o")
 
-    p= stats.ttest_rel(n_beaconed_fields_per_trial,n_nonbeaconed_fields_per_trial)[1]
+    p= stats.ttest_rel(n_beaconed_fields_per_trial,n_nonbeaconed_fields_per_trial, nan_policy="omit")[1]
     print("p="+str(p))
 
     plt.xticks(x_pos, trial_types, fontsize=20, rotation=0)
@@ -153,29 +115,18 @@ def grids_trial_type_paired_t_test(grid_cells, save_path):
     plt.tight_layout()
     plt.savefig(save_path+"/vr_grid_cells_non_beaconed_vs_beaconed.png")
 
-def something(prm):
-    '''
-    cohort_vr_paths = Edmond.Concatenate_from_server.get_recording_paths([], "/mnt/datastore/Harry/Cohort6_july2020/vr")
-    all_days_vr_df = Edmond.Concatenate_from_server.load_virtual_reality_spatial_firing(pd.DataFrame(), cohort_vr_paths, prm=prm)
-    all_days_vr_df = add_session_identifiers(all_days_vr_df)
+def something(vr_data, of_data, prm):
 
-    cohort_of_paths = Edmond.Concatenate_from_server.get_recording_paths([], "/mnt/datastore/Harry/Cohort6_july2020/of")
-    all_days_of_df = Edmond.Concatenate_from_server.load_open_field_spatial_firing(pd.DataFrame(), cohort_of_paths, prm=prm)
-    all_days_of_df = add_session_identifiers(all_days_of_df)
-
-    combined_df = Edmond.Concatenate_from_server.combine_of_vr_dataframes(all_days_vr_df, all_days_of_df)
+    combined_df = Edmond.Concatenate_from_server.combine_of_vr_dataframes(vr_data, of_data)
 
     grid_cells = combined_df[(combined_df['rate_map_correlation_first_vs_second_half'] > 0) &
                              (combined_df['grid_score'] > 0.2)]
     grid_cells.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/grid_cells.pkl")
-    '''
-
     grid_cells = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/grid_cells.pkl")
-    next_trial_jitter_test(grid_cells, save_path="/mnt/datastore/Harry/Vr_grid_cells")
-    grids_trial_type_paired_t_test(grid_cells, save_path="/mnt/datastore/Harry/Vr_grid_cells")
 
-
-    print("do something with the grid cells ")
+    combined_df = combined_df[(combined_df["rate_map_correlation_first_vs_second_half"] > 0)]
+    next_trial_jitter_test(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells")
+    grids_trial_type_paired_t_test(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells")
 
 
 def main():
@@ -185,8 +136,9 @@ def main():
     params.set_sampling_rate(30000)
     params.set_vr_grid_analysis_bin_size(20)
     params.set_pixel_ratio(440)
-
-    something(params)
+    vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
+    of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
+    something(vr_data=vr_data, of_data=of_data, prm=params)
 
     print("look now`")
 
