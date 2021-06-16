@@ -107,6 +107,25 @@ def add_reward_variables(spike_data, processed_position_data):
 
     return spike_data
 
+def remove_cluster_without_firing_events(spike_data):
+    '''
+    Removes rows where no firing times are found, this occurs when spikes are found in one session type and not the
+    other when multiple sessions are spike sorted together
+    '''
+
+    spike_data_filtered = pd.DataFrame()
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
+        firing_times = cluster_spike_data["firing_times"].iloc[0]
+        if len(firing_times)>0:
+            spike_data_filtered = pd.concat([spike_data_filtered, cluster_spike_data])
+        else:
+            print("I am removing cluster ", cluster_id, " from this recording")
+            print("because it has no firing events in this spatial firing dataframe")
+
+    return spike_data_filtered
+
+
 def process_dir(recordings_path, concatenated_spike_data=None, save_path=None):
 
     """
@@ -135,6 +154,7 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None):
 
         if os.path.exists(spike_dataframe_path):
             spike_data = pd.read_pickle(spike_dataframe_path)
+            spike_data = remove_cluster_without_firing_events(spike_data)
             if os.path.exists(spatial_dataframe_path):
                 processed_position_data = pd.read_pickle(spatial_dataframe_path)
 
