@@ -23,6 +23,7 @@ def add_nested_time_binned_data(spike_data, processed_position_data):
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
 
+        spikes_in_time = []
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
             trial_type = trial_proccessed_position_data["trial_type"].iloc[0]
@@ -44,7 +45,6 @@ def add_nested_time_binned_data(spike_data, processed_position_data):
                 trial_numbers = np.repeat(trial_number, len(rates))
                 trial_types = np.repeat(trial_type, len(rates))
 
-                spikes_in_time = []
                 spikes_in_time.append(rates)
                 spikes_in_time.append(speed)
                 spikes_in_time.append(position)
@@ -64,14 +64,14 @@ def add_nested_space_binned_data(spike_data, processed_position_data):
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
 
+        spikes_in_space = []
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
 
-            rates = cluster_spike_data['fr_binned_in_space'].iloc[0][trial_number-1]
+            rates = np.array(cluster_spike_data['fr_binned_in_space'].iloc[0][trial_number-1])
             trial_numbers = np.repeat(trial_number, len(rates))
             trial_types = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(rates))
 
-            spikes_in_space = []
             spikes_in_space.append(rates)
             spikes_in_space.append(trial_numbers)
             spikes_in_space.append(trial_types)
