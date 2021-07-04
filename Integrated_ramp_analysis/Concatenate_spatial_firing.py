@@ -82,27 +82,55 @@ def add_nested_space_binned_data(spike_data, processed_position_data):
 
     return spike_data
 
-def add_reward_variables(spike_data, processed_position_data):
+def add_stop_variables(spike_data, processed_position_data):
     rewarded_locations_clusters = []
     rewarded_trials_clusters = []
+    rewarded_trial_types_clusters = []
+
+    stop_locations_clusters = []
+    stop_trials_clusters = []
+    stop_trial_types_clusters = []
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
-        rewarded_trials = []
         rewarded_locations = []
+        rewarded_trials = []
+        rewarded_trial_types = []
+
+        stop_locations = []
+        stop_trials = []
+        stop_trial_type = []
 
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
-
+            trial_type = trial_proccessed_position_data["trial_type"].iloc[0]
             rewarded = trial_proccessed_position_data["rewarded"].iloc[0]
+
+            # get rewarded stops and all stops in a given trial
             trial_rewarded_locations = trial_proccessed_position_data["reward_stop_location_cm"].iloc[0]
+            trial_stop_locations = trial_proccessed_position_data["stop_location_cm"].iloc[0]
+
+            # append stops, trial number, types and the same for rewarded stops
+            stop_trials.extend(np.repeat(trial_number, len(trial_stop_locations)).tolist())
+            stop_trial_type.extend(np.repeat(trial_type, len(trial_stop_locations)).tolist())
+            stop_locations.extend(trial_stop_locations.tolist())
             if rewarded:
                 rewarded_trials.append(trial_number)
-                rewarded_locations.extend(trial_rewarded_locations)
+                rewarded_trial_types.append(trial_type)
+                rewarded_locations.append(trial_rewarded_locations[0])
 
-        rewarded_locations_clusters.append(rewarded_locations)
+        # append to cluster lists
+        stop_trials_clusters.append(stop_trials)
+        stop_trial_types_clusters.append(stop_trial_type)
+        stop_locations_clusters.append(stop_locations)
         rewarded_trials_clusters.append(rewarded_trials)
+        rewarded_trial_types_clusters.append(rewarded_trial_types)
+        rewarded_locations_clusters.append(rewarded_locations)
 
+    spike_data["stop_trials"] = stop_trials_clusters
+    spike_data["stop_trial_types"] = stop_trial_types_clusters
+    spike_data["stop_locations"] = stop_locations_clusters
     spike_data["rewarded_trials"] = rewarded_trials_clusters
+    spike_data["rewarded_trial_types"] = rewarded_trials_clusters
     spike_data["rewarded_locations"] = rewarded_locations_clusters
 
     return spike_data
@@ -163,7 +191,7 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None):
 
                     spike_data = add_nested_time_binned_data(spike_data, processed_position_data)
                     spike_data = add_nested_space_binned_data(spike_data, processed_position_data)
-                    spike_data = add_reward_variables(spike_data, processed_position_data)
+                    spike_data = add_stop_variables(spike_data, processed_position_data)
 
                     columns_to_drop = ['all_snippets', 'random_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
                                        'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
@@ -197,7 +225,6 @@ def main():
 
     spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
                              save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/")
-
 
     spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data.pkl")
     print("were done for now ")
