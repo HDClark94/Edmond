@@ -45,11 +45,8 @@ def add_nested_time_binned_data(spike_data, processed_position_data):
                 trial_numbers = np.repeat(trial_number, len(rates))
                 trial_types = np.repeat(trial_type, len(rates))
 
-                spikes_in_time.append(rates)
-                spikes_in_time.append(speed)
-                spikes_in_time.append(position)
-                spikes_in_time.append(trial_numbers)
-                spikes_in_time.append(trial_types)
+                trial_list = [rates, speed, position, trial_numbers, trial_types]
+                spikes_in_time.append(trial_list)
 
         nested_lists.append(spikes_in_time)
 
@@ -72,9 +69,8 @@ def add_nested_space_binned_data(spike_data, processed_position_data):
             trial_numbers = np.repeat(trial_number, len(rates))
             trial_types = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(rates))
 
-            spikes_in_space.append(rates)
-            spikes_in_space.append(trial_numbers)
-            spikes_in_space.append(trial_types)
+            trial_list = [rates, trial_numbers, trial_types]
+            spikes_in_space.append(trial_list)
 
         nested_lists.append(spikes_in_space)
 
@@ -223,8 +219,8 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
-                             save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/")
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
+    #                         save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/")
 
     spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data.pkl")
     print("were done for now ")
