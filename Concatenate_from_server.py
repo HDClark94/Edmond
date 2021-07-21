@@ -17,6 +17,40 @@ prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
 prm.set_pixel_ratio(440)
 
+def get_proportion_reward(processed_position, trial_type="all"):
+    if trial_type == "beaconed":
+        processed_position = processed_position[processed_position["trial_type"] == 0]
+    if trial_type == "non_beaconed":
+        processed_position = processed_position[processed_position["trial_type"] == 1]
+    if trial_type == "probe":
+        processed_position = processed_position[processed_position["trial_type"] == 2]
+    elif trial_type == "all":
+        processed_position = processed_position
+
+    return np.sum(processed_position["rewarded"]/len(processed_position))
+
+def get_performance(processed_position, trial_type="all"):
+    if trial_type == "beaconed":
+        processed_position = processed_position[processed_position["trial_type"] == 0]
+    if trial_type == "non_beaconed":
+        processed_position = processed_position[processed_position["trial_type"] == 1]
+    if trial_type == "probe":
+        processed_position = processed_position[processed_position["trial_type"] == 2]
+    elif trial_type == "all":
+        processed_position = processed_position
+
+    rewarded_stops=0
+    stops=0
+    for index, row in processed_position.iterrows():
+        trial_row = row.to_frame().T.reset_index(drop=True)
+
+        n_stop_location_cm = len(trial_row["stop_location_cm"].iloc[0])
+        n_reward_stop_location_cm = len(trial_row["reward_stop_location_cm"].iloc[0])
+
+        rewarded_stops += n_reward_stop_location_cm
+        stops += n_stop_location_cm
+
+    return rewarded_stops/stops
 
 def get_recording_paths(path_list, folder_path):
     list_of_recordings = [f.path for f in os.scandir(folder_path) if f.is_dir()]
@@ -35,7 +69,7 @@ def add_full_session_id(spatial_firing, full_path):
     return spatial_firing
 
 
-def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="", prm=None):
+def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix=""):
     spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
     spatial_path = "/MountainSort/DataFrames/position_data.pkl"
     processed_path = "/MountainSort/DataFrames/processed_position_data.pkl"
@@ -50,39 +84,21 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
             try:
                 print('I found a spatial data frame, processing ' + data_frame_path)
                 spatial_firing = pd.read_pickle(data_frame_path)
+                processed_position = pd.read_pickle(processed_position_path)
 
                 if "Curated" in list(spatial_firing):
                     spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
-
                 spatial_firing = add_full_session_id(spatial_firing, path)
 
-                if ("fields_com" not in list(spatial_firing)) and (len(spatial_firing) > 0):
-                    positional_data = pd.read_pickle(spatial_df_path)
-                    processed_position_data = pd.read_pickle(processed_position_path)
-                    spatial_firing = PostSorting.vr_grid_cells.process_vr_grid(spatial_firing, positional_data, prm.get_vr_grid_analysis_bin_size(), prm)
-                    spatial_firing = PostSorting.vr_grid_cells.process_vr_field_stats(spatial_firing, processed_position_data, prm)
-                    spatial_firing = PostSorting.vr_grid_cells.process_vr_field_distances(spatial_firing, processed_position_data, prm)
-                '''
                 if len(spatial_firing) > 0:
                     spatial_firing=spatial_firing[["session_id",
                                                    "cluster_id",
                                                    "tetrode",
                                                    "primary_channel",
-                                                   "fields_com",
-                                                   "fields_com_trial_number",
-                                                   "fields_com_trial_type",
-                                                   "n_beaconed_fields_per_trial",
-                                                   "n_nonbeaconed_fields_per_trial",
-                                                   "n_probe_fields_per_trial",
-                                                   "distance_between_fields",
-                                                   "fields_com_next_trial_type",
-                                                   "minimum_distance_to_field_in_next_trial"]]
-                '''
-                if len(spatial_firing) > 0:
-                    spatial_firing=spatial_firing[["session_id",
-                                                   "cluster_id",
-                                                   "tetrode",
-                                                   "primary_channel"]]
+                                                   "mean_firing_rate_local"]]
+
+                    # rename the mean_firing_rate_local collumn to be specific to vr or of
+                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate_local': ('mean_firing_rate_vr')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -105,6 +121,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
         else:
             print("I couldn't find a spatial firing dataframe")
     if save_path is not None:
+
         all_days_df.to_pickle(save_path+"/All_mice_vr_"+suffix+".pkl")
     print("completed all in list")
     return all_days_df
@@ -133,11 +150,11 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
 
                 if ("hd_score" not in list(spatial_firing)) and (len(spatial_firing) > 0):
                     spatial_data = pd.read_pickle(spatial_df_path)
-                    _, spatial_firing = PostSorting.open_field_head_direction.process_hd_data(spatial_firing, spatial_data, prm)
+                    _, spatial_firing = PostSorting.open_field_head_direction.process_hd_data(spatial_firing, spatial_data)
 
                 if ("grid_score" not in list(spatial_firing)) and (len(spatial_firing) > 0):
                     spatial_data = pd.read_pickle(spatial_df_path)
-                    position_heat_map, spatial_firing = PostSorting.open_field_firing_maps.make_firing_field_maps(spatial_data, spatial_firing, prm)
+                    position_heat_map, spatial_firing = PostSorting.open_field_firing_maps.make_firing_field_maps(spatial_data, spatial_firing)
                     spatial_firing = PostSorting.open_field_grid_cells.process_grid_data(spatial_firing)
 
                 if ("Boccara_theta_class" not in list(spatial_firing)) and (len(spatial_firing) > 0):
@@ -152,11 +169,17 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
                                                    "primary_channel",
                                                    "hd_score",
                                                    "grid_score",
+                                                   "speed_score",
+                                                   "border_score",
                                                    "grid_spacing",
                                                    "full_session_id",
                                                    "ThetaIndex",
                                                    "Boccara_theta_class",
-                                                   "rate_map_correlation_first_vs_second_half"]]
+                                                   "rate_map_correlation_first_vs_second_half",
+                                                   "mean_firing_rate_local"]]
+
+                    # rename the mean_firing_rate_local collumn to be specific to vr or of
+                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate_local': ('mean_firing_rate_of')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -250,77 +273,10 @@ def load_processed_position_all_days(recordings_folder_path, paths, mouse):
 
     all_days.to_pickle(recordings_folder_path + '/all_days_processed_position_' + mouse + '.pkl')
 
-
-
-def concat_multi_spatial_dir(base_recordings_folder, save_path):
-
-    spatial_firing_data = pd.DataFrame()
-    for recording_folder in glob.glob(base_recordings_folder + '*'):
-        processed_position_data = pd.DataFrame()
-        os.path.isdir(recording_folder)
-        spatial_data_frame_path = recording_folder + '/MountainSort/DataFrames/processed_position_data.pkl'
-        spike_data_frame_path = recording_folder + '/MountainSort/DataFrames/spatial_firing.pkl'
-
-        if os.path.exists(spatial_data_frame_path):
-            if os.path.exists(spike_data_frame_path):
-                session_id = recording_folder.split('/')[-1]
-                print('I found a processed position data frame at ', session_id)
-                processed_position = pd.read_pickle(spatial_data_frame_path)
-                '''
-                
-                'binned_time_ms_per_trial' 'binned_speed_ms_per_trial' 'rewarded_trials'
-                'rewarded_stop_locations' 'binned_apsolute_elapsed_time'
-                'stop_location_cm' 'stop_trial_number' 'stop_trial_type'
-                
-                '''
-                processed_position = processed_position[['binned_speed_ms', 'rewarded_trials', 'rewarded_stop_locations', 'stop_location_cm', 'stop_trial_number', 'stop_trial_type']].copy()
-
-                processed_position_data = processed_position_data.append({"session_id": session_id,
-                                                                          'binned_speed_ms': np.array(processed_position['binned_speed_ms']),
-                                                                          'rewarded_trials': np.array(processed_position['rewarded_trials']),
-                                                                          'rewarded_locations': np.array(processed_position['rewarded_stop_locations']),
-                                                                          'stop_location_cm': np.array(processed_position['stop_location_cm']),
-                                                                          'stop_trial_number': np.array(processed_position['stop_trial_number']),
-                                                                          'stop_trial_type': np.array(processed_position['stop_trial_type'])}, ignore_index=True)
-                print('Position data extracted from frame, loading spatial data...')
-
-                # load spatial firing frame and desired columns
-                spatial_firing = pd.read_pickle(spike_data_frame_path)
-                '''
-                'session_id' 'cluster_id' 'tetrode' 'number_of_spikes' 'mean_firing_rate' 
-                 'isolation' 'noise_overlap' 'firing_times' 'x_position_cm' 'speed_per200ms'
-                 'trial_number' 'trial_type' 'random_snippets' 
-                 'spike_num_on_trials' 'spike_rate_on_trials' 'spike_rate_on_trials_smoothed'
-                 'position_rate_in_time' 'spike_rate_in_time' 'speed_rate_in_time'
-                '''
-
-                print('I found a firing data frame with ', spatial_firing.shape[0], ' cell(s)')
-                if (spatial_firing.shape[0] >0 and 'position_rate_in_time' in spatial_firing):
-                    spatial_firing = spatial_firing[['session_id', 'cluster_id', 'mean_firing_rate','firing_times', 'random_snippets','x_position_cm', 'trial_number', 'trial_type','spike_rate_on_trials', 'spike_rate_on_trials_smoothed', 'spike_rate_in_time', 'position_rate_in_time', 'speed_rate_in_time']].copy()
-                    spatial_firing.reset_index(drop=True, inplace=True)
-
-                    frames= pd.concat([processed_position_data]*(spatial_firing.shape[0]), ignore_index= True)
-                    spatial_firing["binned_speed_ms"]=frames["binned_speed_ms"]
-                    spatial_firing["stop_trial_number"]=frames["stop_trial_number"]
-                    spatial_firing["stop_location_cm"]=frames["stop_location_cm"]
-                    spatial_firing["rewarded_trials"]=frames["rewarded_trials"]
-                    spatial_firing["rewarded_locations"]=frames["rewarded_locations"]
-                    print('appending data frames ...')
-
-                    spatial_firing_data = spatial_firing_data.append(spatial_firing)
-                print(spatial_firing_data.shape[0], ' cells found so far in this mouse')
-            else:
-                print("Dataframe not found...")
-
-    spatial_firing_data.to_pickle(save_path+'all_mice_spatial_firing.pkl')
-    return spatial_firing_data
-
-
 def main():
 
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
-    concat_multi_spatial_dir(base_recordings_folder="/mnt/datastore/Harry/Cohort7_october2020/vr/", save_path="/mnt/datastore/Harry/Cohort7_october2020/vr/")
 
 if __name__ == '__main__':
     main()
