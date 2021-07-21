@@ -21,8 +21,8 @@ def recompute_scores(spike_data, synced_spatial_data, prm):
 
     spike_data = PostSorting.open_field_spatial_firing.process_spatial_firing(spike_data, synced_spatial_data)
     spike_data = PostSorting.speed.calculate_speed_score(synced_spatial_data, spike_data, settings.gauss_sd_for_speed_score, settings.sampling_rate)
-    _, spike_data = PostSorting.open_field_head_direction.process_hd_data(spike_data, synced_spatial_data, prm)
-    position_heatmap, spike_data = PostSorting.open_field_firing_maps.make_firing_field_maps(synced_spatial_data, spike_data, prm)
+    _, spike_data = PostSorting.open_field_head_direction.process_hd_data(spike_data, synced_spatial_data)
+    position_heatmap, spike_data = PostSorting.open_field_firing_maps.make_firing_field_maps(synced_spatial_data, spike_data)
     spike_data = PostSorting.open_field_grid_cells.process_grid_data(spike_data)
     spike_data = PostSorting.open_field_firing_maps.calculate_spatial_information(spike_data, position_heatmap)
 
