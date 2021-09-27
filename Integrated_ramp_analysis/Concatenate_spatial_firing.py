@@ -5,7 +5,8 @@ import numpy as np
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
-
+from PostSorting.post_process_sorted_data_vr import process_running_parameter_tag
+from control_sorting_analysis import get_tags_parameter_file
 """
 This file creates a concatenated dataframe of all the recording directories passed to it and saves it where specified,
 for collection of the processed position data for the vr side, there will be a link pointing to the original processed position
@@ -23,7 +24,11 @@ def add_nested_time_binned_data(spike_data, processed_position_data):
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
 
-        spikes_in_time = []
+        rates_ = []
+        speeds_ = []
+        positions_ = []
+        trial_numbers_ = []
+        trial_types_ = []
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
             trial_type = trial_proccessed_position_data["trial_type"].iloc[0]
@@ -45,8 +50,14 @@ def add_nested_time_binned_data(spike_data, processed_position_data):
                 trial_numbers = np.repeat(trial_number, len(rates))
                 trial_types = np.repeat(trial_type, len(rates))
 
-                trial_list = [rates, speed, position, trial_numbers, trial_types]
-                spikes_in_time.append(trial_list)
+                rates_.extend(rates.tolist())
+                speeds_.extend(speed.tolist())
+                positions_.extend(position.tolist())
+                trial_numbers_.extend(trial_numbers.tolist())
+                trial_types_.extend(trial_types.tolist())
+
+        spikes_in_time = [np.array(rates_), np.array(speeds_),
+                          np.array(positions_), np.array(trial_numbers_), np.array(trial_types_)]
 
         nested_lists.append(spikes_in_time)
 
@@ -61,6 +72,10 @@ def add_nested_space_binned_data(spike_data, processed_position_data):
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
 
+        rates_ = []
+        trial_numbers_ = []
+        trial_types_ = []
+
         spikes_in_space = []
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
@@ -69,8 +84,11 @@ def add_nested_space_binned_data(spike_data, processed_position_data):
             trial_numbers = np.repeat(trial_number, len(rates))
             trial_types = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(rates))
 
-            trial_list = [rates, trial_numbers, trial_types]
-            spikes_in_space.append(trial_list)
+            rates_.extend(rates.tolist())
+            trial_numbers_.extend(trial_numbers.tolist())
+            trial_types_.extend(trial_types.tolist())
+
+        spikes_in_space = [np.array(rates_), np.array(trial_numbers_), np.array(trial_types_)]
 
         nested_lists.append(spikes_in_space)
 
@@ -150,7 +168,7 @@ def remove_cluster_without_firing_events(spike_data):
     return spike_data_filtered
 
 
-def process_dir(recordings_path, concatenated_spike_data=None, save_path=None):
+def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, track_length=200):
 
     """
     Creates a dataset with spike data for ramp analysis and modelling
@@ -174,40 +192,47 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None):
 
         spatial_dataframe_path = recording + '/MountainSort/DataFrames/processed_position_data.pkl'
         spike_dataframe_path = recording + '/MountainSort/DataFrames/spatial_firing.pkl'
-        mouse_id = recording.split("/")[-1].split("_")[0]
+        recording_stop_threshold, recording_track_length, _ = process_running_parameter_tag(get_tags_parameter_file(recording))
 
-        if os.path.exists(spike_dataframe_path):
-            spike_data = pd.read_pickle(spike_dataframe_path)
-            spike_data = remove_cluster_without_firing_events(spike_data)
-            if os.path.exists(spatial_dataframe_path):
-                processed_position_data = pd.read_pickle(spatial_dataframe_path)
+        mouse_id = str(recording.split("/")[-1].split("_")[0])
 
-                # look for key collumns needs for ramp amalysis
-                if ("fr_time_binned" in list(spike_data)) or ("fr_binned_in_space" in list(spike_data)):
+        # only take recordings with the given track length
+        if int(track_length) == int(recording_track_length):
 
-                    spike_data = add_nested_time_binned_data(spike_data, processed_position_data)
-                    spike_data = add_nested_space_binned_data(spike_data, processed_position_data)
-                    spike_data = add_stop_variables(spike_data, processed_position_data)
+            if os.path.exists(spike_dataframe_path):
+                spike_data = pd.read_pickle(spike_dataframe_path)
+                spike_data = remove_cluster_without_firing_events(spike_data)
 
-                    columns_to_drop = ['all_snippets', 'random_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
-                                       'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
-                                       'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
-                                       'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
-                                       'probe_firing_rate_map_sem']
-                    for column in columns_to_drop:
-                        if column in list(spike_data):
-                            del spike_data[column]
+                if os.path.exists(spatial_dataframe_path):
+                    processed_position_data = pd.read_pickle(spatial_dataframe_path)
 
-                    concatenated_spike_data = pd.concat([concatenated_spike_data, spike_data], ignore_index=True)
+                    # look for key collumns needs for ramp amalysis
+                    if ("fr_time_binned" in list(spike_data)) or ("fr_binned_in_space" in list(spike_data)):
+
+                        spike_data = add_nested_time_binned_data(spike_data, processed_position_data)
+                        spike_data = add_nested_space_binned_data(spike_data, processed_position_data)
+                        spike_data = add_stop_variables(spike_data, processed_position_data)
+                        spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data)).tolist()
+
+                        columns_to_drop = ['all_snippets', 'random_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
+                                           'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
+                                           'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
+                                           'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
+                                           'probe_firing_rate_map_sem']
+                        for column in columns_to_drop:
+                            if column in list(spike_data):
+                                del spike_data[column]
+
+                        concatenated_spike_data = pd.concat([concatenated_spike_data, spike_data], ignore_index=True)
+
+                    else:
+                        if (len(spike_data)==0):
+                            print("this recording has no units, ", recording.split("/")[-1])
+                        else:
+                            print("could not find correct binned collumn in recording ", recording.split("/")[-1])
 
                 else:
-                    if (len(spike_data)==0):
-                        print("this recording has no units, ", recording.split("/")[-1])
-                    else:
-                        print("could not find correct binned collumn in recording ", recording.split("/")[-1])
-
-            else:
-                print("couldn't find processed_position for ", recording.split("/")[-1])
+                    print("couldn't find processed_position for ", recording.split("/")[-1])
 
     if save_path is not None:
         concatenated_spike_data.to_pickle(save_path+"concatenated_spike_data.pkl")
@@ -219,9 +244,18 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    #spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
-    #                         save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/")
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
 
+    spike_data = spike_data[spike_data["mouse_id"] != "1124"]
     spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data.pkl")
     print("were done for now ")
 
