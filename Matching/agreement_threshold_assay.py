@@ -1,7 +1,7 @@
 import pandas as pd
-from Edmond import sorting_comparison
+from EdmondHC import sorting_comparison
 import os
-from Edmond.plotting import *
+from EdmondHC.plotting import *
 import numpy as np
 import sys
 import traceback

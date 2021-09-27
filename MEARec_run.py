@@ -1,4 +1,4 @@
-import Edmond.SpikeInterface_fileutility as file_utility
+import EdmondHC.SpikeInterface_fileutility as file_utility
 from control_sorting_analysis import get_tags_parameter_file, check_for_paired
 import os
 import pandas as pd
@@ -12,10 +12,10 @@ import spikeinterface.comparison as sc
 import spikeinterface.widgets as sw
 import json
 import pickle
-import Edmond.spikeinterfaceHelper as spikeinterfaceHelper
+import EdmondHC.spikeinterfaceHelper as spikeinterfaceHelper
 from tqdm import tqdm
 import numpy as np
-import Edmond.SpikeInterface_setting as setting
+import EdmondHC.SpikeInterface_setting as setting
 import logging
 from types import SimpleNamespace
 import matplotlib.pylab as plt

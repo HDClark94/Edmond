@@ -28,8 +28,8 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    broken_recording = "/mnt/datastore/Harry/Cohort7_october2020/of/M4_D20_2020-11-23_15-36-50"
-    clip_recording(broken_recording, clip_end_sampling_points=None, clip_start_sampling_points=54032384)
+    broken_recording = "/mnt/datastore/Harry/Cohort8_may2021/of/M11_D44_2021-07-08_11-24-55"
+    clip_recording(broken_recording, clip_end_sampling_points=54032384, clip_start_sampling_points=None)
 
 
 

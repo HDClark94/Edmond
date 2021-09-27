@@ -332,7 +332,6 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
 def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, filter_by_slope=False):
     fig, ax = plt.subplots(figsize=(6,3))
 
-
     PS = data[data.tetrode_location == "PS"]
     MEC = data[data.tetrode_location == "MEC"]
     UN = data[data.tetrode_location == "UN"]

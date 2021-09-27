@@ -10,7 +10,7 @@ import PostSorting.theta_modulation
 from scipy import stats
 from scipy import signal
 from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
-import Edmond.Concatenate_from_server
+import EdmondHC.Concatenate_from_server
 from scipy import stats
 
 import matplotlib.pyplot as plt
@@ -115,9 +115,9 @@ def grids_trial_type_paired_t_test(grid_cells, save_path):
     plt.tight_layout()
     plt.savefig(save_path+"/vr_grid_cells_non_beaconed_vs_beaconed.png")
 
-def something(vr_data, of_data, prm):
+def something(vr_data, of_data):
 
-    combined_df = Edmond.Concatenate_from_server.combine_of_vr_dataframes(vr_data, of_data)
+    combined_df = EdmondHC.Concatenate_from_server.combine_of_vr_dataframes(vr_data, of_data)
 
     grid_cells = combined_df[(combined_df['rate_map_correlation_first_vs_second_half'] > 0) &
                              (combined_df['grid_score'] > 0.2)]
@@ -138,7 +138,7 @@ def main():
     params.set_pixel_ratio(440)
     vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
     of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
-    something(vr_data=vr_data, of_data=of_data, prm=params)
+    something(vr_data=vr_data, of_data=of_data)
 
     print("look now`")
 

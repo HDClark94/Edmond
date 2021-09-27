@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib.patches import Patch
 import itertools
 from scipy import stats
-from Edmond.ramp_cells_of import *
+from EdmondHC.ramp_cells_of import *
 import os
 import shutil
 

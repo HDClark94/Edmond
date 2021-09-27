@@ -244,19 +244,26 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
-                             save_path=None, track_length=200)
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
+    #                         save_path=None, track_length=200)
+    #spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort7.pkl")
+
     spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", concatenated_spike_data=None,
                              save_path=None, track_length=200)
+    spike_data = spike_data[spike_data["mouse_id"] != "1124"]
+    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort2.pkl")
+
     spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", concatenated_spike_data=None,
                              save_path=None, track_length=200)
+    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort3.pkl")
+
     spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", concatenated_spike_data=None,
                              save_path=None, track_length=200)
+    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort4.pkl")
+
     spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", concatenated_spike_data=None,
                              save_path=None, track_length=200)
-
-    spike_data = spike_data[spike_data["mouse_id"] != "1124"]
-    spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data.pkl")
+    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort5.pkl")
     print("were done for now ")
 
 if __name__ == '__main__':
