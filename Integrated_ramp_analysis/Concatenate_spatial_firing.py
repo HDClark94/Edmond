@@ -5,7 +5,8 @@ import numpy as np
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
-
+from PostSorting.post_process_sorted_data_vr import process_running_parameter_tag
+from control_sorting_analysis import get_tags_parameter_file
 """
 This file creates a concatenated dataframe of all the recording directories passed to it and saves it where specified,
 for collection of the processed position data for the vr side, there will be a link pointing to the original processed position
@@ -17,88 +18,165 @@ def load_processed_position_data_collumns(spike_data, processed_position_data):
         spike_data[collumn] = [collumn_data for x in range(len(spike_data))]
     return spike_data
 
-def make_longform(spike_data, processed_position_data, binning):
-    long_form_spike_data = pd.DataFrame()
+def add_nested_time_binned_data(spike_data, processed_position_data):
 
+    nested_lists = []
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
 
+        rates_ = []
+        speeds_ = []
+        positions_ = []
+        trial_numbers_ = []
+        trial_types_ = []
+        for trial_number in processed_position_data["trial_number"]:
+            trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
+            trial_type = trial_proccessed_position_data["trial_type"].iloc[0]
+
+            speed_o = pd.Series(trial_proccessed_position_data['speeds_binned_in_time'].iloc[0])
+            position_o = pd.Series(trial_proccessed_position_data['pos_binned_in_time'].iloc[0])
+            #acceleration_o = pd.Series(trial_proccessed_position_data['acc_binned_in_time'].iloc[0])
+            rates_o = pd.Series(cluster_spike_data['fr_time_binned'].iloc[0][trial_number-1])
+
+            if len(speed_o)>0: # add a catch for nans?
+
+                # remove outliers
+                rates = rates_o[speed_o.between(speed_o.quantile(.05), speed_o.quantile(.95))].to_numpy() # without outliers
+                speed = speed_o[speed_o.between(speed_o.quantile(.05), speed_o.quantile(.95))].to_numpy() # without outliers
+                position = position_o[speed_o.between(speed_o.quantile(.05), speed_o.quantile(.95))].to_numpy() # without outliers
+                #acceleration = acceleration_o[speed_o.between(speed_o.quantile(.05), speed_o.quantile(.95))].to_numpy() # without outliers
+
+                # make trial type, trial number and whether it was a rewarded trial into longform
+                trial_numbers = np.repeat(trial_number, len(rates))
+                trial_types = np.repeat(trial_type, len(rates))
+
+                rates_.extend(rates.tolist())
+                speeds_.extend(speed.tolist())
+                positions_.extend(position.tolist())
+                trial_numbers_.extend(trial_numbers.tolist())
+                trial_types_.extend(trial_types.tolist())
+
+        spikes_in_time = [np.array(rates_), np.array(speeds_),
+                          np.array(positions_), np.array(trial_numbers_), np.array(trial_types_)]
+
+        nested_lists.append(spikes_in_time)
+
+    spike_data["spike_rate_in_time"] = nested_lists
+
+    return spike_data
+
+
+def add_nested_space_binned_data(spike_data, processed_position_data):
+
+    nested_lists = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
+
+        rates_ = []
+        trial_numbers_ = []
+        trial_types_ = []
+
+        spikes_in_space = []
         for trial_number in processed_position_data["trial_number"]:
             trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
 
-            # space
-            if binning == "space":
-                speed = trial_proccessed_position_data['speeds_binned_in_space'].iloc[0]
-                pos = trial_proccessed_position_data['pos_binned_in_space'].iloc[0]
-                acc = trial_proccessed_position_data['acc_binned_in_space'].iloc[0]
-                fr = np.array(cluster_spike_data['fr_binned_in_space'].iloc[0][trial_number-1])
-                fr_pos_bin_centres = np.array(cluster_spike_data['fr_binned_in_space_bin_centres'].iloc[0][trial_number-1])
+            rates = np.array(cluster_spike_data['fr_binned_in_space'].iloc[0][trial_number-1])
+            trial_numbers = np.repeat(trial_number, len(rates))
+            trial_types = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(rates))
 
-                if len(speed)>0: # add a catch for nans?
-                    cluster_spike_data_long_form = pd.concat([cluster_spike_data]*len(fr), ignore_index=True)
-                    del cluster_spike_data_long_form["fr_binned_in_space_bin_centres"]
-                    del cluster_spike_data_long_form["fr_binned_in_space"]
+            rates_.extend(rates.tolist())
+            trial_numbers_.extend(trial_numbers.tolist())
+            trial_types_.extend(trial_types.tolist())
 
-                    trial_number_long_form = np.repeat(trial_number, len(fr))
-                    trial_type_long_form = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(fr))
-                    rewarded_long_form = np.repeat(trial_proccessed_position_data["rewarded"].iloc[0], len(fr))
+        spikes_in_space = [np.array(rates_), np.array(trial_numbers_), np.array(trial_types_)]
 
-                    cluster_spike_data_long_form["Trials"] = trial_number_long_form
-                    cluster_spike_data_long_form["Trial_Type"] = trial_type_long_form
-                    cluster_spike_data_long_form["Rewarded"] = rewarded_long_form
-                    cluster_spike_data_long_form["Speeds"] = speed
-                    cluster_spike_data_long_form["Position"] = pos
-                    cluster_spike_data_long_form["Acceleration"] = acc
-                    cluster_spike_data_long_form["Rates"] = fr
+        nested_lists.append(spikes_in_space)
 
-                    long_form_spike_data = pd.concat([long_form_spike_data, cluster_spike_data_long_form], ignore_index=True)
+    spike_data["spike_rate_on_trials_smoothed"] = nested_lists
 
-            # or from time
-            elif binning == "time": # add a catch for nans?
-                speed = trial_proccessed_position_data['speeds_binned_in_time'].iloc[0]
-                pos = trial_proccessed_position_data['pos_binned_in_time'].iloc[0]
-                acc = trial_proccessed_position_data['acc_binned_in_time'].iloc[0]
-                fr = cluster_spike_data['fr_time_binned'].iloc[0][trial_number-1]
-
-                if len(speed)>0: #only create longform if there is a time binned variable to add
-                    cluster_spike_data_long_form = pd.concat([cluster_spike_data]*len(speed), ignore_index=True)
-                    del cluster_spike_data_long_form["fr_time_binned"]
-
-                    trial_number_long_form = np.repeat(trial_number, len(fr))
-                    trial_type_long_form = np.repeat(trial_proccessed_position_data["trial_type"].iloc[0], len(fr))
-                    rewarded_long_form = np.repeat(trial_proccessed_position_data["rewarded"].iloc[0], len(fr))
-
-                    cluster_spike_data_long_form["Trials"] = trial_number_long_form
-                    cluster_spike_data_long_form["Trial_Type"] = trial_type_long_form
-                    cluster_spike_data_long_form["Rewarded"] = rewarded_long_form
-                    cluster_spike_data_long_form["Speeds"] = speed
-                    cluster_spike_data_long_form["Position"] = pos
-                    cluster_spike_data_long_form["Acceleration"] = acc
-                    cluster_spike_data_long_form["Rates"] = fr
-
-                    long_form_spike_data = pd.concat([long_form_spike_data, cluster_spike_data_long_form], ignore_index=True)
-
-    return long_form_spike_data
-
-
-def delete_other_binning_collumn(spike_data, binning):
-    if binning == "space":
-        del spike_data['fr_time_binned']
-    elif binning == "time":
-        del spike_data['fr_binned_in_space']
-        del spike_data['fr_binned_in_space_bin_centres']
     return spike_data
 
-def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, binning="space"):
+def add_stop_variables(spike_data, processed_position_data):
+    rewarded_locations_clusters = []
+    rewarded_trials_clusters = []
+    rewarded_trial_types_clusters = []
+
+    stop_locations_clusters = []
+    stop_trials_clusters = []
+    stop_trial_types_clusters = []
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        rewarded_locations = []
+        rewarded_trials = []
+        rewarded_trial_types = []
+
+        stop_locations = []
+        stop_trials = []
+        stop_trial_type = []
+
+        for trial_number in processed_position_data["trial_number"]:
+            trial_proccessed_position_data = processed_position_data[(processed_position_data["trial_number"] == trial_number)]
+            trial_type = trial_proccessed_position_data["trial_type"].iloc[0]
+            rewarded = trial_proccessed_position_data["rewarded"].iloc[0]
+
+            # get rewarded stops and all stops in a given trial
+            trial_rewarded_locations = trial_proccessed_position_data["reward_stop_location_cm"].iloc[0]
+            trial_stop_locations = trial_proccessed_position_data["stop_location_cm"].iloc[0]
+
+            # append stops, trial number, types and the same for rewarded stops
+            stop_trials.extend(np.repeat(trial_number, len(trial_stop_locations)).tolist())
+            stop_trial_type.extend(np.repeat(trial_type, len(trial_stop_locations)).tolist())
+            stop_locations.extend(trial_stop_locations.tolist())
+            if rewarded:
+                rewarded_trials.append(trial_number)
+                rewarded_trial_types.append(trial_type)
+                rewarded_locations.append(trial_rewarded_locations[0])
+
+        # append to cluster lists
+        stop_trials_clusters.append(stop_trials)
+        stop_trial_types_clusters.append(stop_trial_type)
+        stop_locations_clusters.append(stop_locations)
+        rewarded_trials_clusters.append(rewarded_trials)
+        rewarded_trial_types_clusters.append(rewarded_trial_types)
+        rewarded_locations_clusters.append(rewarded_locations)
+
+    spike_data["stop_trials"] = stop_trials_clusters
+    spike_data["stop_trial_types"] = stop_trial_types_clusters
+    spike_data["stop_locations"] = stop_locations_clusters
+    spike_data["rewarded_trials"] = rewarded_trials_clusters
+    spike_data["rewarded_trial_types"] = rewarded_trials_clusters
+    spike_data["rewarded_locations"] = rewarded_locations_clusters
+
+    return spike_data
+
+def remove_cluster_without_firing_events(spike_data):
+    '''
+    Removes rows where no firing times are found, this occurs when spikes are found in one session type and not the
+    other when multiple sessions are spike sorted together
+    '''
+
+    spike_data_filtered = pd.DataFrame()
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
+        firing_times = cluster_spike_data["firing_times"].iloc[0]
+        if len(firing_times)>0:
+            spike_data_filtered = pd.concat([spike_data_filtered, cluster_spike_data])
+        else:
+            print("I am removing cluster ", cluster_id, " from this recording")
+            print("because it has no firing events in this spatial firing dataframe")
+
+    return spike_data_filtered
+
+
+def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, track_length=200):
 
     """
-    Creates a long form dataset with spike data for ramp analysis and modelling
+    Creates a dataset with spike data for ramp analysis and modelling
 
     :param recordings_path: path for a folder with all the recordings you want to process
     :param concatenated_spike_data: a pandas dataframe to append all processsed spike data to
     :param save_path: where we save the new processed spike data
-    :param binning: "time" or "space": depends if you want the longform to include the space binned or time binned data
-    :return: processed spike data in longform
+    :return: processed spike data
     """
 
     # make an empty dataframe if concatenated frame given as none
@@ -114,51 +192,50 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, b
 
         spatial_dataframe_path = recording + '/MountainSort/DataFrames/processed_position_data.pkl'
         spike_dataframe_path = recording + '/MountainSort/DataFrames/spatial_firing.pkl'
-        mouse_id = recording.split("/")[-1].split("_")[0]
+        recording_stop_threshold, recording_track_length, _ = process_running_parameter_tag(get_tags_parameter_file(recording))
 
-        if os.path.exists(spike_dataframe_path):
-            spike_data = pd.read_pickle(spike_dataframe_path)
-            if os.path.exists(spatial_dataframe_path):
-                processed_position_data = pd.read_pickle(spatial_dataframe_path)
+        mouse_id = str(recording.split("/")[-1].split("_")[0])
 
-                # look for key collumns needs for ramp amalysis
-                if ("fr_time_binned" in list(spike_data)) or ("fr_binned_in_space" in list(spike_data)):
+        # only take recordings with the given track length
+        if int(track_length) == int(recording_track_length):
 
-                    # load mouse id
-                    spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data))
+            if os.path.exists(spike_dataframe_path):
+                spike_data = pd.read_pickle(spike_dataframe_path)
+                spike_data = remove_cluster_without_firing_events(spike_data)
 
-                    # drop any heavy collumns in the dataframe for housekeeping
+                if os.path.exists(spatial_dataframe_path):
+                    processed_position_data = pd.read_pickle(spatial_dataframe_path)
 
-                    columns_to_drop = ['firing_times', 'trial_number', 'trial_type',
-                                       'all_snippets', 'random_snippets', 'speed_per200ms',
-                                       'x_position_cm', 'beaconed_position_cm', 'beaconed_trial_number',
-                                       'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
-                                       'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
-                                       'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
-                                       'probe_firing_rate_map_sem', 'tetrode', 'primary_channel', 'isolation', 'noise_overlap',
-                                       'peak_snr','peak_amp', 'number_of_spikes', 'mean_firing_rate', 'mean_firing_rate_local',
-                                       'ThetaPower', 'ThetaIndex', 'Boccara_theta_class']
+                    # look for key collumns needs for ramp amalysis
+                    if ("fr_time_binned" in list(spike_data)) or ("fr_binned_in_space" in list(spike_data)):
 
-                    for column in columns_to_drop:
-                        if column in list(spike_data):
-                            del spike_data[column]
-                    spike_data = delete_other_binning_collumn(spike_data, binning)
+                        spike_data = add_nested_time_binned_data(spike_data, processed_position_data)
+                        spike_data = add_nested_space_binned_data(spike_data, processed_position_data)
+                        spike_data = add_stop_variables(spike_data, processed_position_data)
+                        spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data)).tolist()
 
-                    # create longform dataframe
-                    spike_data_long_form = make_longform(spike_data, processed_position_data, binning=binning)
-                    concatenated_spike_data = pd.concat([concatenated_spike_data, spike_data_long_form], ignore_index=True)
-                else:
-                    if (len(spike_data)==0):
-                        print("this recording has no units, ", recording.split("/")[-1])
+                        columns_to_drop = ['all_snippets', 'random_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
+                                           'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
+                                           'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
+                                           'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
+                                           'probe_firing_rate_map_sem']
+                        for column in columns_to_drop:
+                            if column in list(spike_data):
+                                del spike_data[column]
+
+                        concatenated_spike_data = pd.concat([concatenated_spike_data, spike_data], ignore_index=True)
+
                     else:
-                        print("could not find correct binned collumn in recording ", recording.split("/")[-1])
+                        if (len(spike_data)==0):
+                            print("this recording has no units, ", recording.split("/")[-1])
+                        else:
+                            print("could not find correct binned collumn in recording ", recording.split("/")[-1])
 
-            else:
-                print("couldn't find processed_position for ", recording.split("/")[-1])
+                else:
+                    print("couldn't find processed_position for ", recording.split("/")[-1])
 
     if save_path is not None:
-        concatenated_spike_data.to_pickle(save_path+binning+"_binned_concatenated_spike_data.pkl")
-        concatenated_spike_data.to_csv(save_path+binning+"_binned_concatenated_spike_data.csv")
+        concatenated_spike_data.to_pickle(save_path+"concatenated_spike_data.pkl")
 
     return concatenated_spike_data
 
@@ -168,14 +245,18 @@ def main():
     print('-------------------------------------------------------------')
 
     spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
-                             save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/", binning="time")
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
+    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", concatenated_spike_data=None,
+                             save_path=None, track_length=200)
 
-    print("wve done one")
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
-                             save_path= "/mnt/datastore/Harry/Ramp_cells_open_field_paper/", binning="space")
-
-
-    spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/time_binned_concatenated_spike_data.pkl")
+    spike_data = spike_data[spike_data["mouse_id"] != "1124"]
+    spike_data = pd.read_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data.pkl")
     print("were done for now ")
 
 if __name__ == '__main__':
