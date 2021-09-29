@@ -85,12 +85,12 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             processed_position_data = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_avg_trial_speed(processed_position_data)
 
-            #spike_data = EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis.process_spatial_information(spike_data, position_data, processed_position_data, track_length=get_track_length(recording))
-            #spike_data = EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations(spike_data, processed_position_data)
-            #spike_data = EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations_shuffle(spike_data, processed_position_data)
-            #spike_data = EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis.add_pairwise_classifier(spike_data)
+            #spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_spatial_information(spike_data, position_data, processed_position_data, track_length=get_track_length(recording))
+            #spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations(spike_data, processed_position_data)
+            #spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations_shuffle(spike_data, processed_position_data)
+            #spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.add_pairwise_classifier(spike_data)
 
-            EdmondHC.VR_grid_analysis.vr_grid_stability_plots.plot_hmt_against_pairwise(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            Edmond.VR_grid_analysis.vr_grid_stability_plots.plot_hmt_against_pairwise(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
 
             #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 

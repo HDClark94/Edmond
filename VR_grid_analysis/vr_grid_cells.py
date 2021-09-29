@@ -47,8 +47,8 @@ def add_hit_miss_try(processed_position_data, track_length):
     for trial_number in np.unique(rewarded_processed_position_data["trial_number"]):
         trial_rewarded_processed_position_data = rewarded_processed_position_data[rewarded_processed_position_data["trial_number"] == trial_number]
 
-        rewarded_speeds_in_space = EdmondHC.plot_utility2.pandas_collumn_to_numpy_array(trial_rewarded_processed_position_data['speeds_binned_in_space'])
-        rewarded_bin_centres = EdmondHC.plot_utility2.pandas_collumn_to_numpy_array(trial_rewarded_processed_position_data['position_bin_centres'])
+        rewarded_speeds_in_space = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_rewarded_processed_position_data['speeds_binned_in_space'])
+        rewarded_bin_centres = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_rewarded_processed_position_data['position_bin_centres'])
         in_rz_mask = (rewarded_bin_centres > reward_zone_start) & (rewarded_bin_centres <= reward_zone_end)
         rewarded_speeds_in_space_in_reward_zone = rewarded_speeds_in_space[in_rz_mask]
         rewarded_speeds_in_space_in_reward_zone = rewarded_speeds_in_space_in_reward_zone[~np.isnan(rewarded_speeds_in_space_in_reward_zone)]
@@ -67,8 +67,8 @@ def add_hit_miss_try(processed_position_data, track_length):
     hit_miss_try =[]
     for i, trial_number in enumerate(processed_position_data.trial_number):
         trial_process_position_data = processed_position_data[(processed_position_data.trial_number == trial_number)]
-        trial_speeds_in_space = EdmondHC.plot_utility2.pandas_collumn_to_numpy_array(trial_process_position_data['speeds_binned_in_space'])
-        trial_bin_centres = EdmondHC.plot_utility2.pandas_collumn_to_numpy_array(trial_process_position_data['position_bin_centres'])
+        trial_speeds_in_space = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_process_position_data['speeds_binned_in_space'])
+        trial_bin_centres = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_process_position_data['position_bin_centres'])
         in_rz_mask = (trial_bin_centres > reward_zone_start) & (trial_bin_centres <= reward_zone_end)
         trial_speeds_in_reward_zone = trial_speeds_in_space[in_rz_mask]
         trial_speeds_in_reward_zone = trial_speeds_in_reward_zone[~np.isnan(trial_speeds_in_reward_zone)]
