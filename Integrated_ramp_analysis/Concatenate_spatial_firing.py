@@ -214,7 +214,7 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, t
                         spike_data = add_stop_variables(spike_data, processed_position_data)
                         spike_data["mouse_id"] = np.repeat(mouse_id, len(spike_data)).tolist()
 
-                        columns_to_drop = ['all_snippets', 'random_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
+                        columns_to_drop = ['all_snippets', 'beaconed_position_cm', 'beaconed_trial_number',
                                            'nonbeaconed_position_cm', 'nonbeaconed_trial_number', 'probe_position_cm',
                                            'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
                                            'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',

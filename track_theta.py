@@ -12,9 +12,9 @@ import traceback
 import warnings
 import sys
 from PostSorting.theta_modulation import *
-from EdmondHC.ramp_cells_of import *
+from Edmond.ramp_cells_of import *
 import scipy
-from EdmondHC.loc_ramp_analysis import remove_mouse
+from Edmond.loc_ramp_analysis import remove_mouse
 warnings.filterwarnings('ignore')
 
 test_params = PostSorting.parameters.Parameters()

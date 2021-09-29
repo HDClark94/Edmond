@@ -10,7 +10,7 @@ import PostSorting.theta_modulation
 from scipy import stats
 from scipy import signal
 from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
-import EdmondHC.Concatenate_from_server
+import Edmond.Concatenate_from_server
 from scipy import stats
 
 import matplotlib.pyplot as plt

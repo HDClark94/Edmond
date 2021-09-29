@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import settings
 from numpy import inf
 from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
-from EdmondHC.Concatenate_from_server import *
+from Edmond.Concatenate_from_server import *
 from scipy import stats
 
 def get_spatial_information_score(cluster_spike_data, position_data, processed_position_data,

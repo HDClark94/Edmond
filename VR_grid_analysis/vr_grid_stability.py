@@ -15,10 +15,10 @@ import traceback
 import warnings
 import matplotlib.ticker as ticker
 import sys
-import EdmondHC.plot_utility2
-import EdmondHC.VR_grid_analysis.vr_grid_stability_plots
-import EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis
-from EdmondHC.VR_grid_analysis.vr_grid_cells import *
+import Edmond.plot_utility2
+import Edmond.VR_grid_analysis.vr_grid_stability_plots
+import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
+from Edmond.VR_grid_analysis.vr_grid_cells import *
 import settings
 import matplotlib.pylab as plt
 import matplotlib as mpl

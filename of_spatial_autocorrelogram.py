@@ -18,7 +18,7 @@ import warnings
 import matplotlib.ticker as ticker
 import sys
 import math
-import EdmondHC.plot_utility2
+import Edmond.plot_utility2
 import settings
 import matplotlib.pylab as plt
 import matplotlib as mpl

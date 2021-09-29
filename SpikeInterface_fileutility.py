@@ -1,6 +1,6 @@
 import glob
 import os
-import EdmondHC.SpikeInterface_setting as setting
+import Edmond.SpikeInterface_setting as setting
 import OpenEphys
 import numpy as np
 

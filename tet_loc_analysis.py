@@ -6,7 +6,7 @@ import itertools
 from scipy import stats
 from sklearn.linear_model import LinearRegression
 import warnings
-from EdmondHC.ramp_cells_of import *
+from Edmond.ramp_cells_of import *
 warnings.filterwarnings('ignore')
 
 ''' this code is old and depreceated now'''

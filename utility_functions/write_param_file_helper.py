@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import traceback
 import sys
-from EdmondHC.Concatenate_from_server import get_recording_paths
+from Edmond.Concatenate_from_server import get_recording_paths
 
 '''
 This script enables quick writing of the parameter file for all recordings

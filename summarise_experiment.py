@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
-from EdmondHC.Concatenate_from_server import *
+from Edmond.Concatenate_from_server import *
 
 def get_tidy_title(collumn):
     if collumn == "speed_score":

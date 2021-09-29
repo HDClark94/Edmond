@@ -15,8 +15,8 @@ import traceback
 import warnings
 import matplotlib.ticker as ticker
 import sys
-import EdmondHC.plot_utility2
-import EdmondHC.VR_grid_analysis.hit_miss_try_firing_analysis
+import Edmond.plot_utility2
+import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
 import settings
 import matplotlib.pylab as plt
 import matplotlib as mpl
