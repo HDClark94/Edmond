@@ -1,17 +1,13 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import traceback
-import warnings
 import sys
 import PostSorting.open_field_head_direction
 import PostSorting.parameters
 import PostSorting.open_field_grid_cells
 import PostSorting.open_field_firing_maps
 import PostSorting.theta_modulation
-import PostSorting.vr_grid_cells
-import glob
 
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
@@ -59,6 +55,15 @@ def get_recording_paths(path_list, folder_path):
         print(recording_path.split("/datastore/")[-1])
     return path_list
 
+def get_collumns_with_single_values(spatial_firing):
+
+    collumn_names_to_keep = []
+    for i in range(len(list(spatial_firing))):
+        collumn_name = list(spatial_firing)[i]
+        if (np.size(spatial_firing[collumn_name].iloc[0]) == 1):
+            collumn_names_to_keep.append(collumn_name)
+    return collumn_names_to_keep
+
 def add_full_session_id(spatial_firing, full_path):
     full_session_ids = []
 
@@ -91,14 +96,13 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                 spatial_firing = add_full_session_id(spatial_firing, path)
 
                 if len(spatial_firing) > 0:
-                    spatial_firing=spatial_firing[["session_id",
-                                                   "cluster_id",
-                                                   "tetrode",
-                                                   "primary_channel",
-                                                   "mean_firing_rate_local"]]
+                    collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
+                    collumn_names_to_keep.append("firing_times")
+                    collumn_names_to_keep.append("random_snippets")
+                    spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
-                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate_local': ('mean_firing_rate_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -128,7 +132,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
 
 
 
-def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="", prm=None):
+def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix=""):
     spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
     spatial_path = "/MountainSort/DataFrames/position.pkl"
 
@@ -147,39 +151,14 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
 
                 spatial_firing = add_full_session_id(spatial_firing, path)
 
-
-                if ("hd_score" not in list(spatial_firing)) and (len(spatial_firing) > 0):
-                    spatial_data = pd.read_pickle(spatial_df_path)
-                    _, spatial_firing = PostSorting.open_field_head_direction.process_hd_data(spatial_firing, spatial_data)
-
-                if ("grid_score" not in list(spatial_firing)) and (len(spatial_firing) > 0):
-                    spatial_data = pd.read_pickle(spatial_df_path)
-                    position_heat_map, spatial_firing = PostSorting.open_field_firing_maps.make_firing_field_maps(spatial_data, spatial_firing)
-                    spatial_firing = PostSorting.open_field_grid_cells.process_grid_data(spatial_firing)
-
-                if ("Boccara_theta_class" not in list(spatial_firing)) and (len(spatial_firing) > 0):
-                    prm.set_output_path(path+"/MountainSort")
-                    spatial_firing = PostSorting.theta_modulation.calculate_theta_index(spatial_firing, prm)
-
                 if len(spatial_firing) > 0:
-
-                    spatial_firing=spatial_firing[["session_id",
-                                                   "cluster_id",
-                                                   "tetrode",
-                                                   "primary_channel",
-                                                   "hd_score",
-                                                   "grid_score",
-                                                   "speed_score",
-                                                   "border_score",
-                                                   "grid_spacing",
-                                                   "full_session_id",
-                                                   "ThetaIndex",
-                                                   "Boccara_theta_class",
-                                                   "rate_map_correlation_first_vs_second_half",
-                                                   "mean_firing_rate_local"]]
+                    collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
+                    collumn_names_to_keep.append("firing_times")
+                    collumn_names_to_keep.append("random_snippets")
+                    spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
-                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate_local': ('mean_firing_rate_of')})
+                    spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_of')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -226,7 +205,7 @@ def combine_of_vr_dataframes(of_dataframe, vr_dataframe):
                                      (vr_dataframe.mouse == mouse)]
 
         combined_cluster = cluster_of_df.copy()
-        if len(cluster_vr_df) == 1:
+        if ((len(cluster_vr_df) == 1) and (len(cluster_of_df) == 1)):
             collumns_to_add = np.setdiff1d(list(cluster_vr_df), list(cluster_of_df)) # finds collumns in 1 list that are not in the other
             for i in range(len(collumns_to_add)):
                 combined_cluster[collumns_to_add[i]] = [cluster_vr_df[collumns_to_add[i]].iloc[0]]

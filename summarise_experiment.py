@@ -133,7 +133,7 @@ def add_full_session_id(data, all_recording_paths):
     data["full_session_id"] = full_session_ids
     return data
 
-def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, prm=None):
+def summarise_experiment(recordings_folder_path, suffix=None, save_path=None):
     '''
     :param recordings_folder_path: path to folder with all the recordings you want to summarise
     :param suffix: should be vr or of
@@ -147,9 +147,9 @@ def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, pr
     recording_paths = get_recording_paths([], recordings_folder_path)
     all_days_df = pd.DataFrame()
     if suffix == "vr":
-        all_days_df = load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="vr", prm=prm)
+        all_days_df = load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None)
     elif suffix == "of":
-        all_days_df = load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix="of", prm=prm)
+        all_days_df = load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None)
 
     all_days_df = add_full_session_id(all_days_df, recording_paths)
     all_days_df = add_session_identifiers(all_days_df)
@@ -157,7 +157,7 @@ def summarise_experiment(recordings_folder_path, suffix=None, save_path=None, pr
     if save_path is not None:
         all_days_df.to_pickle(save_path+"/All_mice_"+suffix+".pkl")
         all_days_df.to_csv(save_path+"/All_mice_"+suffix+".csv")
-    return
+    return all_days_df
 
 def check_structure_session_id(session_id):
     # looks at string of session id and returns the correct structure if extra bits are added
@@ -316,39 +316,104 @@ def plot_summary_per_mouse(days_data, save_path=None):
         plot_stat_across_days(mouse_all_days, collumn="hd_score", save_path=save_path)
         plot_stat_across_days(mouse_all_days, collumn="Boccara_theta_class", save_path=save_path)
 
+def add_model_classifications(df, linear_model_classifications, mixed_model_classifications):
+    """
+    :param df: data frame with the structure of spatial firing
+    :param linear_model_classifications: dataframe with the linear model classifications
+    :param mixed_model_classifications: dataframe with the mixed model classifications
+    :return: a dataframe with the structure of the linear model but with the mixed model
+    classifications and the spatial firing metrics added
+    """
+    new_df = pd.DataFrame()
 
+    # rename the classification collumn to be specific to linear model or mixed model
+    linear_model_classifications = linear_model_classifications.rename(columns={'classification': ('linear_model_class')})
+    mixed_model_classifications = mixed_model_classifications.rename(columns={'classication': ('mixed_model_class')}) # TODO fix typo in R script
+
+    # merge the linear and mixed model dataframes based on shared collumns that are the same
+    merged_df = linear_model_classifications.merge(mixed_model_classifications, how = 'inner', on = ['cluster_id', 'session_id',
+                                                                                                     'trial_type', 'track_region'])
+    collumns_to_add = df.columns.difference(merged_df.columns)
+
+    # find the matching cluster per row and add the spatial firing metrics to the merged df
+    for index, row in merged_df.iterrows():
+        row = row.to_frame().T.reset_index(drop=True)
+        session_id = row["session_id"].iloc[0]
+        cluster_id = row["cluster_id"].iloc[0]
+
+        # only add to dataframe if match was found
+        matched_row = df[(df["session_id"] == session_id) &
+                         (df["cluster_id"] == cluster_id)]
+
+        if len(matched_row)==1:
+            # add spatial firing metrics
+            for collumn in collumns_to_add:
+                row[collumn] = [matched_row[collumn].iloc[0]]
+
+            new_df = pd.concat([new_df, row], ignore_index=True)
+
+    return new_df
 
 def main():
     print("============================================")
     print("============================================")
 
-    prm = PostSorting.parameters.Parameters()
-    prm.set_sampling_rate(30000)
-    prm.set_pixel_ratio(440)
-    prm.set_vr_grid_analysis_bin_size(20)
-
     # =================== for concatenation ====================================== #
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/", prm=prm)
+    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
-    summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/", prm=prm)
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/concatenated_dataframes/combined_Cohort7.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/combined_Cohort2.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/combined_Cohort3.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/combined_Cohort4.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/combined_Cohort5.pkl")
+
+    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
     # ============= for loading from concatenated dataframe ====================== #
 
+    #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
+    #of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
+    #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/summary/All_mice_vr.pkl")
+    #of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/summary/All_mice_of.pkl")
+    #plot_summary_per_mouse(of_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    #plot_summary_per_mouse(vr_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    #linear_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/linear_model_classifations.csv")
+    #mixed_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/mixed_model_classifations.csv")
+    #mixed_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/mixed_model_classifations_best_score.csv")
 
-    vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
-    of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
-    plot_summary_per_mouse(of_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
-    plot_summary_per_mouse(vr_data, save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    #combined_df = add_model_classifications(combined_df, linear_model_classifications, mixed_model_classifications)
+    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
-    vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
-    of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
-    plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
-    plot_summary_per_mouse(vr_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    #vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
+    #of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
+    #plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    #plot_summary_per_mouse(vr_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
 
-    print("============================================")#
     print("============================================")
-
+    print("============================================")
 
 if __name__ == '__main__':
     main()

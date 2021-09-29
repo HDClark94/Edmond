@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import shutil
-import Mouse_paths
 
 def copy_MountainSort_folder(recordings_folder_path, paste_path):
 
