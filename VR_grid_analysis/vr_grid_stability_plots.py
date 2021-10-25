@@ -208,6 +208,163 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             traceback.print_tb(exc_traceback)
             print("couldn't process vr_grid analysis on "+recording)
 
+def plot_lomb_classifiers(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+    distance_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Distance"]
+    position_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Position"]
+    null_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Null"]
+
+    avg_SNR_ratio_threshold = np.nanmean(concantenated_dataframe["shuffleSNR"+suffix])
+    avg_distance_from_integer_threshold = np.nanmean(concantenated_dataframe["shufflefreqs"+suffix])
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
+    ax1.set_ylabel("SNR",color="black",fontsize=15, labelpad=10)
+    ax1.set_xlabel("Spatial Frequency", color="black", fontsize=15, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax2.set_xticks([0,0.25, 0.5])
+    plt.setp(ax1.get_xticklabels(), fontsize=15)
+    plt.setp(ax2.get_xticklabels(), fontsize=10)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    ax1.xaxis.grid() # vertical lines
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    ax1.scatter(x=non_grid_cells["freqs"+suffix], y=non_grid_cells["SNR"+suffix], color="black", marker="o", alpha=0.3)
+    ax1.scatter(x=grid_cells["freqs"+suffix], y=grid_cells["SNR"+suffix], color="r", marker="o", alpha=0.3)
+    ax1.axhline(y=avg_SNR_ratio_threshold, xmin=0, xmax=10, color="black", linestyle="dashed")
+    ax1.set_xlim([0,10])
+    ax1.set_ylim([1,3000])
+    ax2.set_xlim([-0.1,0.6])
+    ax2.set_ylim([1,3000])
+    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=15, labelpad=10)
+    ax2.scatter(x=distance_from_integer(non_grid_cells["freqs"+suffix]), y=non_grid_cells["SNR"+suffix], color="black", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(grid_cells["freqs"+suffix]), y=grid_cells["SNR"+suffix], color="r", marker="o", alpha=0.3)
+    ax2.axvline(x=avg_distance_from_integer_threshold, color="black", linestyle="dashed")
+    ax2.axhline(y=avg_SNR_ratio_threshold, color="black", linestyle="dashed")
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_GC_'+suffix+'.png', dpi=200)
+    plt.close()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
+    ax1.set_ylabel("SNR",color="black",fontsize=15, labelpad=10)
+    ax1.set_xlabel("Spatial Frequency", color="black", fontsize=15, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax2.set_xticks([0,0.25, 0.5])
+    plt.setp(ax1.get_xticklabels(), fontsize=15)
+    plt.setp(ax2.get_xticklabels(), fontsize=10)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    ax1.xaxis.grid() # vertical lines
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    ax1.scatter(x=null_cells["freqs"+suffix], y=null_cells["SNR"+suffix], color="black", marker="o", alpha=0.3)
+    ax1.scatter(x=distance_cells["freqs"+suffix], y=distance_cells["SNR"+suffix], color="orange", marker="o", alpha=0.3)
+    ax1.scatter(x=position_cells["freqs"+suffix], y=position_cells["SNR"+suffix], color="turquoise", marker="o", alpha=0.3)
+    ax1.axhline(y=avg_SNR_ratio_threshold, xmin=0, xmax=10, color="black", linestyle="dashed")
+    ax1.set_xlim([0,10])
+    ax1.set_ylim([1,3000])
+    ax2.set_xlim([-0.1,0.6])
+    ax2.set_ylim([1,3000])
+    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=15, labelpad=10)
+    ax2.scatter(x=distance_from_integer(null_cells["freqs"+suffix]), y=null_cells["SNR"+suffix], color="black", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(distance_cells["freqs"+suffix]), y=distance_cells["SNR"+suffix], color="orange", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(position_cells["freqs"+suffix]), y=position_cells["SNR"+suffix], color="turquoise", marker="o", alpha=0.3)
+    ax2.axvline(x=avg_distance_from_integer_threshold, color="black", linestyle="dashed")
+    ax2.axhline(y=avg_SNR_ratio_threshold, color="black", linestyle="dashed")
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_DPN_'+suffix+'.png', dpi=200)
+    plt.close()
+    return
+
+
+def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers proportions...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    fig, ax = plt.subplots(figsize=(4,6))
+    groups = ["Position", "Distance", "Null"]
+    colors_lm = ["turquoise", "orange", "gray"]
+    objects = ["G", "NG"]
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        if object == "G":
+            df = grid_cells
+        elif object == "NG":
+            df = non_grid_cells
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = len(df[(df["Lomb_classifier_"+suffix] == group)])
+            percent = (count/len(df))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            ax.text(x,bottom, str(count), color="k", fontsize=10, ha="center")
+            bottom = bottom+percent
+
+    plt.xticks(x_pos, objects, fontsize=15)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    #plt.tight_layout()
+    plt.subplots_adjust(left=0.4)
+    ax.tick_params(axis='both', which='major', labelsize=25)
+    plt.savefig(save_path + '/lomb_classifiers_proportions_'+suffix+'.png', dpi=200)
+    plt.close()
+    return
+
+def plot_lomb_classifiers_proportions_by_mouse(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix="")
+    print('plotting lomb classifers proportions by mouse...')
+
+    for mouse in np.unique(concantenated_dataframe["mouse"]):
+        mouse_concatenated_dataframe = concantenated_dataframe[(concantenated_dataframe["mouse"] == mouse)]
+        grid_cells = mouse_concatenated_dataframe[mouse_concatenated_dataframe["classifier"] == "G"]
+        non_grid_cells = mouse_concatenated_dataframe[mouse_concatenated_dataframe["classifier"] != "G"]
+
+        fig, ax = plt.subplots(figsize=(4,6))
+        groups = ["Position", "Distance", "Null"]
+        colors_lm = ["turquoise", "orange", "gray"]
+        objects = ["G", "NG"]
+        x_pos = np.arange(len(objects))
+
+        for object, x in zip(objects, x_pos):
+            if object == "G":
+                df = grid_cells
+            elif object == "NG":
+                df = non_grid_cells
+            bottom=0
+            for color, group in zip(colors_lm, groups):
+                count = len(df[(df["Lomb_classifier_"+suffix] == group)])
+                percent = (count/len(df))*100
+                ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+                ax.text(x,bottom, str(count), color="k", fontsize=10, ha="center")
+                bottom = bottom+percent
+
+        plt.xticks(x_pos, objects, fontsize=15)
+        plt.ylabel("Percent of neurons",  fontsize=25)
+        plt.xlim((-0.5, len(objects)-0.5))
+        plt.ylim((0,100))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        #plt.tight_layout()
+        plt.subplots_adjust(left=0.4)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+        plt.savefig(save_path + '/lomb_classifiers_proportions_'+str(mouse)+"_"+suffix+'.png', dpi=200)
+        plt.close()
+    return
+
 
 def main():
     print('-------------------------------------------------------------')
@@ -223,7 +380,13 @@ def main():
 
 
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
-    plot_spatial_info_vs_pearson(combined_df, output_path="/mnt/datastore/Harry/Vr_grid_cells/")
+    #plot_spatial_info_vs_pearson(combined_df, output_path="/mnt/datastore/Harry/Vr_grid_cells/")
+    plot_lomb_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     print("look now`")
 
 if __name__ == '__main__':

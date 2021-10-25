@@ -117,7 +117,7 @@ def grids_trial_type_paired_t_test(grid_cells, save_path):
 
 def something(vr_data, of_data):
 
-    combined_df = EdmondHC.Concatenate_from_server.combine_of_vr_dataframes(vr_data, of_data)
+    combined_df = Edmond.Concatenate_from_server.combine_of_vr_dataframes(vr_data, of_data)
 
     grid_cells = combined_df[(combined_df['rate_map_correlation_first_vs_second_half'] > 0) &
                              (combined_df['grid_score'] > 0.2)]
