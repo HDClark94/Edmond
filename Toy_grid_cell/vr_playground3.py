@@ -218,15 +218,23 @@ def plot_linear_grid_cell_lomb_anchored(n_trials, save_path, bin_size_cm=1, samp
             set_fr = convolve(set_fr, gauss_kernel)
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
-
-            ls = LombScargle(set_elapsed_distance, set_fr)
             step = 0.001
             frequency = np.arange(0.1, 10+step, step)
-            power = ls.power(frequency)
-            max_SNR, max_SNR_freq = get_max_SNR(frequency, power)
+            sliding_window_size=track_length*3
+
+            powers = []
+            indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+            for j in indices_to_test:
+                ls = LombScargle(set_elapsed_distance[j:j+sliding_window_size], set_fr[j:j+sliding_window_size])
+                power = ls.power(frequency)
+                powers.append(power.tolist())
+            powers = np.array(powers)
+            avg_power = np.nanmean(powers, axis=0)
+
+            max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
             max_SNR_text = "SNR: " + reduce_digits(np.round(max_SNR, decimals=2), n_digits=6)
             max_SNR_freq_test = "Freq: " + str(np.round(max_SNR_freq, decimals=1))
-            axes[m,n].plot(frequency, power, color="blue")
+            axes[m,n].plot(frequency, avg_power, color="blue")
             axes[m, n].set_xlim(0, max(frequency))
             axes[m, n].set_ylim(0,1)
             axes[m, n].text(0.9, 0.9, max_SNR_text, ha='right', va='center', transform=axes[m, n].transAxes, fontsize=4)
@@ -272,14 +280,23 @@ def plot_linear_grid_cell_lomb_null(n_trials, save_path, bin_size_cm=1, sampling
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
 
-            ls = LombScargle(set_elapsed_distance, set_fr)
             step = 0.001
             frequency = np.arange(0.1, 10+step, step)
-            power = ls.power(frequency)
-            max_SNR, max_SNR_freq = get_max_SNR(frequency, power)
+            sliding_window_size=track_length*3
+
+            powers = []
+            indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+            for j in indices_to_test:
+                ls = LombScargle(set_elapsed_distance[j:j+sliding_window_size], set_fr[j:j+sliding_window_size])
+                power = ls.power(frequency)
+                powers.append(power.tolist())
+            powers = np.array(powers)
+            avg_power = np.nanmean(powers, axis=0)
+
+            max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
             max_SNR_text = "SNR: " + reduce_digits(np.round(max_SNR, decimals=2), n_digits=6)
             max_SNR_freq_test = "Freq: " + str(np.round(max_SNR_freq, decimals=1))
-            axes[m,n].plot(frequency, power, color="blue")
+            axes[m,n].plot(frequency, avg_power, color="blue")
             axes[m, n].set_xlim(0,max(frequency))
             axes[m, n].set_ylim(0,1)
             far = ls.false_alarm_level(1-(1.e-10))
@@ -327,14 +344,23 @@ def plot_linear_grid_cell_lomb(n_trials, save_path, bin_size_cm=1, sampling_rate
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
 
-            ls = LombScargle(set_elapsed_distance, set_fr)
             step = 0.001
             frequency = np.arange(0.1, 10+step, step)
-            power = ls.power(frequency)
-            max_SNR, max_SNR_freq = get_max_SNR(frequency, power)
+            sliding_window_size=track_length*3
+
+            powers = []
+            indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+            for j in indices_to_test:
+                ls = LombScargle(set_elapsed_distance[j:j+sliding_window_size], set_fr[j:j+sliding_window_size])
+                power = ls.power(frequency)
+                powers.append(power.tolist())
+            powers = np.array(powers)
+            avg_power = np.nanmean(powers, axis=0)
+
+            max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
             max_SNR_text = "SNR: " + reduce_digits(np.round(max_SNR, decimals=2), n_digits=6)
             max_SNR_freq_test = "Freq: " + str(np.round(max_SNR_freq, decimals=1))
-            axes[m,n].plot(frequency, power, color="blue")
+            axes[m,n].plot(frequency, avg_power, color="blue")
             axes[m, n].set_xlim(0,max(frequency))
             axes[m, n].set_ylim(0,1)
             far = ls.false_alarm_level(1-(1.e-10))
