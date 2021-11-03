@@ -11,7 +11,7 @@ from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_dat
 from scipy import stats
 from scipy import signal
 from scipy.interpolate import interp1d
-from astropy.convolution import convolve, Gaussian1DKernel
+from astropy.convolution import convolve, Gaussian1DKernel, Gaussian2DKernel
 import os
 import traceback
 import warnings
@@ -453,6 +453,353 @@ def reduce_digits(numeric_float, n_digits=6):
     scientific_notation = "{:.1e}".format(numeric_float)
     return scientific_notation
 
+def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length):
+    print('plotting moving lomb_scargle periodogram...')
+    save_path = output_path + '/Figures/moving_lomb_scargle_periodograms'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    # get trial numbers to use from processed_position_data
+    trial_number_to_use = np.unique(processed_position_data["trial_number"])
+    trial_numbers = np.array(position_data["trial_number"])
+    x_positions = np.array(position_data["x_position_cm"])
+    x_positions_elapsed = x_positions+(trial_numbers*track_length)-track_length
+    n_trials = max(trial_numbers)
+
+    # get distances from raw position data which has been smoothened
+    rpd = np.asarray(raw_position_data["x_position_cm"])
+    tn = np.asarray(raw_position_data["trial_number"])
+    elapsed_distance30 = rpd+(tn*track_length)-track_length
+
+    # get denominator and handle nans
+    denominator, _ = np.histogram(elapsed_distance30, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+
+    freqs = []
+    SNRs = []
+    all_powers = []
+    all_centre_trials=[]
+    SNR_thresholds = []
+    freq_thresholds = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        recording_length_sampling_points = int(cluster_spike_data['recording_length_sampling_points'].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        firing_locations_cluster = np.array(cluster_spike_data["x_position_cm"].iloc[0])
+        firing_trial_numbers = np.array(cluster_spike_data["trial_number"].iloc[0])
+        firing_locations_cluster_elapsed = firing_locations_cluster+(firing_trial_numbers*track_length)-track_length
+
+        if len(firing_times_cluster)>1:
+            numerator, bin_edges = np.histogram(firing_locations_cluster_elapsed, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+            fr = numerator/denominator
+            elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+            trial_numbers_by_bin=((0.5*(bin_edges[1:]+bin_edges[:-1])//track_length)+1).astype(np.int32)
+            gauss_kernel = Gaussian1DKernel(stddev=1)
+
+            # remove nan values that coincide with start and end of the track before convolution
+            fr[fr==np.inf] = np.nan
+            nan_mask = ~np.isnan(fr)
+            fr = fr[nan_mask]
+            trial_numbers_by_bin = trial_numbers_by_bin[nan_mask]
+            elapsed_distance = elapsed_distance[nan_mask]
+
+            fr = convolve(fr, gauss_kernel)
+            fr = moving_sum(fr, window=2)/2
+            fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+
+            # make and apply the set mask
+            set_mask = np.isin(trial_numbers_by_bin, trial_number_to_use)
+            fr = fr[set_mask]
+            elapsed_distance = elapsed_distance[set_mask]
+
+            # construct the lomb-scargle periodogram
+            step = 0.001
+            frequency = np.arange(0.1, 10+step, step)
+            sliding_window_size=track_length*3
+
+            powers = []
+            centre_distances = []
+            indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+            for m in indices_to_test:
+                ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
+                power = ls.power(frequency)
+                powers.append(power.tolist())
+                centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
+            powers = np.array(powers)
+            centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
+
+            avg_power = np.nanmean(powers, axis=0)
+            max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+            max_SNR_text = "SNR: " + reduce_digits(np.round(max_SNR, decimals=2), n_digits=6)
+            max_SNR_freq_test = "Freq: " + str(np.round(max_SNR_freq, decimals=1))
+
+            '''
+            #====================================================# Attempt bootstrapped approach using standard spike time shuffling procedure
+            shuffle_avg_powers = []
+            for i in range(10):
+                random_firing_additions = np.random.randint(low=int(20*settings.sampling_rate), high=int(580*settings.sampling_rate), size=len(firing_times_cluster))
+                shuffled_firing_times = firing_times_cluster + random_firing_additions
+                shuffled_firing_times[shuffled_firing_times >= recording_length_sampling_points] = shuffled_firing_times[shuffled_firing_times >= recording_length_sampling_points] - recording_length_sampling_points # wrap around
+                shuffled_firing_locations_elapsed = elapsed_distance30[shuffled_firing_times.astype(np.int64)]
+                numerator, bin_edges = np.histogram(shuffled_firing_locations_elapsed, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+                fr = numerator/denominator
+                elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+
+                # remove nan values that coincide with start and end of the track before convolution and then convolve
+                fr[fr==np.inf] = np.nan
+                nan_mask = ~np.isnan(fr)
+                fr = fr[nan_mask]
+                elapsed_distance = elapsed_distance[nan_mask]
+                fr = convolve(fr, gauss_kernel)
+                fr = moving_sum(fr, window=2)/2
+                fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+
+                # make and apply the set mask
+                fr = fr[set_mask]
+                elapsed_distance = elapsed_distance[set_mask]
+
+                # run moving window lomb on the shuffled firing
+                shuffle_powers = []
+                shuffle_centre_distances = []
+                indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+                for m in indices_to_test:
+                    ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
+                    shuffle_power = ls.power(frequency)
+                    shuffle_powers.append(shuffle_power.tolist())
+                    shuffle_centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
+                shuffle_powers = np.array(shuffle_powers)
+                shuffle_avg_power = np.nanmean(shuffle_powers, axis=0)
+                shuffle_avg_powers.append(shuffle_avg_power.tolist())
+
+            shuffle_avg_powers = np.array(shuffle_avg_powers)
+
+            fig = plt.figure(figsize=(4,4))
+            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            for shuffle_i in range(len(shuffle_avg_powers)):
+                ax.plot(frequency, shuffle_avg_powers[shuffle_i], color="black", linestyle="solid", linewidth=0.5)
+                ax.plot(frequency, avg_power, color="blue")
+            plt.xlabel('Spatial Frequency', fontsize=20, labelpad = 10)
+            plt.ylabel('Power', fontsize=20, labelpad = 10)
+            plt.xlim(0,max(frequency))
+            plt.ylim(bottom=0)
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_moving_lomb_scargle_avg_shuffle_periodogram_Cluster_' + str(cluster_id) + suffix + '.png', dpi=300)
+            plt.close()
+            #====================================================# Attempt bootstrapped approach using standard spike time shuffling procedure
+            '''
+
+
+            n_x_ticks = int(max(centre_trials)//50)+1
+            x_tick_locs= np.linspace(0, len(centre_distances)-1, n_x_ticks, dtype=np.int64)
+            fig = plt.figure(figsize=(4,4))
+            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            ax.imshow(powers.T, origin='lower', aspect="auto", cmap="jet")
+            plt.ylabel('Spatial Frequency', fontsize=20, labelpad = 10)
+            plt.xlabel('Centre Trial', fontsize=20, labelpad = 10) #TODO Change this to centre trial
+            ax.set_yticks([0, 2000, 4000, 6000, 8000, 10000])
+            ax.set_yticklabels([0, 2, 4, 6, 8, 10])
+            ax.set_xticks(x_tick_locs.tolist())
+            ax.set_xticklabels(np.take(centre_distances, x_tick_locs).astype(np.int64).tolist())
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_moving_lomb_scargle_periodogram_Cluster_' + str(cluster_id) +'.png', dpi=300)
+            plt.close()
+
+            fig = plt.figure(figsize=(4,4))
+            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            ax.plot(frequency, avg_power, color="yellow")
+
+            for tt in [0, 1, 2]:
+                for hmt in ["hit", "miss", "try"]:
+                    subset_trial_numbers = processed_position_data[(processed_position_data["hit_miss_try"] == hmt) & (processed_position_data["trial_type"] == tt)]["trial_number"]
+                    if len(subset_trial_numbers)>0:
+                        subset_trial_numbers = np.asarray(subset_trial_numbers)
+                        subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                        subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                        subset_powers = powers.copy()
+                        subset_powers[subset_mask == False] = np.nan
+                        avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                        ax.plot(frequency, avg_subset_powers, color=get_tt_color(tt), linestyle=get_hmt_linestyle(hmt), linewidth=0.5)
+
+            ax.text(0.9, 0.9, max_SNR_text, ha='right', va='center', transform=ax.transAxes, fontsize=10)
+            ax.text(0.9, 0.8, max_SNR_freq_test, ha='right', va='center', transform=ax.transAxes, fontsize=10)
+            plt.xlabel('Spatial Frequency', fontsize=20, labelpad = 10)
+            plt.ylabel('Power', fontsize=20, labelpad = 10)
+            plt.xlim(0,max(frequency))
+            plt.ylim(bottom=0)
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_moving_lomb_scargle_avg_periodogram_Cluster_' + str(cluster_id) + '.png', dpi=300)
+            plt.close()
+
+            freqs.append(max_SNR_freq)
+            SNRs.append(max_SNR)
+            all_powers.append(powers)
+            all_centre_trials.append(centre_trials)
+            #SNR_thresholds.append(SNR_threshold)
+            #freq_thresholds.append(freq_threshold)
+        else:
+            freqs.append(np.nan)
+            SNRs.append(np.nan)
+            all_powers.append(np.nan)
+            all_centre_trials.append(np.nan)
+            #SNR_thresholds.append(np.nan)
+            #freq_thresholds.append(np.nan)
+
+    spike_data["MOVING_LOMB_freqs"] = freqs
+    spike_data["MOVING_LOMB_SNR"] = SNRs
+    spike_data["MOVING_LOMB_all_powers"] = all_powers
+    spike_data["MOVING_LOMB_all_centre_trials"] = all_centre_trials
+    #spike_data["shuffleSNR"+suffix] = SNR_thresholds
+    #spike_data["shufflefreqs"+suffix] = freq_thresholds #TODO change these collumn names, they're misleading
+    return spike_data
+
+def analyse_lomb_powers(spike_data, processed_position_data):
+    '''
+    Requires the collumns of MOVING LOMB PERIODOGRAM
+    This function takes the moving window periodogram and computes the average SNR, and for all combinations of trial types and hit miss try behaviours
+    :param spike_data:
+    :param processed_position_data:
+    :param track_length:
+    :return:
+    '''
+
+    step = 0.001
+    frequency = np.arange(0.1, 10+step, step)
+
+    SNRs = [];                     Freqs = []
+    SNRs_all_beaconed = [];        Freqs_all_beaconed = []
+    SNRs_all_nonbeaconed = [];     Freqs_all_nonbeaconed = []
+    SNRs_all_probe = [];           Freqs_all_probe = []
+
+    SNRs_beaconed_hits = [];       Freqs_beaconed_hits = []
+    SNRs_nonbeaconed_hits = [];    Freqs_nonbeaconed_hits = []
+    SNRs_probe_hits = [];          Freqs_probe_hits = []
+    SNRs_all_hits = [];            Freqs_all_hits = []
+
+    SNRs_beaconed_tries = [];      Freqs_beaconed_tries = []
+    SNRs_nonbeaconed_tries = [];   Freqs_nonbeaconed_tries = []
+    SNRs_probe_tries = [];         Freqs_probe_tries = []
+    SNRs_all_tries = [];           Freqs_all_tries = []
+
+    SNRs_beaconed_misses = [];     Freqs_beaconed_misses = []
+    SNRs_nonbeaconed_misses = [];  Freqs_nonbeaconed_misses = []
+    SNRs_probe_misses = [];        Freqs_probe_misses = []
+    SNRs_all_misses =[];           Freqs_all_misses = []
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
+        for tt in [0, 1, 2, "all"]:
+            for hmt in ["hit", "miss", "try", "all"]:
+                if tt != "all":
+                    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == tt)]
+                if hmt != "all":
+                    processed_position_data = processed_position_data[(processed_position_data["hit_miss_try"] == hmt)]
+                subset_trial_numbers = processed_position_data["trial_number"]
+
+                if len(firing_times_cluster)>1:
+                    if len(subset_trial_numbers)>0:
+                        subset_trial_numbers = np.asarray(subset_trial_numbers)
+                        subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                        subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                        subset_powers = powers.copy()
+                        subset_powers[subset_mask == False] = np.nan
+                        avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_subset_powers)
+                    else:
+                        max_SNR, max_SNR_freq = (np.nan, np.nan)
+                else:
+                    max_SNR, max_SNR_freq = (np.nan, np.nan)
+
+                if (tt=="all") and (hmt=="hit"):
+                    SNRs_all_hits.append(max_SNR)
+                    Freqs_all_hits.append(max_SNR_freq)
+                elif (tt=="all") and (hmt=="try"):
+                    SNRs_all_tries.append(max_SNR)
+                    Freqs_all_tries.append(max_SNR_freq)
+                elif (tt=="all") and (hmt=="miss"):
+                    SNRs_all_misses.append(max_SNR)
+                    Freqs_all_misses.append(max_SNR_freq)
+                elif (tt=="all") and (hmt=="all"):
+                    SNRs.append(max_SNR)
+                    Freqs.append(max_SNR_freq)
+                elif (tt==0) and (hmt=="hit"):
+                    SNRs_beaconed_hits.append(max_SNR)
+                    Freqs_beaconed_hits.append(max_SNR_freq)
+                elif (tt==0) and (hmt=="try"):
+                    SNRs_beaconed_tries.append(max_SNR)
+                    Freqs_beaconed_tries.append(max_SNR_freq)
+                elif (tt==0) and (hmt=="miss"):
+                    SNRs_beaconed_misses.append(max_SNR)
+                    Freqs_beaconed_misses.append(max_SNR_freq)
+                elif (tt==0) and (hmt=="all"):
+                    SNRs_all_beaconed.append(max_SNR)
+                    Freqs_all_beaconed.append(max_SNR_freq)
+                elif (tt==1) and (hmt=="hit"):
+                    SNRs_nonbeaconed_hits.append(max_SNR)
+                    Freqs_nonbeaconed_hits.append(max_SNR_freq)
+                elif (tt==1) and (hmt=="try"):
+                    SNRs_nonbeaconed_tries.append(max_SNR)
+                    Freqs_nonbeaconed_tries.append(max_SNR_freq)
+                elif (tt==1) and (hmt=="miss"):
+                    SNRs_nonbeaconed_misses.append(max_SNR)
+                    Freqs_nonbeaconed_misses.append(max_SNR_freq)
+                elif (tt==1) and (hmt=="all"):
+                    SNRs_all_nonbeaconed.append(max_SNR)
+                    Freqs_all_nonbeaconed.append(max_SNR_freq)
+                elif (tt==2) and (hmt=="hit"):
+                    SNRs_probe_hits.append(max_SNR)
+                    Freqs_probe_hits.append(max_SNR_freq)
+                elif (tt==2) and (hmt=="try"):
+                    SNRs_probe_tries.append(max_SNR)
+                    Freqs_probe_tries.append(max_SNR_freq)
+                elif (tt==2) and (hmt=="miss"):
+                    SNRs_probe_misses.append(max_SNR)
+                    Freqs_probe_misses.append(max_SNR_freq)
+                elif (tt==2) and (hmt=="all"):
+                    SNRs_all_probe.append(max_SNR)
+                    Freqs_all_probe.append(max_SNR_freq)
+
+
+    spike_data["ML_SNRs"] = SNRs;                                         spike_data["ML_Freqs"] = Freqs
+    spike_data["ML_SNRs_all_beaconed"] = SNRs_all_beaconed;               spike_data["ML_Freqs_all_beaconed"] = Freqs_all_beaconed
+    spike_data["ML_SNRs_all_nonbeaconed"] =SNRs_all_nonbeaconed;          spike_data["ML_Freqs_all_nonbeaconed"] = Freqs_all_nonbeaconed
+    spike_data["ML_SNRs_all_probe"] =SNRs_all_probe;                      spike_data["ML_Freqs_all_probe"] = Freqs_all_probe
+
+    spike_data["ML_SNRs_beaconed_hits"] =SNRs_beaconed_hits;              spike_data["ML_Freqs_beaconed_hits"] = Freqs_beaconed_hits
+    spike_data["ML_SNRs_nonbeaconed_hits"] =SNRs_nonbeaconed_hits;        spike_data["ML_Freqs_nonbeaconed_hits"] = Freqs_nonbeaconed_hits
+    spike_data["ML_SNRs_probe_hits"] =SNRs_probe_hits;                    spike_data["ML_Freqs_probe_hits"] = Freqs_probe_hits
+    spike_data["ML_SNRs_all_hits"] =SNRs_all_hits;                        spike_data["ML_Freqs_all_hits"] = Freqs_all_hits
+
+    spike_data["ML_SNRs_beaconed_tries"] =SNRs_beaconed_tries;            spike_data["ML_Freqs_beaconed_tries"] = Freqs_beaconed_tries
+    spike_data["ML_SNRs_nonbeaconed_tries"] =SNRs_nonbeaconed_tries;      spike_data["ML_Freqs_nonbeaconed_tries"] = Freqs_nonbeaconed_tries
+    spike_data["ML_SNRs_probe_tries"] =SNRs_probe_tries;                  spike_data["ML_Freqs_probe_tries"] = Freqs_probe_tries
+    spike_data["ML_SNRs_all_tries"] =SNRs_all_tries;                      spike_data["ML_Freqs_all_tries"] = Freqs_all_tries
+
+    spike_data["ML_SNRs_beaconed_misses"] =SNRs_beaconed_misses;          spike_data["ML_Freqs_beaconed_misses"] = Freqs_beaconed_misses
+    spike_data["ML_SNRs_nonbeaconed_misses"] =SNRs_nonbeaconed_misses;    spike_data["ML_Freqs_nonbeaconed_misses"] = Freqs_nonbeaconed_misses
+    spike_data["ML_SNRs_probe_misses"] =SNRs_probe_misses;                spike_data["ML_Freqs_probe_misses"] = Freqs_probe_misses
+    spike_data["ML_SNRs_all_misses"] =SNRs_all_misses;                    spike_data["ML_Freqs_all_misses"] = Freqs_all_misses
+    return spike_data
+
+def get_tt_color(tt):
+    if tt == 0:
+        return "black"
+    elif tt==1:
+        return "red"
+    elif tt ==2:
+        return "blue"
+
+def get_hmt_linestyle(hmt):
+    if hmt == "hit":
+        return "solid"
+    elif hmt=="miss":
+        return "dashed"
+    elif hmt =="try":
+        return "dotted"
+
 def plot_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length, suffix="", GaussianKernelSTD_ms=5, fr_integration_window=2):
     print('plotting lomb_scargle periodogram...')
     save_path = output_path + '/Figures/lomb_scargle_periodograms'
@@ -625,6 +972,7 @@ def plot_lomb_scargle_periodogram(spike_data, processed_position_data, position_
     spike_data["shufflefreqs"+suffix] = freq_thresholds #TODO change these collumn names, they're misleading
     return spike_data
 
+
 def add_lomb_classifier(spatial_firing, suffix=""):
     """
     :param spatial_firing:
@@ -633,23 +981,58 @@ def add_lomb_classifier(spatial_firing, suffix=""):
     """
     lomb_classifiers = []
     for index, row in spatial_firing.iterrows():
-        lomb_SNR = row["SNR"+suffix]
-        lomb_freq = row["freqs"+suffix]
-        lomb_distance_from_int = distance_from_integer(lomb_freq)[0]
-        lomb_SNR_theshold = row["shuffleSNR"+suffix]
-        lomb_freq_threshold = row["shufflefreqs"+suffix]
+        if "SNR"+suffix in list(spatial_firing):
+            lomb_SNR = row["SNR"+suffix]
+            lomb_freq = row["freqs"+suffix]
+            lomb_distance_from_int = distance_from_integer(lomb_freq)[0]
+            lomb_SNR_theshold = row["shuffleSNR"+suffix]
+            lomb_freq_threshold = row["shufflefreqs"+suffix]
 
-        if lomb_SNR>lomb_SNR_theshold:
-            if lomb_distance_from_int<lomb_freq_threshold:
+            if lomb_SNR>lomb_SNR_theshold:
+                if lomb_distance_from_int<0.025:
+                    lomb_classifier = "Position"
+                else:
+                    lomb_classifier = "Distance"
+            elif lomb_distance_from_int<0.025:
                 lomb_classifier = "Position"
             else:
-                lomb_classifier = "Distance"
+                lomb_classifier = "Null"
         else:
-            lomb_classifier = "Null"
+            lomb_classifier = "Unclassifed"
 
         lomb_classifiers.append(lomb_classifier)
 
     spatial_firing["Lomb_classifier_"+suffix] = lomb_classifiers
+    return spatial_firing
+
+def add_pairwise_classifier(spatial_firing, suffix=""):
+    """
+    :param spatial_firing:
+    :param suffix: specific set string for subsets of results
+    :return: spatial_firing with classifier collumn of type ["Pairwise_classifer_"+suffix] with either "Distance", "Position" or "Null"
+    """
+    pairwise_classifiers = []
+    for index, row in spatial_firing.iterrows():
+        if "SNR"+suffix in list(spatial_firing):
+            pairwise_corr = row["pairwise_corr"+suffix]
+            pairwise_freq = row["pairwise_freq"+suffix]
+            lomb_distance_from_int = distance_from_integer(pairwise_freq)[0]
+
+            if pairwise_corr>0.05:
+                if lomb_distance_from_int<0.05:
+                    pairwise_classifier = "Position"
+                else:
+                    pairwise_classifier = "Distance"
+            elif lomb_distance_from_int<0.05:
+                pairwise_classifier = "Position"
+            else:
+                pairwise_classifier = "Null"
+        else:
+            pairwise_classifier = "Unclassifed"
+
+        pairwise_classifiers.append(pairwise_classifier)
+
+    spatial_firing["Pairwise_classifier_"+suffix] = pairwise_classifiers
     return spatial_firing
 
 
@@ -1453,8 +1836,8 @@ def add_time_elapsed_collumn(position_data):
     position_data["time_in_bin_seconds"] = time_elapsed.tolist()
     return position_data
 
-def extract_PI_trials(processed_position_data):
-    PI_trial_numbers = processed_position_data[(processed_position_data["hit_miss_try"] == "hit") &
+def extract_PI_trials(processed_position_data, hmt):
+    PI_trial_numbers = processed_position_data[(processed_position_data["hit_miss_try"] == hmt) &
                                                ((processed_position_data["trial_type"] == 1) | (processed_position_data["trial_type"] == 2))]["trial_number"]
     trial_numbers_to_keep = []
     for t in PI_trial_numbers:
@@ -1483,11 +1866,14 @@ def get_max_int_SNR(spatial_frequency, powers):
     return 0
 
 def get_max_SNR(spatial_frequency, powers):
-    max_SNR = np.max(powers)/np.median(powers)
+    max_SNR = np.abs(np.max(powers)/np.min(powers))
     max_SNR_freq = spatial_frequency[np.argmax(powers)]
     return max_SNR, max_SNR_freq
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
+    #vr_recording_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+    #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"]
+
     for recording in vr_recording_path_list:
         print("processing ", recording)
         #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"
@@ -1500,28 +1886,14 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
             raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
-            rpd = np.asarray(raw_position_data["x_position_cm"])
-            gauss_kernel = Gaussian1DKernel(stddev=200)
-            rpd = convolve(rpd, gauss_kernel)
-            rpd = moving_sum(rpd, window=100)/100
-            rpd = np.append(rpd, np.zeros(len(raw_position_data["x_position_cm"])-len(rpd)))
-
-            '''
-            fig = plt.figure(figsize=(12,4))
-            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-            n=200000
-            ax.plot(rpd[:n])
-            ax.plot(np.asarray(raw_position_data["x_position_cm"])[:n])
-            plt.savefig('/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03/MountainSort/tmp.png', dpi=200)
-            plt.close()
-            '''
-
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
             processed_position_data = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
-            PI_processed_position_data = extract_PI_trials(processed_position_data)
+            PI_hits_processed_position_data = extract_PI_trials(processed_position_data, hmt="hit")
+            PI_misses_processed_position_data = extract_PI_trials(processed_position_data, hmt="miss")
+            PI_tries_position_data = extract_PI_trials(processed_position_data, hmt="try")
             b_processed_position_data = extract_beaconed_hit_trials(processed_position_data)
 
             #spike_data = process_vr_grid(spike_data, position_data, track_length=get_track_length(recording))
@@ -1532,12 +1904,19 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #spike_data = process_vr_field_stats(spike_data, processed_position_data)
             #spike_data = process_vr_field_distances(spike_data, track_length=get_track_length(recording))
 
+            # LOMB PERIODOGRAMS
+            #spike_data = plot_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="", GaussianKernelSTD_ms=5, fr_integration_window=2)
+            #spike_data = plot_lomb_scargle_periodogram(spike_data, PI_hits_processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="PI", GaussianKernelSTD_ms=5, fr_integration_window=2)
+            #spike_data = plot_lomb_scargle_periodogram(spike_data, PI_misses_processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="PI_miss", GaussianKernelSTD_ms=5, fr_integration_window=2)
+            #spike_data = plot_lomb_scargle_periodogram(spike_data, PI_tries_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="PI_try", GaussianKernelSTD_ms=5, fr_integration_window=2)
+
+            # MOVING LOMB PERIODOGRAMS
+            spike_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
+            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+
+            # SPATIAL AUTO CORRELOGRAMS
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
             #spike_data = plot_spatial_autocorrelogram(spike_data, PI_processed_position_data, output_path, track_length=get_track_length(recording), suffix="PI")
-            spike_data = plot_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="", GaussianKernelSTD_ms=5, fr_integration_window=2)
-            spike_data = plot_lomb_scargle_periodogram(spike_data, PI_processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="PI", GaussianKernelSTD_ms=5, fr_integration_window=2)
-            #spike_data = plot_lomb_scargle_periodogram(spike_data, b_processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="B", GaussianKernelSTD_ms=5, fr_integration_window=2)
-            #spike_data = plot_lomb_scargle_periodogram(spike_data, processed_position_data[(processed_position_data["trial_type"] == 1)], position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="NB", GaussianKernelSTD_ms=5, fr_integration_window=2)
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), suffix="hit")
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[processed_position_data["hit_miss_try"] == "try"], output_path, track_length=get_track_length(recording), suffix="try")
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[processed_position_data["hit_miss_try"] == "miss"], output_path, track_length=get_track_length(recording), suffix="miss")
@@ -1550,8 +1929,6 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[(processed_position_data["hit_miss_try"] == "hit") & (processed_position_data["trial_type"] == 2)], output_path, track_length=get_track_length(recording), suffix="hit_probe")
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[(processed_position_data["hit_miss_try"] == "try") & (processed_position_data["trial_type"] == 2)], output_path, track_length=get_track_length(recording), suffix="try_probe")
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data[(processed_position_data["hit_miss_try"] == "miss") & (processed_position_data["trial_type"] == 2)], output_path, track_length=get_track_length(recording), suffix="miss_probe")
-
-
 
             #spike_data = calculate_allocentric_correlation(spike_data, position_data, output_path, track_length=get_track_length(recording))
             #spike_data = calculate_egocentric_correlation(spike_data, position_data, output_path, track_length=get_track_length(recording))
@@ -1600,7 +1977,6 @@ def main():
     process_recordings(vr_path_list, of_path_list)
 
     print("look now`")
-
 
 if __name__ == '__main__':
     main()

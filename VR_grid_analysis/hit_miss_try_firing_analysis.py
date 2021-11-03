@@ -7,6 +7,44 @@ from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
 from Edmond.Concatenate_from_server import *
 from scipy import stats
 
+def distance_from_integer(frequencies):
+    distance_from_zero = np.asarray(frequencies)%1
+    distance_from_one = 1-(np.asarray(frequencies)%1)
+    tmp = np.vstack((distance_from_zero, distance_from_one))
+    return np.min(tmp, axis=0)
+
+def add_lomb_classifier(spatial_firing, suffix=""):
+    """
+    :param spatial_firing:
+    :param suffix: specific set string for subsets of results
+    :return: spatial_firing with classifier collumn of type ["Lomb_classifer_"+suffix] with either "Distance", "Position" or "Null"
+    """
+    lomb_classifiers = []
+    for index, row in spatial_firing.iterrows():
+        if "SNR"+suffix in list(spatial_firing):
+            lomb_SNR = row["SNR"+suffix]
+            lomb_freq = row["freqs"+suffix]
+            lomb_distance_from_int = distance_from_integer(lomb_freq)[0]
+            lomb_SNR_theshold = row["shuffleSNR"+suffix]
+            lomb_freq_threshold = row["shufflefreqs"+suffix]
+
+            if lomb_SNR>lomb_SNR_theshold:
+                if lomb_distance_from_int<0.025:
+                    lomb_classifier = "Position"
+                else:
+                    lomb_classifier = "Distance"
+            elif lomb_distance_from_int<0.025:
+                lomb_classifier = "Position"
+            else:
+                lomb_classifier = "Null"
+        else:
+            lomb_classifier = "Unclassifed"
+
+        lomb_classifiers.append(lomb_classifier)
+
+    spatial_firing["Lomb_classifier_"+suffix] = lomb_classifiers
+    return spatial_firing
+
 def get_spatial_information_score(cluster_spike_data, position_data, processed_position_data,
                                   hit_miss_try, trial_type, track_length):
 
@@ -673,8 +711,14 @@ def plot_spatial_info_cum_hist(combined_df, save_path):
     plt.savefig(save_path+"spatial_cumhist.png", dpi=300)
     plt.show()
 
-def plot_pairwise_comparison_b(combined_df, save_path):
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+def plot_pairwise_comparison_b(combined_df, save_path, CT="",  PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
     hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_b"])
     misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_b"])
     tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_b"])
@@ -697,7 +741,7 @@ def plot_pairwise_comparison_b(combined_df, save_path):
     plt.gca().spines['right'].set_visible(False)
     plt.title("Beaconed", fontsize=25)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_cumhist_b.png", dpi=300)
+    plt.savefig(save_path+"pairwise_cumhist_b_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
     fig, ax = plt.subplots(figsize=(4,4))
@@ -733,11 +777,17 @@ def plot_pairwise_comparison_b(combined_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_bar_b.png", dpi=300)
+    plt.savefig(save_path+"pairwise_bar_b_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
-def plot_pairwise_comparison_p(combined_df, save_path):
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+def plot_pairwise_comparison_p(combined_df, save_path, CT="", PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN !=  "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
     hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_p"])
     misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_p"])
     tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_p"])
@@ -760,7 +810,7 @@ def plot_pairwise_comparison_p(combined_df, save_path):
     plt.gca().spines['right'].set_visible(False)
     plt.title("Probe", fontsize=25)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_cumhist_p.png", dpi=300)
+    plt.savefig(save_path+"pairwise_cumhist_p_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
     fig, ax = plt.subplots(figsize=(4,4))
@@ -796,11 +846,17 @@ def plot_pairwise_comparison_p(combined_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_bar_p.png", dpi=300)
+    plt.savefig(save_path+"pairwise_bar_p_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
-def plot_pairwise_comparison_nb(combined_df, save_path):
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+def plot_pairwise_comparison_nb(combined_df, save_path, CT="",  PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN !=  "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
     hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_nb"])
     misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_nb"])
     tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_nb"])
@@ -823,7 +879,7 @@ def plot_pairwise_comparison_nb(combined_df, save_path):
     plt.gca().spines['right'].set_visible(False)
     plt.title("Non Beaconed", fontsize=25)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_cumhist_nb.png", dpi=300)
+    plt.savefig(save_path+"pairwise_cumhist_nb_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
     fig, ax = plt.subplots(figsize=(4,4))
@@ -859,11 +915,17 @@ def plot_pairwise_comparison_nb(combined_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_bar_nb.png", dpi=300)
+    plt.savefig(save_path+"pairwise_bar_nb_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
-def plot_pairwise_comparison(combined_df, save_path):
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+def plot_pairwise_comparison(combined_df, save_path, CT="", PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
     hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit"])
     misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss"])
     tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try"])
@@ -884,7 +946,7 @@ def plot_pairwise_comparison(combined_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_cumhist.png", dpi=300)
+    plt.savefig(save_path+"pairwise_cumhist_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
     fig, ax = plt.subplots(figsize=(4,4))
@@ -920,7 +982,7 @@ def plot_pairwise_comparison(combined_df, save_path):
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
-    plt.savefig(save_path+"pairwise_bar.png", dpi=300)
+    plt.savefig(save_path+"pairwise_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
 
@@ -943,15 +1005,30 @@ def main():
     #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
-    plot_spatial_info_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
+    #plot_spatial_info_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
     #plot_spatial_info_spatial_info_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
     #plot_spatial_info_cum_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
     #plot_cumhist_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
 
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    plot_pairwise_comparison_b(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    plot_pairwise_comparison_nb(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    plot_pairwise_comparison_p(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
+    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Position")
+    plot_pairwise_comparison_b(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Position")
+    plot_pairwise_comparison_nb(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Position")
+    plot_pairwise_comparison_p(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Position")
+
+    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Null")
+    plot_pairwise_comparison_b(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Null")
+    plot_pairwise_comparison_nb(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Null")
+    plot_pairwise_comparison_p(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="G", PDN="Null")
+
+    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Position")
+    plot_pairwise_comparison_b(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Position")
+    plot_pairwise_comparison_nb(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Position")
+    plot_pairwise_comparison_p(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Position")
+
+    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Null")
+    plot_pairwise_comparison_b(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Null")
+    plot_pairwise_comparison_nb(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Null")
+    plot_pairwise_comparison_p(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", CT="NG", PDN="Null")
     print("look now")
 
 if __name__ == '__main__':

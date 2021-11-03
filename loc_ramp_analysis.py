@@ -1,5 +1,4 @@
 import pandas as pd
-import pickle5 as pkl5
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -11,6 +10,7 @@ from scipy.stats import kde
 from sklearn.linear_model import LinearRegression
 import warnings
 warnings.filterwarnings('ignore')
+from matplotlib.pyplot import cm
 from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
 
 def split_data_by_recording_day(data):
@@ -398,7 +398,6 @@ def simple_boxplot(data, collumn, save_path=None, ramp_region=None, trial_type=N
 def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, print_p=False, filter_by_slope=False):
     fig, ax = plt.subplots(figsize=(5, 4.2))
     p_str = get_p_text(p, ns=True)
-    #ax.set_title("rr= "+ramp_region+", tt= "+trial_type +", p="+p_str, fontsize=12)
 
     objects = np.unique(data["cohort_mouse"])
     x_pos = np.arange(len(objects))
@@ -416,24 +415,12 @@ def simple_bar_mouse(data, collumn, save_path=None, ramp_region=None, trial_type
         else:
             ax.errorbar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), ecolor='black', capsize=10, fmt="o", color="black")
             ax.scatter(x_pos[i]*np.ones(len(np.asarray(y[collumn]))), np.asarray(y[collumn]), edgecolor="black", marker="o", facecolors='none')
-            #ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
 
-        #ax.bar(x_pos[i], np.mean(np.asarray(y[collumn])), yerr=stats.sem(np.asarray(y[collumn])), align='center', alpha=0.5, ecolor='black', capsize=10)
-
-    #ax.text(0.95, 1, p_str, ha='left', va='top', transform=ax.transAxes, fontsize=20)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
     plt.locator_params(axis='y', nbins=4)
     plt.ylabel(get_tidy_title(collumn),  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
-    #if collumn == "ramp_score":
-    #    plt.ylim(-0.6, 0.6)
-    #elif collumn == "abs_ramp_score":
-    #    plt.ylim(0, 0.6)
-    #plt.axvline(x=-1, ymax=1, ymin=0, linewidth=3, color="k")
-    #plt.axhline(y=0, xmin=-1, xmax=2, linewidth=3, color="k")
-    #plt.title('Programming language usage')
-    #ax.legend()
 
     if print_p:
         print(p)
@@ -760,19 +747,16 @@ def simple_lm_stack_negpos(data, collumn, save_path=None, ramp_region=None, tria
     plt.close()
 
 
-def add_locations(ramp_scores_df, tetrode_locations_df):
+def add_locations(df, tetrode_locations_df):
 
     data = pd.DataFrame()
-    for index, row_ramp_score in ramp_scores_df.iterrows():
-        row_ramp_score =  row_ramp_score.to_frame().T.reset_index(drop=True)
-        session_id_short = row_ramp_score.session_id_short.iloc[0]
-
-        print("processing "+session_id_short)
-
-        session_tetrode_info = tetrode_locations_df[(tetrode_locations_df.session_id_short == session_id_short)]
-        row_ramp_score["tetrode_location"] = session_tetrode_info.estimated_location.iloc[0]
-        data = pd.concat([data, row_ramp_score], ignore_index=True)
-
+    for index, df_row in df.iterrows():
+        df_row =  df_row.to_frame().T.reset_index(drop=True)
+        session_id_datetime = df_row.session_id_datetime.iloc[0]
+        print("processing, ", session_id_datetime)
+        session_tetrode_info = tetrode_locations_df[(tetrode_locations_df.session_id == session_id_datetime)]
+        df_row["tetrode_location"] = session_tetrode_info.estimated_location.iloc[0]
+        data = pd.concat([data, df_row], ignore_index=True)
     return data
 
 def add_short_session_id(df):
@@ -780,9 +764,10 @@ def add_short_session_id(df):
     data = pd.DataFrame()
     for index, row in df.iterrows():
         row =  row.to_frame().T.reset_index(drop=True)
-        session_id = row.session_id.iloc[0]
-        session_id_short = "_".join(session_id.split("_")[0:3])
-        row["session_id_short"] = session_id_short
+        session_id_datetime = row.session_id.iloc[0]
+        session_id_date = "_".join(session_id_datetime.split("_")[0:3])
+        row["session_id_date"] = session_id_date
+        row["session_id_datetime"] = session_id_datetime
         data = pd.concat([data, row], ignore_index=True)
     return data
 
@@ -1004,20 +989,8 @@ def get_suedo_day(full_session_id):
     return(int(year+month+day)) # this ruturns a useful number in terms of the order of recordings
 
 def get_cohort(full_session_id):
-    if "Klara" in full_session_id:
-        return "K"
-    if "Bri" in full_session_id:
-        return "B"
-    if "Junji" in full_session_id:
-        return "J"
-    if "Ian" in full_session_id:
-        return "I"
-    if "Cohort6_july2020" in full_session_id:
-        return "H2"
     if "Cohort7_october2020" in full_session_id:
-        return "H3"
-    if "Cue_conditioned_cohort1_190902" in full_session_id:
-        return "H1"
+        return "C7"
 
     elements = full_session_id.split("/")
     for i in range(len(elements)):
@@ -1817,7 +1790,6 @@ def remove_location_classification(data, locations):
     return data
 
 def plot_theta_histogram(data, save_path):
-
     rythmic = data[(data["ThetaIndex"] > 0.07)]
     no_rythmic = data[(data["ThetaIndex"] < 0.07)]
 
@@ -1910,18 +1882,81 @@ def plot_theta(theta_df, save_path):
     plt.savefig(save_path+"/tracked_theta_index.png", dpi=300)
     plt.show()
 
+def plot_theta_by_mouse(df, save_path=None):
+    fig, ax = plt.subplots(figsize=(7, 5.2))
+    objects = np.unique(df["cohort_mouse"])
+    x_pos = np.arange(len(objects))
+    cycle_colors = cm.rainbow(np.linspace(0, 1, len(x_pos)))
+    for i in range(len(objects)):
+        print(objects[i])
+        y = df[(df["cohort_mouse"] == objects[i])]
+        theta_indices = np.asarray(y["ThetaIndex"], dtype=np.float64)
+        theta_indices = theta_indices[~np.isnan(theta_indices)]
+        ax.errorbar(x_pos[i], np.nanmean(theta_indices), yerr=stats.sem(theta_indices), ecolor=cycle_colors[i], capsize=10, fmt="o", color=cycle_colors[i])
+        ax.scatter(x_pos[i]*np.ones(len(theta_indices)), theta_indices, edgecolor=cycle_colors[i], marker="o", facecolors=cycle_colors[i], alpha=0.3)
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
+    plt.locator_params(axis='y', nbins=4)
+    plt.ylabel("Theta Index",  fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/Theta_Index_by_mice.png", dpi=300)
+    plt.show()
+    plt.close()
+
+def plot_theta_by_location(df, save_path=None):
+    df=df[df["tetrode_location"] != "UN"]
+    fig, ax = plt.subplots(figsize=(2.8, 5.2))
+    objects = np.unique(df["tetrode_location"])
+    x_pos = np.arange(len(objects))
+    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i in range(len(objects)):
+        y = df[(df["tetrode_location"] == objects[i])]
+        theta_indices = np.asarray(y["ThetaIndex"], dtype=np.float64)
+        theta_indices = theta_indices[~np.isnan(theta_indices)]
+        ax.errorbar(x_pos[i], np.nanmean(theta_indices), yerr=stats.sem(theta_indices), ecolor="black", capsize=10, fmt="o", color="black")
+        ax.scatter(x_pos[i]*np.ones(len(theta_indices)), theta_indices, edgecolor="black", marker="o", facecolors="black", alpha=0.3)
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
+    plt.locator_params(axis='y', nbins=4)
+    plt.ylabel("Theta Index",  fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/Theta_Index_by_tetrode_location.png", dpi=300)
+    plt.show()
+    plt.close()
+
 
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    #all_mice_lfp_data = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_mice_lfp_data.pkl")
-    #all_mice_lfp_data = add_lfp_theta_power(all_mice_lfp_data)
-    #lfp_vs_trial_number(all_mice_lfp_data, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/")
+    # load concatenated spatial firing dataframes and pull them into a single frame
+    df = pd.DataFrame()
+    df = pd.concat([df, pd.read_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/All_mice_vr.pkl")], ignore_index=True)
+    df = pd.concat([df, pd.read_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/All_mice_vr.pkl")], ignore_index=True)
+    df = pd.concat([df, pd.read_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/All_mice_vr.pkl")], ignore_index=True)
+    df = pd.concat([df, pd.read_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/All_mice_vr.pkl")], ignore_index=True)
+    df = pd.concat([df, pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")], ignore_index=True)
+    df = add_short_session_id(df)
+    df = add_cohort_mouse_label(df)
+    df = add_locations(df, pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"))
+    df = remove_mouse(df, cohort_mouse_list=["C2_1124"])
+
+    # plot theta histogram for all cells and plots for theta locations and by mouse
+    plot_theta_histogram(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
+    plot_theta_by_mouse(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
+    plot_theta_by_location(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
+
 
     ramp_scores_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.csv"
     ramp_score_path2 = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.pkl"
-    tetrode_location_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"
     save_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/vr_vs_of"
     theta_df_VR = pd.read_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/theta/theta_df_VR.pkl")
     #linear_model_path_old = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.txt", sep="\t")

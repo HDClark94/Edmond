@@ -284,6 +284,82 @@ def plot_lomb_classifiers(concantenated_dataframe, suffix="", save_path=""):
     plt.close()
     return
 
+def plot_pairwise_classifiers(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_pairwise_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting pairwise classifers...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+    distance_cells = concantenated_dataframe[concantenated_dataframe["Pairwise_classifier_"+suffix] == "Distance"]
+    position_cells = concantenated_dataframe[concantenated_dataframe["Pairwise_classifier_"+suffix] == "Position"]
+    null_cells = concantenated_dataframe[concantenated_dataframe["Pairwise_classifier_"+suffix] == "Null"]
+
+    avg_SNR_ratio_threshold = 0.05
+    avg_distance_from_integer_threshold =  0.05
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
+    ax1.set_ylabel("Pairwise Correlation",color="black",fontsize=15, labelpad=10)
+    ax1.set_xlabel("Spatial Frequency", color="black", fontsize=15, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax2.set_xticks([0,0.25, 0.5])
+    plt.setp(ax1.get_xticklabels(), fontsize=15)
+    plt.setp(ax2.get_xticklabels(), fontsize=10)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    ax1.xaxis.grid() # vertical lines
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    ax1.scatter(x=non_grid_cells["pairwise_freq"+suffix], y=non_grid_cells["pairwise_corr"+suffix], color="black", marker="o", alpha=0.3)
+    ax1.scatter(x=grid_cells["pairwise_freq"+suffix], y=grid_cells["pairwise_corr"+suffix], color="r", marker="o", alpha=0.3)
+    ax1.axhline(y=avg_SNR_ratio_threshold, xmin=0, xmax=10, color="black", linestyle="dashed")
+    ax1.set_xlim([0,10])
+    ax1.set_ylim([-0.2,0.2])
+    ax2.set_xlim([-0.1,0.6])
+    ax2.set_ylim([-0.2,0.2])
+    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=15, labelpad=10)
+    ax2.scatter(x=distance_from_integer(non_grid_cells["pairwise_freq"+suffix]), y=non_grid_cells["pairwise_corr"+suffix], color="black", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(grid_cells["pairwise_freq"+suffix]), y=grid_cells["pairwise_corr"+suffix], color="r", marker="o", alpha=0.3)
+    ax2.axvline(x=avg_distance_from_integer_threshold, color="black", linestyle="dashed")
+    ax2.axhline(y=avg_SNR_ratio_threshold, color="black", linestyle="dashed")
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    plt.tight_layout()
+    plt.savefig(save_path + '/pairwise_classifiers_GC_'+suffix+'.png', dpi=200)
+    plt.close()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9,6), gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
+    ax1.set_ylabel("SNR",color="black",fontsize=15, labelpad=10)
+    ax1.set_xlabel("Spatial Frequency", color="black", fontsize=15, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax2.set_xticks([0,0.25, 0.5])
+    plt.setp(ax1.get_xticklabels(), fontsize=15)
+    plt.setp(ax2.get_xticklabels(), fontsize=10)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    ax1.xaxis.grid() # vertical lines
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    ax1.scatter(x=null_cells["pairwise_freq"+suffix], y=null_cells["pairwise_corr"+suffix], color="black", marker="o", alpha=0.3)
+    ax1.scatter(x=distance_cells["pairwise_freq"+suffix], y=distance_cells["pairwise_corr"+suffix], color="orange", marker="o", alpha=0.3)
+    ax1.scatter(x=position_cells["pairwise_freq"+suffix], y=position_cells["pairwise_corr"+suffix], color="turquoise", marker="o", alpha=0.3)
+    ax1.axhline(y=avg_SNR_ratio_threshold, xmin=0, xmax=10, color="black", linestyle="dashed")
+    ax1.set_xlim([0,10])
+    ax1.set_ylim([-0.2,0.2])
+    ax2.set_xlim([-0.1,0.6])
+    ax2.set_ylim([-0.2,0.2])
+    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=15, labelpad=10)
+    ax2.scatter(x=distance_from_integer(null_cells["pairwise_freq"+suffix]), y=null_cells["pairwise_corr"+suffix], color="black", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(distance_cells["pairwise_freq"+suffix]), y=distance_cells["pairwise_corr"+suffix], color="orange", marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(position_cells["pairwise_freq"+suffix]), y=position_cells["pairwise_corr"+suffix], color="turquoise", marker="o", alpha=0.3)
+    ax2.axvline(x=avg_distance_from_integer_threshold, color="black", linestyle="dashed")
+    ax2.axhline(y=avg_SNR_ratio_threshold, color="black", linestyle="dashed")
+    ax1.set_yscale('log')
+    ax2.set_yscale('log')
+    plt.tight_layout()
+    plt.savefig(save_path + '/pairwise_classifiers_DPN_'+suffix+'.png', dpi=200)
+    plt.close()
+    return
+
 
 def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_path=""):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
@@ -324,8 +400,163 @@ def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_p
     plt.close()
     return
 
+def plot_lomb_classifiers_proportions_hmt(concantenated_dataframe, save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix="PI")
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix="PI_try")
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix="PI_miss")
+    print('plotting lomb classifers proportions...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    for df, c in zip([grid_cells, non_grid_cells], ["gc", "ngc"]):
+        fig, ax = plt.subplots(figsize=(4,6))
+        groups = ["Position", "Distance", "Null"]
+        colors_lm = ["turquoise", "orange", "gray"]
+        objects = ["Hit", "Try", "Miss"]
+        x_pos = np.arange(len(objects))
+
+        for object, x in zip(objects, x_pos):
+            if object == "Hit":
+                collumn = "Lomb_classifier_PI"
+            elif group == "Try":
+                collumn = "Lomb_classifier_PI_try"
+            elif group == "Miss":
+                collumn = "Lomb_classifier_PI_miss"
+            bottom=0
+
+            for color, group in zip(colors_lm, groups):
+                count = len(df[(df[collumn] == group)])
+                percent = (count/len(df))*100
+                ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+                ax.text(x,bottom, str(count), color="k", fontsize=10, ha="center")
+                bottom = bottom+percent
+
+        plt.xticks(x_pos, objects, fontsize=15)
+        plt.ylabel("Percent of neurons",  fontsize=25)
+        plt.xlim((-0.5, len(objects)-0.5))
+        plt.ylim((0,100))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plt.subplots_adjust(left=0.4)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+        if c == "gc":
+            plt.savefig(save_path + '/lomb_classifiers_proportions_hmt_'+c+'_.png', dpi=200)
+        elif c == "ngc":
+            plt.savefig(save_path + '/lomb_classifiers_proportions_hmt_'+c+'_.png', dpi=200)
+    plt.close()
+    return
+
+def plot_grid_scores_by_classifier(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers grid scores...')
+    classifier_collumn = "Lomb_classifier_"+suffix
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    G_P = grid_cells[grid_cells[classifier_collumn] == "Position"]
+    G_D = grid_cells[grid_cells[classifier_collumn] == "Distance"]
+    G_N = grid_cells[grid_cells[classifier_collumn] == "Null"]
+    NG_P = non_grid_cells[non_grid_cells[classifier_collumn] == "Position"]
+    NG_D = non_grid_cells[non_grid_cells[classifier_collumn] == "Distance"]
+    NG_N = non_grid_cells[non_grid_cells[classifier_collumn] == "Null"]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    _, _, patches1 = ax.hist(np.asarray(G_P["grid_score"]), bins=500, color="turquoise", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches2 = ax.hist(np.asarray(G_D["grid_score"]), bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches3 = ax.hist(np.asarray(G_N["grid_score"]), bins=500, color="gray", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches4 = ax.hist(np.asarray(NG_P["grid_score"]), bins=500, color="turquoise", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+    _, _, patches5 = ax.hist(np.asarray(NG_D["grid_score"]), bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+    _, _, patches6 = ax.hist(np.asarray(NG_N["grid_score"]), bins=500, color="gray", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    patches2[0].set_xy(patches2[0].get_xy()[:-1])
+    patches3[0].set_xy(patches3[0].get_xy()[:-1])
+    patches4[0].set_xy(patches4[0].get_xy()[:-1])
+    patches5[0].set_xy(patches5[0].get_xy()[:-1])
+    patches6[0].set_xy(patches6[0].get_xy()[:-1])
+
+    plt.ylabel("Density",  fontsize=20)
+    plt.xlabel("Grid Score",  fontsize=15)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_grid_scores_'+suffix+'.png', dpi=300)
+    plt.close()
+    return
+
+def plot_of_stability_by_classifier(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers half session scores...')
+    classifier_collumn = "Lomb_classifier_"+suffix
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    G_P = grid_cells[grid_cells[classifier_collumn] == "Position"]
+    G_D = grid_cells[grid_cells[classifier_collumn] == "Distance"]
+    G_N = grid_cells[grid_cells[classifier_collumn] == "Null"]
+    NG_P = non_grid_cells[non_grid_cells[classifier_collumn] == "Position"]
+    NG_D = non_grid_cells[non_grid_cells[classifier_collumn] == "Distance"]
+    NG_N = non_grid_cells[non_grid_cells[classifier_collumn] == "Null"]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    _, _, patches1 = ax.hist(np.asarray(G_P["rate_map_correlation_first_vs_second_half"]), bins=500, color="turquoise", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches2 = ax.hist(np.asarray(G_D["rate_map_correlation_first_vs_second_half"]), bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches3 = ax.hist(np.asarray(G_N["rate_map_correlation_first_vs_second_half"]), bins=500, color="gray", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches4 = ax.hist(np.asarray(NG_P["rate_map_correlation_first_vs_second_half"]), bins=500, color="turquoise", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+    _, _, patches5 = ax.hist(np.asarray(NG_D["rate_map_correlation_first_vs_second_half"]), bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+    _, _, patches6 = ax.hist(np.asarray(NG_N["rate_map_correlation_first_vs_second_half"]), bins=500, color="gray", histtype="step", density=True, cumulative=True, linewidth=2, linestyle="dotted")
+
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    patches2[0].set_xy(patches2[0].get_xy()[:-1])
+    patches3[0].set_xy(patches3[0].get_xy()[:-1])
+    patches4[0].set_xy(patches4[0].get_xy()[:-1])
+    patches5[0].set_xy(patches5[0].get_xy()[:-1])
+    patches6[0].set_xy(patches6[0].get_xy()[:-1])
+
+    plt.ylabel("Density",  fontsize=20)
+    plt.xlabel("Half-session Stability",  fontsize=15)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_hs_stability_'+suffix+'.png', dpi=300)
+    plt.close()
+    return
+
+def plot_of_stability_vs_grid_score_by_classifier(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers half session scores...')
+    classifier_collumn = "Lomb_classifier_"+suffix
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    G_P = grid_cells[grid_cells[classifier_collumn] == "Position"]
+    G_D = grid_cells[grid_cells[classifier_collumn] == "Distance"]
+    G_N = grid_cells[grid_cells[classifier_collumn] == "Null"]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    ax.scatter(np.asarray(G_N["grid_score"]), np.asarray(G_N["rate_map_correlation_first_vs_second_half"]), marker="o", alpha=0.3, color="gray")
+    ax.scatter(np.asarray(G_P["grid_score"]), np.asarray(G_P["rate_map_correlation_first_vs_second_half"]), marker="o", alpha=0.3, color="turquoise")
+    ax.scatter(np.asarray(G_D["grid_score"]), np.asarray(G_D["rate_map_correlation_first_vs_second_half"]), marker="o", alpha=0.3, color="orange")
+
+    plt.ylabel("Half-session Stability",  fontsize=20)
+    plt.xlabel("Grid Score",  fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_hs_stability_vs_grid_score_'+suffix+'.png', dpi=300)
+    plt.close()
+    return
+
 def plot_lomb_classifiers_proportions_by_mouse(concantenated_dataframe, suffix="", save_path=""):
-    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix="")
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
     print('plotting lomb classifers proportions by mouse...')
 
     for mouse in np.unique(concantenated_dataframe["mouse"]):
@@ -387,7 +618,27 @@ def main():
     plot_lomb_classifiers_proportions(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    print("look now`")
+    plot_grid_scores_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_grid_scores_by_classifier(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_of_stability_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_of_stability_by_classifier(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_of_stability_vs_grid_score_by_classifier(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+
+    # PAIRWISE CLASSIFIERS
+    plot_pairwise_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/pairwise_classifiers")
+
+    # Hit Miss Try specific analysis #
+    plot_lomb_classifiers_proportions_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers(combined_df, suffix="PI_miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers(combined_df, suffix="PI_try", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions(combined_df, suffix="PI_miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions(combined_df, suffix="PI_try", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="PI", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="PI_miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="PI_try", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
+    print("look now")
 
 if __name__ == '__main__':
     main()
