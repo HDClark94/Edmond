@@ -1875,7 +1875,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     for recording in vr_recording_path_list:
         print("processing ", recording)
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"
+        recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"
         #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01"
         #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03"
         #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50"

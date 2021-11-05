@@ -173,7 +173,7 @@ def plot_egocentric_spike_spatial_autocorrelogram(spike_data, position_data, out
             fig = plt.figure(figsize=(4,4))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
             cmap = plt.cm.get_cmap("inferno")
-            c = ax.imshow(diff_autocorrelogram_2d, interpolation='none', cmap=cmap, vmin=0, vmax=0.1, origin='lower')
+            c = ax.imshow(diff_autocorrelogram_2d, interpolation='none', cmap=cmap, vmin=0, vmax=1, origin='lower')
             clb = fig.colorbar(c, ax=ax, shrink=0.5)
             clb.mappable.set_clim(0, 0.1)
             plt.ylabel('Y lag (cm)', fontsize=20, labelpad = 10)
@@ -205,6 +205,45 @@ def plot_egocentric_spike_spatial_autocorrelogram(spike_data, position_data, out
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_egocentric_spatial_autocorrelogram_Cluster_' + str(cluster_id) + '_1D.png', dpi=200)
             plt.close()
 
+            # make a 1D figure for the shuffle
+            fig = plt.figure(figsize=(4,4))
+            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+            ax.bar(bin_centres, shuffle_autocorrelogram_1d, color="black", edgecolor="black", align="edge")
+            plt.ylabel('Counts', fontsize=20, labelpad = 10)
+            plt.xlabel('Distance (cm)', fontsize=20, labelpad = 10)
+            plt.xlim(0,150)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            Edmond.plot_utility2.style_vr_plot(ax, x_max=max(autocorrelogram_1d[1:]))
+            plt.locator_params(axis = 'x', nbins  = 8)
+            tick_spacing = 50
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_egocentric_spatial_autocorrelogram_shuffle_Cluster_' + str(cluster_id) + '_1D.png', dpi=200)
+            plt.close()
+
+            # make a 1D figure for the shuffle difference
+            fig = plt.figure(figsize=(4,4))
+            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+            ax.bar(bin_centres, shuffle_autocorrelogram_1d, color="black", edgecolor="black", align="edge")
+            plt.ylabel('Counts', fontsize=20, labelpad = 10)
+            plt.xlabel('Distance (cm)', fontsize=20, labelpad = 10)
+            plt.xlim(0,150)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            Edmond.plot_utility2.style_vr_plot(ax, x_max=max(autocorrelogram_1d[1:]))
+            plt.locator_params(axis = 'x', nbins  = 8)
+            tick_spacing = 50
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_egocentric_spatial_autocorrelogram_shuffle_diff_Cluster_' + str(cluster_id) + '_1D.png', dpi=200)
+            plt.close()
+
+
+
+
     if return_spike_data:
         return spike_data
     else:
@@ -214,7 +253,7 @@ def plot_egocentric_spike_spatial_autocorrelogram(spike_data, position_data, out
 def process_recordings(of_recording_path_list):
 
     for recording in of_recording_path_list:
-        recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01"
+        recording = "/mnt/datastore/Harry/cohort8_may2021/of/M14_D31_2021-06-21_11-23-26"
         print("processing ", recording)
         try:
             output_path = recording+'/'+settings.sorterName

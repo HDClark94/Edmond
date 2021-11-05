@@ -8,6 +8,25 @@ from Edmond.Concatenate_from_server import *
 from scipy import stats
 from matplotlib.markers import TICKDOWN
 
+def get_p_text(p, ns=True):
+
+    if p is not None:
+
+        if p<0.0001:
+            return "****"
+        elif p<0.001:
+            return "***"
+        elif p<0.01:
+            return "**"
+        elif p<0.05:
+            return "*"
+        elif ns:
+            return "ns"
+        else:
+            return " "
+    else:
+        return " "
+
 def distance_from_integer(frequencies):
     distance_from_zero = np.asarray(frequencies)%1
     distance_from_one = 1-(np.asarray(frequencies)%1)
@@ -772,6 +791,11 @@ def plot_pairwise_comparison_b(combined_df, save_path, CT="",  PDN=""):
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
 
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
     #plt.xticks(rotation=-45)
@@ -840,6 +864,11 @@ def plot_pairwise_comparison_p(combined_df, save_path, CT="", PDN=""):
     hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
 
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
@@ -910,6 +939,11 @@ def plot_pairwise_comparison_nb(combined_df, save_path, CT="",  PDN=""):
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
 
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
     #plt.xticks(rotation=-45)
@@ -977,6 +1011,11 @@ def plot_pairwise_comparison(combined_df, save_path, CT="", PDN=""):
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
 
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
     #plt.xticks(rotation=-45)
@@ -985,6 +1024,7 @@ def plot_pairwise_comparison(combined_df, save_path, CT="", PDN=""):
     plt.tight_layout()
     plt.savefig(save_path+"pairwise_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
+
 
 def plot_SNR_comparison(combined_df, save_path, CT="", PDN=""):
     combined_df = add_lomb_classifier(combined_df)
@@ -1043,6 +1083,11 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN=""):
     hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
 
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
@@ -1111,6 +1156,11 @@ def plot_SNR_comparison_b(combined_df, save_path, CT="", PDN=""):
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
 
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
     #plt.xticks(rotation=-45)
@@ -1177,6 +1227,11 @@ def plot_SNR_comparison_nb(combined_df, save_path, CT="", PDN=""):
     hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
 
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
@@ -1245,6 +1300,11 @@ def plot_SNR_comparison_p(combined_df, save_path, CT="", PDN=""):
     hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
     hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
     try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
 
     plt.xticks(x_pos, objects, fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
