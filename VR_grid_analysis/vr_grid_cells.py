@@ -691,17 +691,17 @@ def analyse_lomb_powers(spike_data, processed_position_data):
 
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
 
-        for tt in [0, 1, 2, "all"]:
-            for hmt in ["hit", "miss", "try", "all"]:
+        for tt in ["all", 0, 1, 2]:
+            for hmt in ["all", "hit", "miss", "try"]:
+                subset_processed_position_data = processed_position_data.copy()
                 if tt != "all":
-                    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == tt)]
+                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["trial_type"] == tt)]
                 if hmt != "all":
-                    processed_position_data = processed_position_data[(processed_position_data["hit_miss_try"] == hmt)]
-                subset_trial_numbers = processed_position_data["trial_number"]
+                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["hit_miss_try"] == hmt)]
+                subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
 
                 if len(firing_times_cluster)>1:
                     if len(subset_trial_numbers)>0:
-                        subset_trial_numbers = np.asarray(subset_trial_numbers)
                         subset_mask = np.isin(centre_trials, subset_trial_numbers)
                         subset_mask = np.vstack([subset_mask]*len(powers[0])).T
                         subset_powers = powers.copy()
@@ -761,7 +761,6 @@ def analyse_lomb_powers(spike_data, processed_position_data):
                 elif (tt==2) and (hmt=="all"):
                     SNRs_all_probe.append(max_SNR)
                     Freqs_all_probe.append(max_SNR_freq)
-
 
     spike_data["ML_SNRs"] = SNRs;                                         spike_data["ML_Freqs"] = Freqs
     spike_data["ML_SNRs_all_beaconed"] = SNRs_all_beaconed;               spike_data["ML_Freqs_all_beaconed"] = Freqs_all_beaconed
@@ -981,20 +980,22 @@ def add_lomb_classifier(spatial_firing, suffix=""):
     """
     lomb_classifiers = []
     for index, row in spatial_firing.iterrows():
-        if "SNR"+suffix in list(spatial_firing):
-            lomb_SNR = row["SNR"+suffix]
-            lomb_freq = row["freqs"+suffix]
+        if "ML_SNRs"+suffix in list(spatial_firing):
+            lomb_SNR = row["ML_SNRs"+suffix]
+            lomb_freq = row["ML_Freqs"+suffix]
             lomb_distance_from_int = distance_from_integer(lomb_freq)[0]
-            lomb_SNR_theshold = row["shuffleSNR"+suffix]
-            lomb_freq_threshold = row["shufflefreqs"+suffix]
+            #lomb_SNR_theshold = row["shuffleSNR"+suffix]
+            #lomb_freq_threshold = row["shufflefreqs"+suffix]
 
-            if lomb_SNR>lomb_SNR_theshold:
+            if lomb_SNR>5:
                 if lomb_distance_from_int<0.025:
                     lomb_classifier = "Position"
                 else:
                     lomb_classifier = "Distance"
             elif lomb_distance_from_int<0.025:
                 lomb_classifier = "Position"
+            elif np.isnan(lomb_SNR):
+                lomb_classifier = "Unclassifed"
             else:
                 lomb_classifier = "Null"
         else:
@@ -1871,8 +1872,6 @@ def get_max_SNR(spatial_frequency, powers):
     return max_SNR, max_SNR_freq
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
-    #vr_recording_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
-    #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"]
 
     for recording in vr_recording_path_list:
         print("processing ", recording)
@@ -1884,7 +1883,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
@@ -1911,8 +1910,8 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #spike_data = plot_lomb_scargle_periodogram(spike_data, PI_tries_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="PI_try", GaussianKernelSTD_ms=5, fr_integration_window=2)
 
             # MOVING LOMB PERIODOGRAMS
-            spike_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
-            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+            #spike_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
+            spike_data = analyse_lomb_powers(spike_data, processed_position_data)
 
             # SPATIAL AUTO CORRELOGRAMS
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
