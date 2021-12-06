@@ -275,7 +275,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_avg_trial_speed(processed_position_data)
             PI_hits_processed_position_data = extract_PI_trials(processed_position_data, hmt="hit")
             PI_misses_processed_position_data = extract_PI_trials(processed_position_data, hmt="miss")

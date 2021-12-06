@@ -99,6 +99,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
                     collumn_names_to_keep.append("firing_times")
                     collumn_names_to_keep.append("random_snippets")
+                    if "MOVING_LOMB_avg_power" in list(spatial_firing):
+                        collumn_names_to_keep.append("MOVING_LOMB_avg_power")
                     spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of

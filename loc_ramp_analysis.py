@@ -253,52 +253,45 @@ def label_collumn2color(data, label_collumn):
             colors.append(cohort_mouse_label_color(data[label_collumn].iloc[i]))
     return colors
 
-def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type=None, p=None, filter_by_slope=False):
+def simple_histogram(data, collumn, save_path=None, ramp_region=None, filter_by_slope=False):
     fig, ax = plt.subplots(figsize=(6,6))
+    if ramp_region == "outbound":
+        collumn = 'ramp_score_o'
+    elif ramp_region == "homebound":
+        collumn = 'ramp_score_h'
 
     PS = data[data.tetrode_location == "PS"]
     MEC = data[data.tetrode_location == "MEC"]
-    UN = data[data.tetrode_location == "UN"]
 
-    PS_neg = PS[PS.ramp_score < 0]
-    MEC_neg = MEC[MEC.ramp_score < 0]
-    PS_pos = PS[PS.ramp_score > 0]
-    MEC_pos = MEC[MEC.ramp_score > 0]
+    PS_neg = PS[PS[collumn] < 0]
+    MEC_neg = MEC[MEC[collumn]  < 0]
+    PS_pos = PS[PS[collumn]  > 0]
+    MEC_pos = MEC[MEC[collumn]  > 0]
 
-    if trial_type == "all" and filter_by_slope==True:
-        p = stats.ks_2samp(np.asarray(PS_neg[collumn]), np.asarray(MEC_neg[collumn]))[1]
-        print("p =",p, "for negative slopes, ", get_p_text(p))
-        p = stats.ks_2samp(np.asarray(PS_pos[collumn]), np.asarray(MEC_pos[collumn]))[1]
-        print("p =",p, "for positive slopes, ", get_p_text(p))
+    p = stats.ks_2samp(np.asarray(PS_neg[collumn]), np.asarray(MEC_neg[collumn]))[1]
+    print("p =",p, "for negative slopes, ", get_p_text(p))
+    p = stats.ks_2samp(np.asarray(PS_pos[collumn]), np.asarray(MEC_pos[collumn]))[1]
+    print("p =",p, "for positive slopes, ", get_p_text(p))
 
     p = stats.ks_2samp(np.asarray(PS[collumn]), np.asarray(MEC[collumn]))[1]
     p_str = get_p_text(p, ns=True)
     #print("p=", p)
 
-    #density_PS = kde.gaussian_kde(np.asarray(PS[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS(x); ax.plot(x,y, color="b");
-    #density_MEC = kde.gaussian_kde(np.asarray(MEC[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC(x); ax.plot(x,y, color="r");
-
-    #PS_bw = density_PS.covariance_factor()*np.asarray(PS[collumn]).astype(float).std()
-    #MEC_bw = density_MEC.covariance_factor()*np.asarray(MEC[collumn]).astype(float).std()
-    #print("bandwidth for PS = ", PS_bw)
-    #print("bandwidth for MEC = ", MEC_bw)
-
     ax.hist(np.asarray(PS_neg[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="b", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
-    density_PS_neg = kde.gaussian_kde(np.asarray(PS_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_neg(x); ax.plot(x,y, color="b");
+    #density_PS_neg = kde.gaussian_kde(np.asarray(PS_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_neg(x); ax.plot(x,y, color="b");
 
     ax.hist(np.asarray(MEC_neg[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
-    density_MEC_neg = kde.gaussian_kde(np.asarray(MEC_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_neg(x); ax.plot(x,y, color="r");
+    #density_MEC_neg = kde.gaussian_kde(np.asarray(MEC_neg[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_neg(x); ax.plot(x,y, color="r");
 
 
     ax.hist(np.asarray(PS_pos[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="b", label="PS", histtype="bar", density=True, cumulative=False, linewidth=4)
-    density_PS_pos = kde.gaussian_kde(np.asarray(PS_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_pos(x); ax.plot(x,y, color="b");
+    #density_PS_pos = kde.gaussian_kde(np.asarray(PS_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_PS_pos(x); ax.plot(x,y, color="b");
 
     ax.hist(np.asarray(MEC_pos[collumn]), range=(-1, 1), bins=25, alpha=0.3, color="r", label="MEC", histtype="bar", density=True, cumulative=False, linewidth=4)
-    density_MEC_pos = kde.gaussian_kde(np.asarray(MEC_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_pos(x); ax.plot(x,y, color="r");
-
-
+    #density_MEC_pos = kde.gaussian_kde(np.asarray(MEC_pos[collumn]).astype(float)); x = np.linspace(-1,1,300); y=density_MEC_pos(x); ax.plot(x,y, color="r");
 
     ax.set_ylabel("Density", fontsize=25)
+    collumn = "ramp_score"
     ax.set_xlabel(get_tidy_title(collumn), fontsize=25)
     if collumn == "ramp_score":
         ax.set_xlim(left=-0.75, right=0.75)
@@ -320,10 +313,9 @@ def simple_histogram(data, collumn, save_path=None, ramp_region=None, trial_type
     ax.text(0.1, 0.9, p_str, ha='center', va='center', transform=ax.transAxes, fontsize=12)
     if save_path is not None:
         if filter_by_slope:
-            plt.savefig(save_path+"/FBS_location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
+            plt.savefig(save_path+"/FBS_location_histo_"+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
         else:
-            plt.savefig(save_path+"/location_histo_"+"_tt_"+trial_type+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
-
+            plt.savefig(save_path+"/location_histo_"+"_rr_"+ramp_region+"_"+collumn+".png", dpi=300)
 
     plt.show()
     plt.close()
@@ -790,30 +782,41 @@ def add_theta(data, theta_df):
 
 def add_lm(data, linear_model_df):
     data_new = pd.DataFrame()
+
+    outbound_specific_data = linear_model_df.iloc[0::3, :]
+    homebound_specific_data = linear_model_df.iloc[1::3, :]
     for index, row in data.iterrows():
         row =  row.to_frame().T.reset_index(drop=True)
         session_id = row.session_id.iloc[0]
-        if "cluster_id" in list(row):
-            cluster_id = row.cluster_id.iloc[0]
-        elif "sorted_seperately_vr_cluster_ids" in list(row):
-            cluster_id = row.sorted_seperately_vr_cluster_ids.iloc[0]
+        cluster_id = row.cluster_id.iloc[0]
 
         if len(linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)])>0:
-            lm_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_hb
-            lm_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_result_ob
-            lmer_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_ob
-            lmer_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lmer_result_hb
+            lm_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_group_b
+            lm_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].lm_group_b_h
+            lmer_result_ob = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].final_model_o_b
+            lmer_result_hb = linear_model_df[(linear_model_df.session_id == session_id) & (linear_model_df.cluster_id == cluster_id)].iloc[0].final_model_h_b
+            ramp_score_ob = outbound_specific_data[(outbound_specific_data.session_id == session_id) & (outbound_specific_data.cluster_id == cluster_id)].iloc[0].ramp_score
+            ramp_score_hb = homebound_specific_data[(homebound_specific_data.session_id == session_id) & (homebound_specific_data.cluster_id == cluster_id)].iloc[0].ramp_score
+            ramp_score_ob = float(ramp_score_ob.replace(',', '.'))
+            ramp_score_hb = float(ramp_score_hb.replace(',', '.'))
         else:
             lm_result_hb = np.nan
             lm_result_ob = np.nan
             lmer_result_ob = np.nan
             lmer_result_hb = np.nan
+            ramp_score_ob = np.nan
+            ramp_score_hb = np.nan
 
         row["lm_result_hb"] = lm_result_hb
         row["lm_result_ob"] = lm_result_ob
         row["lmer_result_ob"] = lmer_result_ob
         row["lmer_result_hb"] = lmer_result_hb
+        row["ramp_score_o"] = ramp_score_ob
+        row["ramp_score_h"]= ramp_score_hb
         data_new = pd.concat([data_new, row], ignore_index=True)
+
+    # drop the collumns without a classifications, these were dropped for not passing behavioural criteria
+    data_new = data_new.dropna(subset =["lm_result_hb"])
     return data_new
 
 
@@ -835,25 +838,14 @@ def mouse_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="bea
     simple_bar_mouse(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, print_p=print_p, filter_by_slope=filter_by_slope)
     return
 
-def location_ramp(data, collumn, save_path, ramp_region="outbound", trial_type="beaconed", print_p=False, filter_by_slope=False):
-    print("running location_ramp")
-
+def location_ramp(data, collumn, save_path, ramp_region="outbound", filter_by_slope=True):
     if filter_by_slope:
         if ramp_region == "outbound":
             data = data[(data.lm_result_ob == "Positive") | (data.lm_result_ob == "Negative")]
         elif ramp_region == "homebound":
             data = data[(data.lm_result_hb == "Positive") | (data.lm_result_hb == "Negative")]
-        elif ramp_region == "all":
-            data = data[(data.lm_result_ob == "Positive") | (data.lm_result_ob == "Negative") |
-                        (data.lm_result_hb == "Positive") | (data.lm_result_hb == "Negative")]
 
-    # only look at beacoend and outbound
-    data = data[(data.trial_type == trial_type) &
-                (data.ramp_region == ramp_region)]
-
-    simple_histogram(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
-    simple_boxplot(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, filter_by_slope=filter_by_slope)
-    simple_bar_location(data, collumn, save_path, ramp_region=ramp_region, trial_type=trial_type, p=None, print_p=print_p, filter_by_slope=filter_by_slope)
+    simple_histogram(data, collumn, save_path, ramp_region=ramp_region, filter_by_slope=filter_by_slope)
     return
 
 def mouse_slope(data, collumn, save_path, ramp_region="outbound", trial_type="beaconed", print_p=False):
@@ -1892,13 +1884,14 @@ def plot_theta_by_mouse(df, save_path=None):
         y = df[(df["cohort_mouse"] == objects[i])]
         theta_indices = np.asarray(y["ThetaIndex"], dtype=np.float64)
         theta_indices = theta_indices[~np.isnan(theta_indices)]
-        ax.errorbar(x_pos[i], np.nanmean(theta_indices), yerr=stats.sem(theta_indices), ecolor=cycle_colors[i], capsize=10, fmt="o", color=cycle_colors[i])
-        ax.scatter(x_pos[i]*np.ones(len(theta_indices)), theta_indices, edgecolor=cycle_colors[i], marker="o", facecolors=cycle_colors[i], alpha=0.3)
+        ax.errorbar(x_pos[i], np.nanmean(theta_indices), yerr=stats.sem(theta_indices), ecolor="black", capsize=10, fmt="o", color="black")
+        ax.scatter(x_pos[i]*np.ones(len(theta_indices)), theta_indices, edgecolor="black", marker="o", facecolors="black", alpha=0.3)
     plt.xticks(x_pos, objects, fontsize=8)
     plt.xticks(rotation=-45)
     plt.locator_params(axis='y', nbins=4)
     plt.ylabel("Theta Index",  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
+    ax.axhline(y=0.07, color="red", linestyle="dashed")
     ax.tick_params(axis='both', which='major', labelsize=20)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1924,6 +1917,7 @@ def plot_theta_by_location(df, save_path=None):
     plt.locator_params(axis='y', nbins=4)
     plt.ylabel("Theta Index",  fontsize=20)
     plt.xlim((-0.5, len(objects)-0.5))
+    ax.axhline(y=0.07, color="red", linestyle="dashed")
     ax.tick_params(axis='both', which='major', labelsize=20)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1932,6 +1926,159 @@ def plot_theta_by_location(df, save_path=None):
     plt.show()
     plt.close()
 
+def plot_theta_proportions_lm(df, save_path, ramp_region):
+    fig, ax = plt.subplots(figsize=(3,6))
+    if ramp_region == "outbound":
+        column = 'lm_result_ob'
+    elif ramp_region == "homebound":
+        column = 'lm_result_hb'
+    colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black"]
+    groups = ["Negative", "Positive", "Unclassified"]
+    objects = ["NR", "TR"]
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        if object == "TR":
+            subset = df[(df["ThetaIndex"] > 0.07)]
+        elif object == "NR":
+            subset = df[(df["ThetaIndex"] < 0.07)]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = len(subset[(subset[column] == group)])
+            percent = (count/len(subset))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            bottom = bottom+percent
+
+    plt.xticks(x_pos, objects, fontsize=8)
+    #plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/"+ramp_region+"_theta_proportions.png", dpi=300)
+    plt.show()
+    plt.close()
+    return
+
+def plot_location_proportions_lm(df, save_path, ramp_region):
+    fig, ax = plt.subplots(figsize=(3,6))
+    if ramp_region == "outbound":
+        column = 'lm_result_ob'
+    elif ramp_region == "homebound":
+        column = 'lm_result_hb'
+    colors_lm = [((238.0/255,58.0/255,140.0/255)), ((102.0/255,205.0/255,0.0/255)), "black"]
+    groups = ["Negative", "Positive", "Unclassified"]
+    objects = ["MEC", "PS", "RH"]
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        subset = df[(df["tetrode_location"] == object)]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = len(subset[(subset[column] == group)])
+            percent = (count/len(subset))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            bottom = bottom+percent
+
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/"+ramp_region+"_location_proportions.png", dpi=300)
+    plt.show()
+    plt.close()
+    return
+
+def plot_theta_proportions_lmer(df, save_path, ramp_region):
+    fig, ax = plt.subplots(figsize=(3,6))
+    if ramp_region == "outbound":
+        column = 'lmer_result_ob'
+        df=df[df["lm_result_ob"] != "Unclassified"]
+    elif ramp_region == "homebound":
+        column = 'lmer_result_hb'
+        df=df[df["lm_result_hb"] != "Unclassified"]
+
+    groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
+    colors_lm = [lmer_result_color(c) for c in groups]
+
+    objects = ["NR", "TR"]
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        if object == "TR":
+            subset = df[(df["ThetaIndex"] > 0.07)]
+        elif object == "NR":
+            subset = df[(df["ThetaIndex"] < 0.07)]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = len(subset[(subset[column] == group)])
+            percent = (count/len(subset))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            bottom = bottom+percent
+
+    plt.xticks(x_pos, objects, fontsize=8)
+    #plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/"+ramp_region+"_theta_proportions_lmer.png", dpi=300)
+    plt.show()
+    plt.close()
+    return
+
+def plot_location_proportions_lmer(df, save_path, ramp_region):
+    fig, ax = plt.subplots(figsize=(3,6))
+    if ramp_region == "outbound":
+        column = 'lmer_result_ob'
+        df=df[df["lm_result_ob"] != "Unclassified"]
+    elif ramp_region == "homebound":
+        column = 'lmer_result_hb'
+        df=df[df["lm_result_hb"] != "Unclassified"]
+
+    groups = ["None", "PSA", "SA", "PA", "PS", "A", "S", "P"]
+    colors_lm = [lmer_result_color(c) for c in groups]
+
+    objects = ["MEC", "PS", "RH"]
+    x_pos = np.arange(len(objects))
+
+    for object, x in zip(objects, x_pos):
+        subset = df[(df["tetrode_location"] == object)]
+
+        bottom=0
+        for color, group in zip(colors_lm, groups):
+            count = len(subset[(subset[column] == group)])
+            percent = (count/len(subset))*100
+            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+            bottom = bottom+percent
+
+    plt.xticks(x_pos, objects, fontsize=8)
+    plt.xticks(rotation=-45)
+    plt.ylabel("Percent of neurons",  fontsize=25)
+    plt.xlim((-0.5, len(objects)-0.5))
+    plt.ylim((0,100))
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"/"+ramp_region+"_location_proportions_lmer.png", dpi=300)
+    plt.show()
+    plt.close()
+    return
 
 def main():
     print('-------------------------------------------------------------')
@@ -1947,12 +2094,25 @@ def main():
     df = add_short_session_id(df)
     df = add_cohort_mouse_label(df)
     df = add_locations(df, pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/tetrode_locations.csv"))
-    df = remove_mouse(df, cohort_mouse_list=["C2_1124"])
+    df = add_lm(df, pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/all_results_linearmodel.csv", sep=";"))
+    df = remove_mouse(df, cohort_mouse_list=["C2_1124", "C7_M8", "C5_M1"])
 
     # plot theta histogram for all cells and plots for theta locations and by mouse
     plot_theta_histogram(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
     plot_theta_by_mouse(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
     plot_theta_by_location(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper")
+    plot_theta_proportions_lm(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="outbound")
+    plot_theta_proportions_lm(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="homebound")
+    plot_theta_proportions_lmer(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="outbound")
+    plot_theta_proportions_lmer(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="homebound")
+
+    # plot loction specific plots
+    plot_location_proportions_lm(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="outbound")
+    plot_location_proportions_lm(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="homebound")
+    plot_location_proportions_lmer(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="outbound")
+    plot_location_proportions_lmer(df, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="homebound")
+    location_ramp(df, collumn="ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="outbound", filter_by_slope=True)
+    location_ramp(df, collumn="ramp_score", save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/figs/for_paper", ramp_region="homebound", filter_by_slope=True)
 
 
     ramp_scores_path = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/ramp_score_coeff_export.csv"

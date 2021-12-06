@@ -227,7 +227,7 @@ def plot_egocentric_spike_spatial_autocorrelogram(spike_data, position_data, out
             fig = plt.figure(figsize=(4,4))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
             bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
-            ax.bar(bin_centres, shuffle_autocorrelogram_1d, color="black", edgecolor="black", align="edge")
+            ax.bar(bin_centres, autocorrelogram_1d-shuffle_autocorrelogram_1d, color="black", edgecolor="black", align="edge")
             plt.ylabel('Counts', fontsize=20, labelpad = 10)
             plt.xlabel('Distance (cm)', fontsize=20, labelpad = 10)
             plt.xlim(0,150)

@@ -248,6 +248,14 @@ def plot_linear_grid_cell_lomb_anchored(n_trials, save_path, bin_size_cm=1, samp
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
 
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.plot(frequency, avg_power, color="black", linewidth=8)
+            ax.set_xlim(0,max(frequency))
+            ax.set_ylim(0,1)
+            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
+            plot_path = save_path + '/______toy_grid_assay_anchored_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
+
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[]);
@@ -299,16 +307,26 @@ def plot_linear_grid_cell_lomb_null(n_trials, save_path, bin_size_cm=1, sampling
             axes[m,n].plot(frequency, avg_power, color="blue")
             axes[m, n].set_xlim(0,max(frequency))
             axes[m, n].set_ylim(0,1)
-            far = ls.false_alarm_level(1-(1.e-10))
-            axes[m, n].axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red") # change method to "bootstrap" when you have time
             axes[m, n].text(0.9, 0.9, max_SNR_text, ha='right', va='center', transform=axes[m, n].transAxes, fontsize=4)
             axes[m, n].text(0.9, 0.8, max_SNR_freq_test, ha='right', va='center', transform=axes[m, n].transAxes, fontsize=4)
+            far = ls.false_alarm_level(1-(1.e-10))
+            axes[m, n].axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red") # change method to "bootstrap" when you have time
             if m == 0:
                 x_title = "L="+str(track_length)
                 axes[m, n].set_title(x_title, fontsize=10)
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
+
+
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.plot(frequency, avg_power, color="black", linewidth=8)
+            ax.set_xlim(0,max(frequency))
+            ax.set_ylim(0,1)
+            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
+            plot_path = save_path + '/______toy_grid_assay_null_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
+
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -363,16 +381,24 @@ def plot_linear_grid_cell_lomb(n_trials, save_path, bin_size_cm=1, sampling_rate
             axes[m,n].plot(frequency, avg_power, color="blue")
             axes[m, n].set_xlim(0,max(frequency))
             axes[m, n].set_ylim(0,1)
-            far = ls.false_alarm_level(1-(1.e-10))
-            axes[m, n].axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red") # change method to "bootstrap" when you have time
             axes[m, n].text(0.9, 0.9, max_SNR_text, ha='right', va='center', transform=axes[m, n].transAxes, fontsize=4)
             axes[m, n].text(0.9, 0.8, max_SNR_freq_test, ha='right', va='center', transform=axes[m, n].transAxes, fontsize=4)
+            far = ls.false_alarm_level(1-(1.e-10))
+            axes[m, n].axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red") # change method to "bootstrap" when you have time
             if m == 0:
                 x_title = "L="+str(track_length)
                 axes[m, n].set_title(x_title, fontsize=10)
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
+
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.plot(frequency, avg_power, color="black", linewidth=8)
+            ax.set_xlim(0,max(frequency))
+            ax.set_ylim(0,1)
+            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
+            plot_path = save_path + '/______toy_grid_assay_non_anchored_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -407,6 +433,7 @@ def find_set(a,b):
 def plot_linear_grid_cells_spatial_autocorreologram(n_trials, save_path, bin_size_cm=1, sampling_rate=100, avg_speed_cmps=10, p_scalar=1):
 
     track_lengths = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    track_lengths = [100,110]
     grid_spacing = 30
     offsets = [10, 20, 30, 40, 50, 60]
 
@@ -455,6 +482,13 @@ def plot_linear_grid_cells_spatial_autocorreologram(n_trials, save_path, bin_siz
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
+
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
+            ax.set_xlim(1, autocorr_window_size)
+            ax.set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
+            plot_path = save_path + '/______toy_grid_assay_non_anchored_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -505,7 +539,7 @@ def plot_linear_grid_cells_spatial_autocorreologram_null(n_trials, save_path, bi
             #first_peaks[m, n] = get_first_peak(lags[1:], autocorrelogram[1:])
             axes[m, n].bar(lags[1:], autocorrelogram[1:], color="blue", edgecolor="blue", align="edge")
             axes[m, n].set_xlim(1,autocorr_window_size)
-            axes[m, n].set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
+            axes[m, n].set_ylim(0, max(autocorrelogram[1:]*2))
 
             if m == 0:
                 x_title = "L="+str(track_length)
@@ -513,6 +547,13 @@ def plot_linear_grid_cells_spatial_autocorreologram_null(n_trials, save_path, bi
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
+
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
+            ax.set_xlim(1, autocorr_window_size)
+            ax.set_ylim(0, max(autocorrelogram[1:])*2)
+            plot_path = save_path + '/______toy_grid_assay_null_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -578,6 +619,13 @@ def plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials, save_path
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
+
+            fig, ax = plt.subplots(figsize=(8,8))
+            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
+            ax.set_xlim(1, autocorr_window_size)
+            ax.set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
+            plot_path = save_path + '/______toy_grid_assay_anchored_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
+            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -743,8 +791,8 @@ def main():
     for p_scalar in [1.0]:
         for n_trials in [500]:
             #plot_linear_grid_cell_rates(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cells_spatial_autocorreologram(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cell(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cells_spatial_autocorreologram(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             plot_linear_grid_cell_lomb(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 
@@ -752,7 +800,7 @@ def main():
         for n_trials in [500]:
             #plot_linear_grid_cell_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cell_rates_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             plot_linear_grid_cell_lomb_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 
@@ -760,7 +808,7 @@ def main():
         for n_trials in [500]:
             #plot_linear_grid_cell_null(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cell_rates_null(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cells_spatial_autocorreologram_null(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cells_spatial_autocorreologram_null(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             plot_linear_grid_cell_lomb_null(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 
