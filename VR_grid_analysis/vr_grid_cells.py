@@ -106,12 +106,11 @@ def add_hit_miss_try2(processed_position_data, track_length):
     reward_zone_end = track_length-60-30
 
     hmts=[]
-    for trial_number in np.unique(processed_position_data["trial_number"]):
-        trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == trial_number]
-        rewarded = trial_processed_position_data["rewarded"].iloc[0]
-        RZ_speed = trial_processed_position_data["avg_speed_in_RZ"].iloc[0]
-        track_speed = trial_processed_position_data["avg_speed_on_track"].iloc[0]
-        TI = trial_processed_position_data["RZ_stop_bias"].iloc[0]
+    for index, row in processed_position_data.iterrows():
+        rewarded = row["rewarded"]
+        RZ_speed = row["avg_speed_in_RZ"]
+        track_speed = row["avg_speed_on_track"]
+        TI = row["RZ_stop_bias"]
 
         if rewarded and (track_speed<20):
             hmt="slow_hit"
@@ -475,52 +474,68 @@ def find_paired_recording(recording_path, of_recording_path_list):
 def find_set(a,b):
     return set(a) & set(b)
 
-def plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, output_path, track_length, suffix=""):
+def plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length, suffix=""):
     print('plotting spike spatial autocorrelogram fr...')
     save_path = output_path + '/Figures/spatial_autocorrelograms_fr'
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
-    # get trial numbers to use from processed_position_data
-    trial_number_to_use = np.unique(processed_position_data["trial_number"])
+    n_trials = len(processed_position_data)
+    # get distances from raw position data which has been smoothened
+    rpd = np.asarray(raw_position_data["x_position_cm"])
+    tn = np.asarray(raw_position_data["trial_number"])
+    elapsed_distance30 = rpd+(tn*track_length)-track_length
+
+    # get denominator and handle nans
+    denominator, _ = np.histogram(elapsed_distance30, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        recording_length_sampling_points = int(cluster_spike_data['recording_length_sampling_points'].iloc[0])
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
-        trial_numbers = np.array(cluster_spike_data["trial_number"].iloc[0])
-        x_position_cluster = np.array(cluster_spike_data["x_position_cm"].iloc[0])
-
-        # get and apply set_mask (we are only concerned with the trial numbers in processed_position_data)
-        set_mask = np.isin(trial_numbers, trial_number_to_use)
-        firing_times_cluster = firing_times_cluster[set_mask]
-        trial_numbers = trial_numbers[set_mask]
-        x_position_cluster = x_position_cluster[set_mask]
+        firing_locations_cluster = np.array(cluster_spike_data["x_position_cm"].iloc[0])
+        firing_trial_numbers = np.array(cluster_spike_data["trial_number"].iloc[0])
+        firing_locations_cluster_elapsed = firing_locations_cluster+(firing_trial_numbers*track_length)-track_length
 
         if len(firing_times_cluster)>1:
-            lap_distance_covered = (trial_numbers*track_length)-track_length #total elapsed distance
-            x_position_cluster = x_position_cluster+lap_distance_covered
-            x_position_cluster = x_position_cluster[~np.isnan(x_position_cluster)]
-            x_position_cluster_bins = np.floor(x_position_cluster).astype(int)
+            numerator, bin_edges = np.histogram(firing_locations_cluster_elapsed, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+            fr = numerator/denominator
+            elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+            trial_numbers_by_bin=((0.5*(bin_edges[1:]+bin_edges[:-1])//track_length)+1).astype(np.int32)
+            gauss_kernel = Gaussian1DKernel(stddev=1)
 
-            autocorr_window_size = 400
-            lags = np.arange(0, autocorr_window_size, 1).astype(int) # were looking at 10 timesteps back and 10 forward
+            # remove nan values that coincide with start and end of the track before convolution
+            fr[fr==np.inf] = np.nan
+            nan_mask = ~np.isnan(fr)
+            fr = fr[nan_mask]
+            trial_numbers_by_bin = trial_numbers_by_bin[nan_mask]
+            elapsed_distance = elapsed_distance[nan_mask]
 
-            autocorrelogram = np.array([])
-            for lag in lags:
-                correlated = len(find_set(x_position_cluster_bins+lag, x_position_cluster_bins))
-                autocorrelogram = np.append(autocorrelogram, correlated)
+            fr = convolve(fr, gauss_kernel)
+            fr = moving_sum(fr, window=2)/2
+            fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+            normalised_elapsed_distance = elapsed_distance/track_length
 
+            autocorr_window_size = track_length*4
+            lags = np.arange(0, autocorr_window_size, 1) # were looking at 10 timesteps back and 10 forward
+            autocorrelogram = []
+            for i in range(len(lags)):
+                fr_lagged = fr[i:]
+                corr = stats.pearsonr(fr_lagged, fr[:len(fr_lagged)])[0]
+                autocorrelogram.append(corr)
+            autocorrelogram= np.array(autocorrelogram)
             fig = plt.figure(figsize=(4,4))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-            ax.bar(lags[1:], autocorrelogram[1:], edgecolor="black", align="edge")
-            plt.ylabel('Counts', fontsize=20, labelpad = 10)
+            ax.plot(lags[1:], autocorrelogram[1:], color="black")
+            plt.ylabel('Spatial Autocorrelation', fontsize=20, labelpad = 10)
             plt.xlabel('Lag (cm)', fontsize=20, labelpad = 10)
-            plt.xlim(0,400)
+            plt.xlim(0,800)
             ax.yaxis.set_ticks_position('left')
             ax.xaxis.set_ticks_position('bottom')
-            Edmond.plot_utility2.style_vr_plot(ax, x_max=max(autocorrelogram[1:]))
-            plt.locator_params(axis = 'x', nbins  = 8)
-            tick_spacing = 100
+            plt.ylim([min(autocorrelogram[1:]),0.6])
+            plt.locator_params(axis = 'x', nbins  = 4)
+            plt.locator_params(axis = 'y', nbins  = 4)
+            tick_spacing = 200
             ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
             plt.xticks(fontsize=20)
             plt.yticks(fontsize=20)
@@ -1824,6 +1839,10 @@ def min_max_normalize(x):
     x = (x-min_val) / (max_val-min_val)
     return x
 
+def style_track_plot_no_RZ(ax, track_length):
+    ax.axvspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
+    ax.axvspan(track_length-30, track_length, facecolor='k', linewidth =0, alpha=.25)# black box
+
 def style_track_plot(ax, track_length):
     ax.axvspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
     ax.axvspan(track_length-110, track_length-90, facecolor='DarkGreen', alpha=.25, linewidth =0)
@@ -2421,7 +2440,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_RZ_bias(processed_position_data)
             processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
-            processed_position_data = add_hit_miss_try2(processed_position_data, track_length=get_track_length(recording))
+            #processed_position_data = add_hit_miss_try2(processed_position_data, track_length=get_track_length(recording))
             #PI_hits_processed_position_data = extract_PI_trials(processed_position_data, hmt="hit")
             #PI_misses_processed_position_data = extract_PI_trials(processed_position_data, hmt="miss")
             #PI_tries_position_data = extract_PI_trials(processed_position_data, hmt="try")
@@ -2435,13 +2454,13 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             # MOVING LOMB PERIODOGRAMS
             #spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram_parallel(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
             #spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
-            spike_data = analyse_lomb_powers(spike_data, processed_position_data)
-            shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
+            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+            #shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
 
             # SPATIAL AUTO CORRELOGRAMS
             #TODO make the spatial autocorrelograms a function of the firing rate and not the spike count
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
-            #spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
 
             #spike_data = calculate_allocentric_correlation(spike_data, position_data, output_path, track_length=get_track_length(recording))
             #spike_data = calculate_egocentric_correlation(spike_data, position_data, output_path, track_length=get_track_length(recording))
@@ -2464,8 +2483,8 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #if found_paired_recording:
             #    of_spatial_firing = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             #    plot_field_com_ring_attractor_radial(spike_data=spike_data, of_spike_data=of_spatial_firing, output_path=output_path, track_length=get_track_length(recording))
-            spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
+            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            #shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -2482,7 +2501,8 @@ def main():
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
     vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D29_2021-06-17_12-30-32', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01']
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()]

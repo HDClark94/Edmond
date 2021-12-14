@@ -10,6 +10,8 @@ import PostSorting.vr_spatial_data
 from scipy import stats
 import matplotlib.patches as patches
 import matplotlib.colors as colors
+from sklearn.linear_model import LinearRegression
+from PostSorting.vr_spatial_firing import bin_fr_in_space, add_position_x
 from scipy import signal
 from astropy.convolution import convolve, Gaussian1DKernel
 import os
@@ -33,7 +35,7 @@ warnings.filterwarnings('ignore')
 from scipy.stats.stats import pearsonr
 from mpl_toolkits.axes_grid1 import host_subplot
 import mpl_toolkits.axisartist as AA
-
+from Edmond.VR_grid_analysis.hit_miss_try_firing_analysis import significance_bar, get_p_text
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -928,6 +930,147 @@ def plot_lomb_classifiers_proportions_by_mouse(concantenated_dataframe, suffix="
         plt.close()
     return
 
+def plot_snr_vs_RZbias_regression(spike_data, processed_position_data, output_path, track_length):
+    print('plotting TI vs SNR regressions...')
+    save_path = output_path + '/Figures/TI_regressions'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+    step = 0.01
+    frequency = np.arange(0.1, 10+step, step)
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
+        if len(firing_times_cluster)>1:
+            SNRs = []
+            TIs= []
+            TTs= []
+            for trial in np.unique(centre_trials):
+                trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == trial]
+                trial_powers = powers[centre_trials == trial]
+                avg_powers = np.nanmean(trial_powers, axis=0)
+                max_SNR, max_freq = get_max_SNR(frequency, avg_powers)
+                SNRs.append(max_SNR)
+                TTs.append(trial_processed_position_data["trial_type"].iloc[0])
+                TIs.append(trial_processed_position_data["RZ_stop_bias"].iloc[0])
+            SNRs = np.array(SNRs)
+            trials = np.unique(centre_trials)
+            TIs = np.array(TIs)
+            TTs= np.array(TTs)
+
+
+            stops_on_track = plt.figure(figsize=(6,6))
+            ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            for tt, c, y_text in zip([0,1,2], ["black", "red", "blue"], [0.9, 0.8, 0.7]):
+                ax.scatter(SNRs[TTs==tt], np.log(TIs)[TTs==tt], edgecolor=c, facecolor="none", marker="o")
+                plot_regression(ax, y=np.log(TIs)[TTs==tt], x=SNRs[TTs==tt], c=c, y_text_pos=y_text)
+            plt.xlabel('Power', fontsize=20, labelpad = 10)
+            plt.ylabel("log(Task Index)", fontsize=20, labelpad = 10)
+            #ax.set_xticks([0, np.round(ax.get_xlim()[1], 2)])
+            #ax.set_xlim(left=0, right=np.round(ax.get_xlim()[1], 2))
+            #ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+            #ax.set_ylim(bottom=0, top=np.round(ax.get_ylim()[1], 2))
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            #ax.spines['top'].set_visible(False)
+            #ax.spines['right'].set_visible(False)
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+            plt.savefig(save_path + '/TI_regressions_'+str(cluster_id)+'.png', dpi=200)
+            plt.close()
+    return
+
+def plot_regression(ax, x, y, c, y_text_pos):
+    # x  and y are pandas collumn
+    try:
+        x = x.values
+        y = y.values
+    except Exception as ex:
+        print("")
+
+    x = x[~np.isnan(y)].reshape(-1, 1)
+    y = y[~np.isnan(y)].reshape(-1, 1)
+
+    pearson_r = stats.pearsonr(x.flatten(),y.flatten())
+
+    linear_regressor = LinearRegression()  # create object for the class
+    linear_regressor.fit(x,y)  # perform linear regression
+
+    x_test = np.linspace(min(x), max(x), 100)
+
+    Y_pred = linear_regressor.predict(x_test.reshape(-1, 1))  # make predictions
+    #ax.text(6, 0.65, "R= "+str(np.round(pearson_r[0], decimals=2))+ ", p = "+str(np.round(pearson_r[1], decimals=2)))
+
+    ax.text(  # position text relative to Axes
+        0.05, y_text_pos, "R= "+str(np.round(pearson_r[0], decimals=2))+ ", p = "+str(np.round(pearson_r[1], decimals=4)),
+        ha='left', va='top', color=c,
+        transform=ax.transAxes, fontsize=10)
+
+    ax.plot(x_test, Y_pred, color=c)
+
+def plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length):
+    print('plotting the power by hmt...')
+    save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    step = 0.01
+    frequency = np.arange(0.1, 10+step, step)
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
+
+        stops_on_track = plt.figure(figsize=(6,6))
+        ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for f in range(1,6):
+            ax.axvline(x=f, color="gray", linewidth=2,linestyle="dashed")
+
+        for tt in [0, 1, 2]:
+            for hmt in ["hit"]:
+                subset_processed_position_data = processed_position_data.copy()
+                if tt != "all":
+                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["trial_type"] == tt)]
+                if hmt != "all":
+                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["hit_miss_try"] == hmt)]
+                subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
+
+                if len(firing_times_cluster)>1:
+                    if len(subset_trial_numbers)>0:
+                        subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                        subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                        subset_powers = powers.copy()
+                        subset_powers[subset_mask == False] = np.nan
+                        avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                        sem_subset_powers = scipy.stats.sem(subset_powers, axis=0, nan_policy="omit")
+                        ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=get_trial_color(tt), alpha=0.3)
+                        ax.plot(frequency, avg_subset_powers, color=get_trial_color(tt))
+
+        plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        plt.xlim(0,5.05)
+        ax.set_xticks([0,5])
+        ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+        ax.set_ylim(bottom=0)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        #ax.set_yticks([0, 10, 20, 30])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/hit_tt_powers_'+str(cluster_id)+'.png', dpi=200)
+        plt.close()
+    return
+
 def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length):
     print('plotting the power by hmt...')
     save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
@@ -946,6 +1089,8 @@ def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_leng
 
         stops_on_track = plt.figure(figsize=(6,6))
         ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for f in range(1,6):
+            ax.axvline(x=f, color="gray", linewidth=2,linestyle="dashed")
 
         for tt in ["all"]:
             for hmt in ["hit", "miss", "try"]:
@@ -967,9 +1112,11 @@ def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_leng
                         ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=get_hmt_color(hmt), alpha=0.3)
                         ax.plot(frequency, avg_subset_powers, color=get_hmt_color(hmt))
 
-        plt.ylabel('Power', fontsize=20, labelpad = 10)
-        plt.xlabel("Spatial Frequency", fontsize=20, labelpad = 10)
-        plt.xlim(0,10)
+        plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        plt.xlim(0,5.05)
+        ax.set_xticks([0,5])
+        ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
         ax.set_ylim(bottom=0)
         ax.yaxis.set_ticks_position('left')
         ax.xaxis.set_ticks_position('bottom')
@@ -982,6 +1129,102 @@ def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_leng
         plt.savefig(save_path + '/hmt_powers_'+str(cluster_id)+'.png', dpi=200)
         plt.close()
     return
+
+def plot_power_by_hmt(spike_data, processed_position_data, output_path, track_length):
+    print('plotting the power by hmt...')
+    save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    step = 0.01
+    frequency = np.arange(0.1, 10+step, step)
+
+    hit_miss_p_ = []
+    hit_try_p_ = []
+    try_miss_p_ = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
+        if len(firing_times_cluster)>0:
+
+            powers[np.isnan(powers)] = 0
+            SNRs = []
+            HMTs = []
+            for trial in np.unique(centre_trials):
+                trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == trial]
+                hmt = trial_processed_position_data["hit_miss_try"].iloc[0]
+                trial_powers = powers[centre_trials == trial]
+                avg_powers = np.nanmean(trial_powers, axis=0)
+                max_SNR, max_freq = get_max_SNR(frequency, avg_powers)
+                SNRs.append(max_SNR)
+                HMTs.append(hmt)
+            SNRs=np.array(SNRs)
+            HMTs=np.array(HMTs)
+
+            fig, ax = plt.subplots(figsize=(4,4))
+            ax.set_ylabel("Power", fontsize=30, labelpad=10)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            plt.xticks(fontsize=30)
+            plt.yticks(fontsize=30)
+            objects = ["Hit", "Try", "Miss"]
+            x_pos = np.arange(len(objects))
+
+            if len(SNRs[HMTs=="hit"])>1:
+                ax.errorbar(x_pos[0], np.nanmean(SNRs[HMTs=="hit"]), yerr=stats.sem(SNRs[HMTs=="hit"], nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+                ax.scatter(x_pos[0]*np.ones(len(SNRs[HMTs=="hit"])), np.asarray(SNRs[HMTs=="hit"]), edgecolor="green", marker="o", facecolors='none')
+            if len(SNRs[HMTs=="try"])>1:
+                ax.errorbar(x_pos[1], np.nanmean(SNRs[HMTs=="try"]), yerr=stats.sem(SNRs[HMTs=="try"], nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+                ax.scatter(x_pos[1]*np.ones(len(SNRs[HMTs=="try"])), np.asarray(SNRs[HMTs=="try"]), edgecolor="orange", marker="o", facecolors='none')
+            if len(SNRs[HMTs=="miss"])>1:
+                ax.errorbar(x_pos[2], np.nanmean(SNRs[HMTs=="miss"]), yerr=stats.sem(SNRs[HMTs=="miss"], nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+                ax.scatter(x_pos[2]*np.ones(len(SNRs[HMTs=="miss"])), np.asarray(SNRs[HMTs=="miss"]), edgecolor="red", marker="o", facecolors='none')
+
+            if (len(SNRs[HMTs=="hit"])>0) and (len(SNRs[HMTs=="miss"])>0):
+                hit_miss_p = stats.ttest_ind(SNRs[HMTs=="hit"], SNRs[HMTs=="miss"])[1]
+            else:
+                hit_miss_p = np.nan
+
+            if (len(SNRs[HMTs=="hit"])>0) and (len(SNRs[HMTs=="try"])>0):
+                hit_try_p =  stats.ttest_ind(SNRs[HMTs=="hit"], SNRs[HMTs=="try"])[1]
+            else:
+                hit_try_p = np.nan
+
+            if (len(SNRs[HMTs=="try"])>0) and (len(SNRs[HMTs=="miss"])>0):
+                try_miss_p = stats.ttest_ind(SNRs[HMTs=="try"], SNRs[HMTs=="miss"])[1]
+            else:
+                try_miss_p = np.nan
+
+            all_behaviour = []; all_behaviour.extend(SNRs[HMTs=="hit"].tolist()); all_behaviour.extend(SNRs[HMTs=="try"].tolist()); all_behaviour.extend(SNRs[HMTs=="miss"].tolist())
+            significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+            significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+            significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+            plt.xticks(x_pos, objects, fontsize=30)
+            plt.xlim((-0.5, len(objects)-0.5))
+            #plt.xticks(rotation=-45)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(save_path + '/hmt_powers_test_'+str(cluster_id)+'.png', dpi=200)
+            plt.close()
+
+            hit_miss_p_.append(hit_miss_p)
+            hit_try_p_.append(hit_try_p)
+            try_miss_p_.append(try_miss_p)
+        else:
+            hit_miss_p_.append(np.nan)
+            hit_try_p_.append(np.nan)
+            try_miss_p_.append(np.nan)
+
+    spike_data["power_test_hit_miss_p"] = hit_miss_p_
+    spike_data["power_test_hit_try_p"] = hit_try_p_
+    spike_data["power_test_try_miss_p"] = try_miss_p_
+    return spike_data
+
 
 def plot_power_trajectories(spike_data, processed_position_data, output_path, track_length):
     print('plotting power trajectories...')
@@ -1193,6 +1436,8 @@ def plot_snr_by_trial_type(spike_data, processed_position_data, output_path, tra
 
         stops_on_track = plt.figure(figsize=(6,6))
         ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for f in range(1,6):
+            ax.axvline(x=f, color="gray", linewidth=2,linestyle="dashed")
 
         for tt in [0, 1, 2]:
             for hmt in ["all"]:
@@ -1214,9 +1459,11 @@ def plot_snr_by_trial_type(spike_data, processed_position_data, output_path, tra
                         ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=get_trial_color(tt), alpha=0.3)
                         ax.plot(frequency, avg_subset_powers, color=get_trial_color(tt))
 
-        plt.ylabel('Power', fontsize=20, labelpad = 10)
-        plt.xlabel("Spatial Frequency", fontsize=20, labelpad = 10)
-        plt.xlim(0,10)
+        plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        plt.xlim(0,5.05)
+        ax.set_xticks([0,5])
+        ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
         ax.set_ylim(bottom=0)
         ax.yaxis.set_ticks_position('left')
         ax.xaxis.set_ticks_position('bottom')
@@ -1396,51 +1643,6 @@ def plot_trial_cross_correlations(spike_data, processed_position_data, output_pa
             plt.close()
     return
 
-def process_recordings(vr_recording_path_list, of_recording_path_list):
-
-    shuffle_df = pd.DataFrame()
-    for recording in vr_recording_path_list:
-        print("processing ", recording)
-        paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
-        try:
-            session_id = recording.split("/")[-1]
-            output_path = recording+'/'+settings.sorterName
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            position_data = add_time_elapsed_collumn(position_data)
-            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
-            processed_position_data, percentile_speed = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
-
-            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), suffix="hit")
-            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "miss"], output_path, track_length=get_track_length(recording), suffix="miss")
-            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "try"], output_path, track_length=get_track_length(recording), suffix="try")
-            #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
-            #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
-            plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-            plot_snr_by_trial_type(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-            #plot_avg_lomb(spike_data, output_path)
-            #plot_power_trajectories(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_trial_cross_correlations(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_trial_fr_cross_correlations(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_peak_histogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-
-            shuffle_data["session_id"] = session_id
-            shuffle_df = pd.concat([shuffle_df, shuffle_data], ignore_index=True)
-
-            print("")
-
-        except Exception as ex:
-            print('This is what Python says happened:')
-            print(ex)
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            traceback.print_tb(exc_traceback)
-            print("couldn't process vr_grid analysis on "+recording)
-
-    #shuffle_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
-
-
 def print_grid_cells_cluster_ids_and_scores(combined_df):
     recordings = np.unique(combined_df["session_id"])
 
@@ -1584,6 +1786,38 @@ def plot_lomb_classifiers_by_trial_type(concantenated_dataframe, save_path):
 
     return
 
+def plot_proportion_significant_to_trial_outcome(concatenated_dataframe, save_path):
+    grid_cells = concatenated_dataframe[concatenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concatenated_dataframe[concatenated_dataframe["classifier"] != "G"]
+
+    for group in ["Position", "Distance", "Null"]:
+        grids = grid_cells[grid_cells["Lomb_classifier_"] == group]
+        sig_hm = pandas_collumn_to_numpy_array(grids["power_test_hit_miss_p"])
+        sig_ht = pandas_collumn_to_numpy_array(grids["power_test_hit_try_p"])
+        sig_tm = pandas_collumn_to_numpy_array(grids["power_test_try_miss_p"])
+
+        sig_hm = sig_hm[~np.isnan(sig_hm)]
+        sig_ht = sig_ht[~np.isnan(sig_ht)]
+        sig_tm = sig_tm[~np.isnan(sig_tm)]
+
+        sig_hm[sig_hm<=0.05] = 0
+        sig_hm[sig_hm>0.05] = 1
+        sig_ht[sig_ht<=0.05] = 0
+        sig_ht[sig_ht>0.05] = 1
+        sig_tm[sig_tm<=0.05] = 0
+        sig_tm[sig_tm>0.05] = 1
+
+        labels = ["Not Modulated", "Modulated"]
+        sizes = [len(sig_hm[sig_hm==1]), len(sig_hm[sig_hm==0])]
+        explode = (0, 0)  # only "explode" the 2nd slice (i.e. 'Hogs')
+        fig1, ax1 = plt.subplots()
+        ax1.pie(sizes, explode=explode, labels=labels, autopct='%1.1f%%',
+                shadow=False, startangle=90)
+        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        plt.savefig(save_path + '/proportion_significant_modulated_by_trial_outcome_'+group+'.png', dpi=200)
+        plt.close()
+    return
+
 def plot_lomb_classifiers_by_trial_outcome(concantenated_dataframe, save_path):
 
     grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
@@ -1639,6 +1873,267 @@ def plot_lomb_classifiers_by_trial_outcome(concantenated_dataframe, save_path):
 
     return
 
+def plot_firing_rate_maps(spike_data, processed_position_data, raw_position_data, output_path, track_length):
+    print('plotting trial firing rate maps...')
+    save_path = output_path + '/Figures/firing_rate_maps'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    spike_data = add_position_x(spike_data, raw_position_data)
+    spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length)
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        firing_trial_numbers = np.array(cluster_spike_data["trial_number"].iloc[0])
+        firing_locations_cluster = np.array(cluster_spike_data["x_position_cm"].iloc[0])
+
+        if len(firing_times_cluster)>1:
+            fr_binned_in_space = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
+            fr_binned_in_space_bin_centres = np.array(cluster_spike_data['fr_binned_in_space_bin_centres'].iloc[0])[0]
+
+            spikes_on_track = plt.figure()
+            spikes_on_track.set_size_inches(5, 5, forward=True)
+            ax = spikes_on_track.add_subplot(1, 1, 1)
+            y_max=0
+
+            for hmt, c in zip(["hit", "try", "miss"], ["green", "orange", "red"]):
+                hmt_processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
+                hmt_trial_numbers = np.asarray(hmt_processed_position_data["trial_number"])
+                hmt_fr_binned_in_space = fr_binned_in_space[hmt_trial_numbers-1]
+                ax.fill_between(fr_binned_in_space_bin_centres, np.nanmean(hmt_fr_binned_in_space, axis=0)-stats.sem(hmt_fr_binned_in_space, axis=0), np.nanmean(hmt_fr_binned_in_space, axis=0)+stats.sem(hmt_fr_binned_in_space, axis=0), color=c, alpha=0.3)
+                ax.plot(fr_binned_in_space_bin_centres, np.nanmean(hmt_fr_binned_in_space, axis=0), color=c)
+
+                hmt_max = max(np.nanmean(hmt_fr_binned_in_space, axis=0)+stats.sem(hmt_fr_binned_in_space, axis=0))
+                y_max = max([y_max, hmt_max])
+                y_max = np.ceil(y_max)
+
+            plt.ylabel('Firing Rate', fontsize=20, labelpad = 20)
+            plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+            plt.xlim(0, track_length)
+            tick_spacing = 100
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            Edmond.plot_utility2.style_track_plot(ax, track_length)
+            Edmond.plot_utility2.style_vr_plot(ax, x_max=y_max)
+            ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+            plt.locator_params(axis = 'y', nbins  = 4)
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.tight_layout()
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_map_by_trial_outcome_' + str(cluster_id) + '.png', dpi=300)
+            plt.close()
+
+    return
+
+
+def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_path, track_length):
+    print('plotting trial firing rate maps...')
+    save_path = output_path + '/Figures/firing_rate_maps_trials'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
+        if len(firing_times_cluster)>1:
+
+            x_max = len(processed_position_data)
+            spikes_on_track = plt.figure()
+            spikes_on_track.set_size_inches(5, 5, forward=True)
+            ax = spikes_on_track.add_subplot(1, 1, 1)
+
+            cluster_firing_maps = np.array(spike_data["firing_rate_maps"].iloc[cluster_index])
+            where_are_NaNs = np.isnan(cluster_firing_maps)
+            cluster_firing_maps[where_are_NaNs] = 0
+
+            if len(cluster_firing_maps) == 0:
+                print("stop here")
+
+            cluster_firing_maps = min_max_normalize(cluster_firing_maps)
+
+            cmap = plt.cm.get_cmap("jet")
+            cmap.set_bad(color='white')
+            bin_size = settings.vr_grid_analysis_bin_size
+
+            tmp = []
+            for i in range(len(cluster_firing_maps[0])):
+                for j in range(int(settings.vr_grid_analysis_bin_size)):
+                    tmp.append(cluster_firing_maps[:, i].tolist())
+            cluster_firing_maps = np.array(tmp).T
+            c = ax.imshow(cluster_firing_maps, interpolation='none', cmap=cmap, vmin=0, vmax=np.max(cluster_firing_maps), origin='lower', aspect="auto")
+
+            plt.ylabel('Trial Number', fontsize=20, labelpad = 20)
+            plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+            plt.xlim(0, track_length)
+            tick_spacing = 100
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            #Edmond.plot_utility2.style_track_plot(ax, track_length)
+            Edmond.plot_utility2.style_vr_plot(ax, x_max)
+            plt.locator_params(axis = 'y', nbins  = 4)
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+
+            cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+            cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+            cbar.set_ticks([0,np.max(cluster_firing_maps)])
+            cbar.set_ticklabels(["0", "Max"])
+            cbar.ax.tick_params(labelsize=20)
+
+            plt.tight_layout()
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_map_trials_' + str(cluster_id) + '.png', dpi=300)
+            plt.close()
+
+def plot_mean_firing_rates_hmt(concantenated_dataframe, save_path):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    for group in ["Position", "Distance", "Null"]:
+        grids = grid_cells[grid_cells["Lomb_classifier_"] == group]
+
+        for tt in ["all", 0, 1, 2]:
+            hits = pandas_collumn_to_numpy_array(grids['mean_fr_tt_'+str(tt)+'_hmt_hit'])
+            tries = pandas_collumn_to_numpy_array(grids['mean_fr_tt_'+str(tt)+'_hmt_try'])
+            misses = pandas_collumn_to_numpy_array(grids['mean_fr_tt_'+str(tt)+'_hmt_miss'])
+
+            fig, ax = plt.subplots(figsize=(4,4))
+            ax.set_ylabel("Mean Firing Rate (Hz)", fontsize=20, labelpad=10)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            plt.xticks(fontsize=30)
+            plt.yticks(fontsize=20)
+            objects = ["Hit", "Try", "Miss"]
+            x_pos = np.arange(len(objects))
+            for i in range(len(hits)):
+                ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+            ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+            ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+            ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+            ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+            ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+            ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+            bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+            bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+            bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+            hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+            hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+            try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+            all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+            significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+            significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+            significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+            plt.xticks(x_pos, objects, fontsize=30)
+            plt.locator_params(axis='y', nbins=3)
+            plt.xlim((-0.5, len(objects)-0.5))
+            #plt.xticks(rotation=-45)
+            plt.gca().spines['top'].set_visible(False)
+            plt.gca().spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(save_path + '/mean_firing_rate_hmt_'+group+'_tt'+str(tt)+'.png', dpi=200)
+            plt.close()
+
+    return
+
+def add_mean_firing_rate_hmt(spike_data, processed_position_data, position_data, track_length):
+    position_data_trial_numbers = np.asarray(position_data["trial_number"])
+    position_data_time_in_bin_sec = np.asarray(position_data["time_in_bin_seconds"])
+
+    new = pd.DataFrame()
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.asarray(spike_data.firing_times.iloc[cluster_index])
+        firing_trial_numbers = np.asarray(spike_data.trial_number.iloc[cluster_index])
+
+        for tt in ["all", 0, 1, 2]:
+            for hmt in ["all", "hit", "miss", "try"]:
+
+                if len(firing_times_cluster)>1:
+                    subset_processed_position_data = processed_position_data.copy()
+                    if (tt == 0) or (tt == 1) or (tt == 2):
+                        subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["trial_type"] == tt)]
+                    if (hmt == "hit") or (hmt == "try") or (hmt == "try"):
+                        subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["hit_miss_try"] == hmt)]
+
+                    hmt_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
+                    time_seconds = np.sum(position_data_time_in_bin_sec[np.isin(position_data_trial_numbers, hmt_trial_numbers)])
+                    n_spikes = len(firing_trial_numbers[np.isin(firing_trial_numbers, hmt_trial_numbers)])
+                    mean_firing_rate = n_spikes/time_seconds
+
+                    cluster_spike_data["mean_fr_tt_"+str(tt)+"_hmt_"+hmt] = mean_firing_rate
+                else:
+                    cluster_spike_data["mean_fr_tt_"+str(tt)+"_hmt_"+hmt] = 0
+
+        new = pd.concat([new, cluster_spike_data], ignore_index=True)
+    return new
+
+def process_recordings(vr_recording_path_list, of_recording_path_list):
+
+    shuffle_df = pd.DataFrame()
+    for recording in vr_recording_path_list:
+        print("processing ", recording)
+        paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
+        try:
+            session_id = recording.split("/")[-1]
+            output_path = recording+'/'+settings.sorterName
+            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
+            position_data = add_time_elapsed_collumn(position_data)
+            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
+
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
+            #plot_firing_rate_maps(spike_data=spike_data, processed_position_data=processed_position_data, raw_position_data=raw_position_data, output_path=output_path, track_length=get_track_length(recording))
+
+            processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data = add_RZ_bias(processed_position_data)
+            processed_position_data = add_hit_miss_try2(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, percentile_speed = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
+            spike_data = add_mean_firing_rate_hmt(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
+            #plot_firing_rate_maps_per_trial(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), suffix="hit")
+            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "miss"], output_path, track_length=get_track_length(recording), suffix="miss")
+            #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "try"], output_path, track_length=get_track_length(recording), suffix="try")
+            #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
+            #plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+            #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+            #spike_data = plot_power_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+            #plot_snr_by_trial_type(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+            #plot_snr_vs_RZbias_regression(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_avg_lomb(spike_data, output_path)
+            #plot_power_trajectories(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_trial_cross_correlations(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_trial_fr_cross_correlations(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_peak_histogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+
+            shuffle_data["session_id"] = session_id
+            shuffle_df = pd.concat([shuffle_df, shuffle_data], ignore_index=True)
+            spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+
+            print("")
+
+        except Exception as ex:
+            print('This is what Python says happened:')
+            print(ex)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_tb(exc_traceback)
+            print("couldn't process vr_grid analysis on "+recording)
+
+    #shuffle_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
+
+
+
 def main():
     print('-------------------------------------------------------------')
 
@@ -1673,14 +2168,16 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #process_recordings(vr_path_list, of_path_list)
 
     combined_shuffle_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df = add_lomb_classifier(combined_df,suffix="")
-    read_df(combined_df)
+    #read_df(combined_df)
 
+    plot_mean_firing_rates_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/mean_firing_rate")
+    #plot_proportion_significant_to_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
     #plot_max_freq_histogram(combined_df, combined_shuffle_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_overview_ordered(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_spatial_info_vs_pearson(combined_df, output_path="/mnt/datastore/Harry/Vr_grid_cells/")
@@ -1690,11 +2187,11 @@ def main():
         #plot_lomb_classifiers_proportions(combined_df, suffix=suffix, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     #plot_lomb_classifiers_by_trial_type(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_by_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_grid_scores_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_of_stability_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_of_stability_vs_grid_score_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_by_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_grid_scores_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_of_stability_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_of_stability_vs_grid_score_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     print("look now")
 
 if __name__ == '__main__':

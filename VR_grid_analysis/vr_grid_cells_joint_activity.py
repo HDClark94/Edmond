@@ -34,7 +34,7 @@ warnings.filterwarnings('ignore')
 from scipy.stats.stats import pearsonr
 from scipy.stats import shapiro
 import samplerate
-plt.rc('axes', linewidth=1)
+plt.rc('axes', linewidth=3)
 
 def add_avg_trial_speed(processed_position_data):
     avg_trial_speeds = []
@@ -409,6 +409,158 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             traceback.print_tb(exc_traceback)
             print("couldn't process vr_grid analysis on "+recording)
 
+def add_percentage_for_lomb_classes(combined_df):
+    # this function calculates the percentage of concurrently recorded cells
+
+    NG_props_D = []
+    NG_props_P = []
+    NG_props_N = []
+    G_props_D = []
+    G_props_P = []
+    G_props_N = []
+    for index, cluster_row in combined_df.iterrows():
+        cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
+        session_id = cluster_row["session_id"].iloc[0]
+        cluster_id = cluster_row["cluster_id"].iloc[0]
+        NG_cells_in_same_recordings = combined_df[(combined_df["session_id"] == session_id) & (combined_df["classifier"] != "G") & (combined_df["cluster_id"] != cluster_id)]
+        G_cells_in_same_recordings = combined_df[(combined_df["session_id"] == session_id) & (combined_df["classifier"] == "G") & (combined_df["cluster_id"] != cluster_id)]
+        NG_lomb_classes = NG_cells_in_same_recordings["Lomb_classifier_"]
+        G_lomb_classes = G_cells_in_same_recordings["Lomb_classifier_"]
+
+        if len(NG_lomb_classes)>0:
+            NG_proportion_D = np.sum(NG_lomb_classes=="Distance")/len(NG_lomb_classes)
+            NG_proportion_P = np.sum(NG_lomb_classes=="Position")/len(NG_lomb_classes)
+            NG_proportion_N = np.sum(NG_lomb_classes=="Null")/len(NG_lomb_classes)
+        else:
+            NG_proportion_D = np.nan
+            NG_proportion_P = np.nan
+            NG_proportion_N = np.nan
+
+        if len(G_lomb_classes)>0:
+            G_proportion_D = np.sum(G_lomb_classes=="Distance")/len(G_lomb_classes)
+            G_proportion_P = np.sum(G_lomb_classes=="Position")/len(G_lomb_classes)
+            G_proportion_N = np.sum(G_lomb_classes=="Null")/len(G_lomb_classes)
+        else:
+            G_proportion_D = np.nan
+            G_proportion_P = np.nan
+            G_proportion_N = np.nan
+
+        NG_props_D.append(NG_proportion_D)
+        NG_props_P.append(NG_proportion_P)
+        NG_props_N.append(NG_proportion_N)
+        G_props_D.append(G_proportion_D)
+        G_props_P.append(G_proportion_P)
+        G_props_N.append(G_proportion_N)
+
+    combined_df["NG_props_D"] = NG_props_D
+    combined_df["NG_props_P"] = NG_props_P
+    combined_df["NG_props_N"] = NG_props_N
+    combined_df["G_props_D"] = G_props_D
+    combined_df["G_props_P"] = G_props_P
+    combined_df["G_props_N"] = G_props_N
+    return combined_df
+
+def get_grid_cells_from_same_recording(spatial_firing):
+
+    grid_cells = pd.DataFrame()
+    for index, cluster_row in spatial_firing.iterrows():
+        cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
+        session_id = cluster_row["session_id"].iloc[0]
+
+        same_session_id_cells = spatial_firing[spatial_firing["session_id"] == session_id]
+        if len(same_session_id_cells)>1:
+            grid_cells = pd.concat([grid_cells, cluster_row], ignore_index=True)
+    return grid_cells
+
+def plot_class_prection_credence(spatial_firing, save_path):
+    distance_cells = spatial_firing[spatial_firing["Lomb_classifier_"] == "Distance"]
+    position_cells = spatial_firing[spatial_firing["Lomb_classifier_"] == "Position"]
+    null_cells = spatial_firing[spatial_firing["Lomb_classifier_"] == "Null"]
+    errorbarwidth =2
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.bar(x=0.4, height=np.nanmean(np.asarray(position_cells["G_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise")
+    ax.errorbar(x=0.4, y=np.nanmean(np.asarray(position_cells["G_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["G_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=0.5, height=np.nanmean(np.asarray(position_cells["G_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange")
+    ax.errorbar(x=0.5, y=np.nanmean(np.asarray(position_cells["G_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["G_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=0.6, height=np.nanmean(np.asarray(position_cells["G_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray")
+    ax.errorbar(x=0.6, y=np.nanmean(np.asarray(position_cells["G_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["G_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.bar(x=0.9, height=np.nanmean(np.asarray(distance_cells["G_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise")
+    ax.errorbar(x=0.9, y=np.nanmean(np.asarray(distance_cells["G_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["G_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.0, height=np.nanmean(np.asarray(distance_cells["G_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange")
+    ax.errorbar(x=1.0, y=np.nanmean(np.asarray(distance_cells["G_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["G_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.1, height=np.nanmean(np.asarray(distance_cells["G_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray")
+    ax.errorbar(x=1.1, y=np.nanmean(np.asarray(distance_cells["G_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["G_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.bar(x=1.4, height=np.nanmean(np.asarray(null_cells["G_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise")
+    ax.errorbar(x=1.4, y=np.nanmean(np.asarray(null_cells["G_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["G_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.5, height=np.nanmean(np.asarray(null_cells["G_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange")
+    ax.errorbar(x=1.5, y=np.nanmean(np.asarray(null_cells["G_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["G_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.6, height=np.nanmean(np.asarray(null_cells["G_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray")
+    ax.errorbar(x=1.6, y=np.nanmean(np.asarray(null_cells["G_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["G_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.axhline(y=0.33, color="black", linestyle="dashed", linewidth=2)
+    plt.ylabel('Probability', fontsize=20, labelpad = 10)
+    plt.xlabel("Cell Class", fontsize=20, labelpad = 10)
+    ax.set_xticks([0.5, 1, 1.5])
+    ax.set_xticklabels(["P", "D", "N"])
+    ax.set_yticks([0, 0.5,  1])
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_xlim(left=0, right=2)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/prediction_credence_G.png', dpi=200)
+    plt.close()
+
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.bar(x=0.4, height=np.nanmean(np.asarray(position_cells["NG_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise", hatch="/")
+    ax.errorbar(x=0.4, y=np.nanmean(np.asarray(position_cells["NG_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["NG_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=0.5, height=np.nanmean(np.asarray(position_cells["NG_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange", hatch="/")
+    ax.errorbar(x=0.5, y=np.nanmean(np.asarray(position_cells["NG_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["NG_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=0.6, height=np.nanmean(np.asarray(position_cells["NG_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray", hatch="/")
+    ax.errorbar(x=0.6, y=np.nanmean(np.asarray(position_cells["NG_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(position_cells["NG_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.bar(x=0.9, height=np.nanmean(np.asarray(distance_cells["NG_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise", hatch="/")
+    ax.errorbar(x=0.9, y=np.nanmean(np.asarray(distance_cells["NG_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["NG_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.0, height=np.nanmean(np.asarray(distance_cells["NG_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange", hatch="/")
+    ax.errorbar(x=1.0, y=np.nanmean(np.asarray(distance_cells["NG_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["NG_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.1, height=np.nanmean(np.asarray(distance_cells["NG_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray", hatch="/")
+    ax.errorbar(x=1.1, y=np.nanmean(np.asarray(distance_cells["NG_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(distance_cells["NG_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.bar(x=1.4, height=np.nanmean(np.asarray(null_cells["NG_props_P"]), dtype=np.float64), width=0.1, edgecolor="black", color="turquoise", hatch="/")
+    ax.errorbar(x=1.4, y=np.nanmean(np.asarray(null_cells["NG_props_P"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["NG_props_P"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.5, height=np.nanmean(np.asarray(null_cells["NG_props_D"]), dtype=np.float64), width=0.1, edgecolor="black", color="orange", hatch="/")
+    ax.errorbar(x=1.5, y=np.nanmean(np.asarray(null_cells["NG_props_D"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["NG_props_D"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+    ax.bar(x=1.6, height=np.nanmean(np.asarray(null_cells["NG_props_N"]), dtype=np.float64), width=0.1, edgecolor="black", color="gray", hatch="/")
+    ax.errorbar(x=1.6, y=np.nanmean(np.asarray(null_cells["NG_props_N"]), dtype=np.float64), yerr=stats.sem(np.asarray(null_cells["NG_props_N"], dtype=np.float64), nan_policy="omit"), color="black",elinewidth=errorbarwidth)
+
+    ax.axhline(y=0.33, color="black", linestyle="dashed", linewidth=2)
+    plt.ylabel('Probability', fontsize=20, labelpad = 10)
+    plt.xlabel("Cell Class", fontsize=20, labelpad = 10)
+    ax.set_xticks([0.5, 1, 1.5])
+    ax.set_xticklabels(["P", "D", "N"])
+    ax.set_yticks([0, 0.5,  1])
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_xlim(left=0, right=2)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/prediction_credence_NG.png', dpi=200)
+    plt.close()
+
+    return
+
 
 def main():
     print('-------------------------------------------------------------')
@@ -421,7 +573,7 @@ def main():
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()]
 
-
+    # all of these recordings have at least 2 grid cells recorded
     vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53',
@@ -439,8 +591,15 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24']
 
-    process_recordings(vr_path_list, of_path_list)
+    #process_recordings(vr_path_list, of_path_list)
 
+    combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
+    combined_df = add_lomb_classifier(combined_df,suffix="")
+    combined_df = add_percentage_for_lomb_classes(combined_df)
+
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    grid_cells_from_same_recording = get_grid_cells_from_same_recording(grid_cells)
+    plot_class_prection_credence(grid_cells_from_same_recording, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     print("look now")
 
 if __name__ == '__main__':
