@@ -8,10 +8,16 @@ import PostSorting.parameters
 import PostSorting.open_field_grid_cells
 import PostSorting.open_field_firing_maps
 import PostSorting.theta_modulation
+import control_sorting_analysis
 
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
 prm.set_pixel_ratio(440)
+
+def get_track_length(recording_path):
+    parameter_file_path = control_sorting_analysis.get_tags_parameter_file(recording_path)
+    stop_threshold, track_length, cue_conditioned_goal = PostSorting.post_process_sorted_data_vr.process_running_parameter_tag(parameter_file_path)
+    return track_length
 
 def get_proportion_reward(processed_position, trial_type="all"):
     if trial_type == "beaconed":
@@ -94,19 +100,22 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                 if "Curated" in list(spatial_firing):
                     spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
                 spatial_firing = add_full_session_id(spatial_firing, path)
+                track_length = get_track_length(path)
 
                 if len(spatial_firing) > 0:
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
-                    collumn_names_to_keep.append("firing_times")
-                    collumn_names_to_keep.append("random_snippets")
+                    #collumn_names_to_keep.append("firing_times")
+                    #collumn_names_to_keep.append("random_snippets")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
+                    #if "miss_hit_transition_tt_012" in list(spatial_firing):
+                    #    collumn_names_to_keep.append("miss_hit_transition_tt_012")
                     spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
-                    spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
-                    spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
+                    #spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
+                    #spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')

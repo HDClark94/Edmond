@@ -315,8 +315,8 @@ def plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_d
             elapsed_distance = elapsed_distance[set_mask]
 
             # construct the lomb-scargle periodogram
-            step = 0.01
-            frequency = np.arange(0.1, 10+step, step)
+            step = 0.02
+            frequency = np.arange(0.1, 5+step, step)
             sliding_window_size=track_length*3
 
             powers = []

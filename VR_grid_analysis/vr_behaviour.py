@@ -8,6 +8,10 @@ import PostSorting.vr_cued
 import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
 import matplotlib.colors as colors
+from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
+
+from sklearn.cluster import DBSCAN
 from scipy import stats
 import matplotlib.cm as cm
 from scipy import signal
@@ -768,6 +772,85 @@ def plot_average_hmt_speed_trajectories_by_trial_type(processed_position_data, h
         plt.savefig(save_path + '/average_speed_trajectory_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
         plt.close()
 
+def cluster_speed_profiles(processed_position_data, save_path):
+    trajectories = pandas_collumn_to_2d_numpy_array(processed_position_data["speeds_binned_in_space"])
+    hmt = pandas_collumn_to_numpy_array(processed_position_data["hit_miss_try"])
+    tt = pandas_collumn_to_numpy_array(processed_position_data["trial_type"])
+
+    hmts = []
+    for i in range(len(hmt)):
+        hmts.append(get_hmt_color(hmt[i]))
+    hmts=np.array(hmts)
+
+    tts = []
+    for i in range(len(tt)):
+        tts.append(get_trial_color(tt[i]))
+    tts=np.array(tts)
+
+    for i in range(len(trajectories)):
+        trajectories[i] = stats.zscore(trajectories[i], axis=0, ddof=0, nan_policy='omit')
+    #trajectories = stats.zscore(trajectories, axis=0, ddof=0, nan_policy='omit')
+    z_scored_trajectories = trajectories[:, 30:170]
+
+    imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+    imp_mean.fit(z_scored_trajectories)
+    z_scored_trajectories = imp_mean.transform(z_scored_trajectories)
+
+    pca = PCA(n_components=10)
+    pca.fit(z_scored_trajectories)
+    print(pca.explained_variance_ratio_)
+    z_scored_trajectories = pca.transform(z_scored_trajectories)
+    z_scored_trajectories = z_scored_trajectories[:, :4]
+
+    xy = z_scored_trajectories
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.scatter(xy[:, 0], xy[:, 1], marker="o", alpha=0.3, color=tts)
+    plt.savefig(save_path+"/DBSCAN_clusters.png", dpi=300)
+
+
+    db = DBSCAN(eps=0.5, min_samples=50).fit(z_scored_trajectories)
+    core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+    core_samples_mask[db.core_sample_indices_] = True
+    labels = db.labels_
+
+    # Number of clusters in labels, ignoring noise if present.
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise_ = list(labels).count(-1)
+
+    # Black removed and is used for noise instead.
+    unique_labels = set(labels)
+    colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]
+    for k, col in zip(unique_labels, colors):
+        if k == -1:
+            # Black used for noise.
+            col = [0, 0, 0, 1]
+
+        class_member_mask = labels == k
+
+        if k != -1:
+            xy = z_scored_trajectories[class_member_mask & core_samples_mask]
+            plt.plot(
+                xy[:, 0],
+                xy[:, 1],
+                "o",
+                markerfacecolor=tuple(col),
+                markeredgecolor="k",
+                markersize=14,
+            )
+
+            xy = z_scored_trajectories[class_member_mask & ~core_samples_mask]
+            plt.plot(
+                xy[:, 0],
+                xy[:, 1],
+                "o",
+                markerfacecolor=tuple(col),
+                markeredgecolor="k",
+                markersize=6,
+            )
+
+    plt.savefig(save_path+"/DBSCAN_clusters.png", dpi=300)
+    return
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     print(" ")
     all_behaviour = pd.DataFrame()
@@ -834,6 +917,8 @@ def main():
     plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
 
     compute_p_map(save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+
+    #cluster_speed_profiles(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/cluster_analysis")
     print("look now")
 
 
