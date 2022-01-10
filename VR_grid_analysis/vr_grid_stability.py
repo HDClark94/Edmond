@@ -275,11 +275,9 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_avg_trial_speed(processed_position_data)
-            PI_hits_processed_position_data = extract_PI_trials(processed_position_data, hmt="hit")
-            PI_misses_processed_position_data = extract_PI_trials(processed_position_data, hmt="miss")
-            PI_tries_position_data = extract_PI_trials(processed_position_data, hmt="try")
 
             raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
@@ -290,7 +288,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
             spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_spatial_information(spike_data, position_data, processed_position_data, track_length=get_track_length(recording))
             spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations(spike_data, processed_position_data)
-            #spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations_shuffle(spike_data, processed_position_data)
+            spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.process_pairwise_pearson_correlations_shuffle(spike_data, processed_position_data)
             spike_data = Edmond.VR_grid_analysis.hit_miss_try_firing_analysis.add_pairwise_classifier(spike_data)
 
             Edmond.VR_grid_analysis.vr_grid_stability_plots.plot_hmt_against_pairwise(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")

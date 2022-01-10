@@ -733,7 +733,227 @@ def plot_spatial_info_cum_hist(combined_df, save_path):
     plt.savefig(save_path+"spatial_cumhist.png", dpi=300)
     plt.show()
 
+def plot_pairwise_comparison_b(combined_df, save_path, CT="",  PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_b"])
+    misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_b"])
+    tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_b"])
 
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    _, _, patchesP = ax.hist(hits, bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesA = ax.hist(misses, bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesS = ax.hist(tries, bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=1)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.title("Beaconed", fontsize=25)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_cumhist_b_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_bar_b_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+def plot_pairwise_comparison_p(combined_df, save_path, CT="", PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN !=  "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_p"])
+    misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_p"])
+    tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_p"])
+
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    _, _, patchesP = ax.hist(hits, bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesA = ax.hist(misses, bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesS = ax.hist(tries, bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=1)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.title("Probe", fontsize=25)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_cumhist_p_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_bar_p_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+def plot_pairwise_comparison_nb(combined_df, save_path, CT="",  PDN=""):
+    combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN !=  "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_hit_nb"])
+    misses = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_miss_nb"])
+    tries = np.asarray(grid_cells["avg_pairwise_trial_pearson_r_try_nb"])
+
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    _, _, patchesP = ax.hist(hits, bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesA = ax.hist(misses, bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=1)
+    _, _, patchesS = ax.hist(tries, bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=1)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.title("Non Beaconed", fontsize=25)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_cumhist_nb_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Avg Trial-pair Pearson R", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"pairwise_bar_nb_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
 
 def plot_pairwise_comparison(combined_df, save_path, CT="", PDN=""):
     combined_df = add_lomb_classifier(combined_df)
@@ -880,22 +1100,6 @@ def plot_SNR_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lo
     plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
-
-    x1 = 0 * np.ones(len(a[~np.isnan(a)]))
-    x2 = 1 * np.ones(len(b[~np.isnan(b)]))
-    x3 = 2 * np.ones(len(c[~np.isnan(c)]))
-    y1 = a[~np.isnan(a)]
-    y2 = b[~np.isnan(b)]
-    y3 = c[~np.isnan(c)]
-    #Combine the sampled data together
-    x = np.concatenate((x1, x2, x3), axis=0)
-    y = np.concatenate((y1, y2, y3), axis=0)
-    pts = np.linspace(0, np.pi * 2, 24)
-    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
-    vert = np.r_[circ, circ[::-1] * .7]
-    open_circle = mpl.path.Path(vert)
-
-
     fig, ax = plt.subplots(figsize=(4,4))
     ax.set_ylabel("Periodic Power", fontsize=30, labelpad=10)
     ax.yaxis.set_ticks_position('left')
@@ -903,25 +1107,18 @@ def plot_SNR_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lo
     plt.xticks(fontsize=30)
     plt.yticks(fontsize=30)
     objects = ["B", "NB", "P"]
-    objects = ["Cued", "PI"]
     x_pos = np.arange(len(objects))
     for i in range(len(a)):
-        ax.plot(x_pos, [a[i], b[i]], color="black", alpha=0.1)
+        ax.plot(x_pos, [a[i], b[i], c[i]], color="black", alpha=0.1)
 
-    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
     ax.errorbar(x_pos[0], np.nanmean(a), yerr=stats.sem(a, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
-    ax.bar(x_pos[0], np.nanmean(a), edgecolor="black", color="None", facecolor="None", linewidth=3, width=0.5)
-    #ax.scatter(x_pos[0]*np.ones(len(a)), np.asarray(a), edgecolor="black", marker="o", facecolors='none')
+    ax.scatter(x_pos[0]*np.ones(len(a)), np.asarray(a), edgecolor="black", marker="o", facecolors='none')
 
-    ax.errorbar(x_pos[1], np.nanmean(b), yerr=stats.sem(b, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
-    ax.bar(x_pos[1], np.nanmean(b), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
-    #ax.scatter(x_pos[1]*np.ones(len(b)), np.asarray(b), edgecolor="red", marker="o", facecolors='none')
+    ax.errorbar(x_pos[1], np.nanmean(b), yerr=stats.sem(b, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[1]*np.ones(len(b)), np.asarray(b), edgecolor="red", marker="o", facecolors='none')
 
-    #ax.errorbar(x_pos[2], np.nanmean(c), yerr=stats.sem(c, nan_policy='omit'), ecolor='blue', capsize=20, fmt="o", color="blue")
-    #ax.bar(x_pos[2], np.nanmean(c), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
-    #ax.scatter(x_pos[2]*np.ones(len(c)), np.asarray(c), edgecolor="blue", marker="o", facecolors='none')
-
-    ax.plot(x_pos, [np.nanmean(a), np.nanmean(b)], color="black", linestyle="solid", linewidth=2)
+    ax.errorbar(x_pos[2], np.nanmean(c), yerr=stats.sem(c, nan_policy='omit'), ecolor='blue', capsize=20, fmt="o", color="blue")
+    ax.scatter(x_pos[2]*np.ones(len(c)), np.asarray(c), edgecolor="blue", marker="o", facecolors='none')
 
     bad_ac = ~np.logical_or(np.isnan(a), np.isnan(c))
     bad_ab = ~np.logical_or(np.isnan(a), np.isnan(b))
@@ -932,8 +1129,8 @@ def plot_SNR_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lo
 
     all_behaviour = []; all_behaviour.extend(a.tolist()); all_behaviour.extend(c.tolist()); all_behaviour.extend(b.tolist())
     significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(ab_p))
-    #significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(bc_p))
-    #significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(ac_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(bc_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(ac_p))
 
     plt.xticks(x_pos, objects, fontsize=30)
     plt.xlim((-0.5, len(objects)-0.5))
@@ -944,7 +1141,6 @@ def plot_SNR_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lo
     plt.tight_layout()
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
-
 
 def hmt2spatial_information_collumn(hmt, tt):
     if tt == "all" and hmt == "all":
@@ -1087,7 +1283,30 @@ def plot_spatial_info_comparison(combined_df, save_path, CT="", PDN="", tt="", g
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
-def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
+def get_n_fields_indices(hmt, tt):
+    i = tt
+    if hmt=="hit":
+        j = 0
+    elif hmt=="miss":
+        j = 1
+    elif hmt=="try":
+        j = 2
+    return i, j
+
+
+def get_n_fields(spike_data, hmt, tt, pre_post_rz=""):
+    i, j = get_n_fields_indices(hmt, tt) # i is for tt and j is for hmt
+
+    n_fields_all_data = []
+    for index, cluster_data in spike_data.iterrows():
+        cluster_data = cluster_data.to_frame().T.reset_index(drop=True)
+        n_fields_collumn = "fields_per_trial_hmt_by_trial_type"+pre_post_rz
+        n_fields = cluster_data[n_fields_collumn].iloc[0][i][j]
+        n_fields_all_data.append(n_fields)
+
+    return np.array(n_fields_all_data)
+
+def plot_nfields_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", pre_post_rz="", get_lomb_classifier=True):
 
     if get_lomb_classifier:
         combined_df = add_lomb_classifier(combined_df)
@@ -1102,32 +1321,9 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_c
     elif PDN != "":
         grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
 
-    hits = np.asarray(grid_cells[hmt2collumn(hmt="hit", tt=tt)], dtype=np.float64)
-    misses = np.asarray(grid_cells[hmt2collumn(hmt="miss", tt=tt)], dtype=np.float64)
-    tries = np.asarray(grid_cells[hmt2collumn(hmt="try", tt=tt)], dtype=np.float64)
-
-    fig, ax = plt.subplots(figsize=(5,5))
-    ax.set_xlabel("Periodic Power", fontsize=30, labelpad=10)
-    ax.set_ylabel("Cumulative Density", fontsize=30, labelpad=10)
-    ax.yaxis.set_ticks_position('left')
-    ax.xaxis.set_ticks_position('bottom')
-    plt.xticks(fontsize=25)
-    plt.yticks(fontsize=25)
-    plt.locator_params(axis='y', nbins=6)
-    plt.locator_params(axis='x', nbins=4)
-    _, _, patchesP = ax.hist(hits[~np.isnan(hits)], bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=2)
-    _, _, patchesA = ax.hist(misses[~np.isnan(misses)], bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=2)
-    _, _, patchesS = ax.hist(tries[~np.isnan(tries)], bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
-    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
-    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
-    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
-    ax.set_ylim([0,1])
-    ax.set_xlim([0,0.3])
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
-    plt.tight_layout()
-    plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
-    plt.close()
+    hits = get_n_fields(grid_cells, hmt="hit", tt=0, pre_post_rz=pre_post_rz)
+    misses = get_n_fields(grid_cells, hmt="hit", tt=1, pre_post_rz=pre_post_rz)
+    tries = get_n_fields(grid_cells, hmt="hit", tt=2, pre_post_rz=pre_post_rz)
 
     x1 = 0 * np.ones(len(hits[~np.isnan(hits)]))
     x2 = 1 * np.ones(len(tries[~np.isnan(tries)]))
@@ -1145,7 +1341,88 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_c
     open_circle = mpl.path.Path(vert)
 
     fig, ax = plt.subplots(figsize=(5,5))
-    ax.set_ylabel("Periodic Power", fontsize=30, labelpad=10)
+    ax.set_ylabel("AVG Fields/Trial", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    objects = ['B', 'NB', 'P']
+    x_pos = np.arange(len(objects))
+    #ax.axhline(y=0, linewidth=3, color="black")
+
+    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='black', capsize=10, fmt="o", color="black", linewidth=3)
+    ax.bar(x_pos[0], np.nanmean(hits), edgecolor="black", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.bar(x_pos[1], np.nanmean(tries), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='blue', capsize=10, fmt="o", color="blue", linewidth=3)
+    ax.bar(x_pos[2], np.nanmean(misses), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
+    #ax.errorbar(x_pos[2], np.nanmean(diff), yerr=stats.sem(diff, nan_policy='omit'), ecolor='black', capsize=10, fmt="o", color="black", linewidth=3)
+    #ax.bar(x_pos[2], np.nanmean(diff), edgecolor="black", color="None", facecolor="None", linewidth=3)
+    ax.plot(x_pos, [np.nanmean(hits), np.nanmean(tries), np.nanmean(misses)], color="black", linestyle="solid", linewidth=2)
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=5, displaystring=get_p_text(hit_try_p))
+    #significance_bar(start=x_pos[1], end=x_pos[2], height=0.26, displaystring=get_p_text(try_miss_p))
+    #significance_bar(start=x_pos[0], end=x_pos[2], height=5, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=30)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #ax.set_ylim(bottom=0, top=0.31)
+    plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"fields_per_trial_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+def plot_nfields_comparison(combined_df, save_path, CT="", PDN="", tt="", pre_post_rz="", get_lomb_classifier=True):
+
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    if PDN == "PD":
+        grid_cells = grid_cells[(grid_cells["Lomb_classifier_"] == "Position") |
+                                (grid_cells["Lomb_classifier_"] == "Distance")]
+    elif PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    hits = get_n_fields(grid_cells, hmt="hit", tt=tt, pre_post_rz=pre_post_rz)
+    misses = get_n_fields(grid_cells, hmt="miss", tt=tt, pre_post_rz=pre_post_rz)
+    tries = get_n_fields(grid_cells, hmt="try", tt=tt, pre_post_rz=pre_post_rz)
+
+    x1 = 0 * np.ones(len(hits[~np.isnan(hits)]))
+    x2 = 1 * np.ones(len(tries[~np.isnan(tries)]))
+    x3 = 2 * np.ones(len(misses[~np.isnan(misses)]))
+    y1 = hits[~np.isnan(hits)]
+    y2 = tries[~np.isnan(tries)]
+    y3 = misses[~np.isnan(misses)]
+    #Combine the sampled data together
+    x = np.concatenate((x1, x2, x3), axis=0)
+    y = np.concatenate((y1, y2, y3), axis=0)
+
+    pts = np.linspace(0, np.pi * 2, 24)
+    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+    vert = np.r_[circ, circ[::-1] * .7]
+    open_circle = mpl.path.Path(vert)
+
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_ylabel("AVG Fields/Trial", fontsize=30, labelpad=10)
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
     plt.xticks(fontsize=30)
@@ -1177,12 +1454,87 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_c
     all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist())
     #significance_bar(start=x_pos[0], end=x_pos[1], height=0.28, displaystring=get_p_text(hit_try_p))
     #significance_bar(start=x_pos[1], end=x_pos[2], height=0.26, displaystring=get_p_text(try_miss_p))
-    significance_bar(start=x_pos[0], end=x_pos[2], height=0.3, displaystring=get_p_text(hit_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=5, displaystring=get_p_text(hit_miss_p))
 
     plt.xticks(x_pos, objects, fontsize=30)
     plt.xlim((-0.5, len(objects)-0.5))
-    ax.set_ylim(bottom=0, top=0.31)
+    #ax.set_ylim(bottom=0, top=0.31)
     plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"fields_per_trial_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+def plot_SNR_comparison_b(combined_df, save_path, CT="", PDN="", get_lomb_classifier=False):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["ML_SNRs_beaconed_hits"])
+    misses = np.asarray(grid_cells["ML_SNRs_beaconed_misses"])
+    tries = np.asarray(grid_cells["ML_SNRs_beaconed_tries"])
+
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    _, _, patchesP = ax.hist(hits[~np.isnan(hits)], bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesA = ax.hist(misses[~np.isnan(misses)], bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesS = ax.hist(tries[~np.isnan(tries)], bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    ax.set_ylim([0,1])
+    ax.set_xlim([0,0.3])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
     #plt.xticks(rotation=-45)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
@@ -1190,6 +1542,156 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_c
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
+def plot_SNR_comparison_nb(combined_df, save_path, CT="", PDN="", get_lomb_classifier=False):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["ML_SNRs_nonbeaconed_hits"])
+    misses = np.asarray(grid_cells["ML_SNRs_nonbeaconed_misses"])
+    tries = np.asarray(grid_cells["ML_SNRs_nonbeaconed_tries"])
+
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_ylim([0,1])
+    ax.set_xlim([0,0.3])
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    _, _, patchesP = ax.hist(hits[~np.isnan(hits)], bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesA = ax.hist(misses[~np.isnan(misses)], bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesS = ax.hist(tries[~np.isnan(tries)], bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+def plot_SNR_comparison_p(combined_df, save_path, CT="", PDN="", get_lomb_classifier=False):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+    hits = np.asarray(grid_cells["ML_SNRs_probe_hits"])
+    misses = np.asarray(grid_cells["ML_SNRs_probe_misses"])
+    tries = np.asarray(grid_cells["ML_SNRs_probe_tries"])
+
+    fig, ax = plt.subplots(figsize=(8,8))
+    ax.set_xlabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_ylim([0,1])
+    ax.set_xlim([0,0.3])
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    _, _, patchesP = ax.hist(hits[~np.isnan(hits)], bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesA = ax.hist(misses[~np.isnan(misses)], bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesS = ax.hist(tries[~np.isnan(tries)], bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Periodic Power", fontsize=20, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=15)
+    plt.yticks(fontsize=15)
+    objects = ["Hit", "Try", "Miss"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(hits)):
+        ax.plot(x_pos, [hits[i], tries[i], misses[i]], color="black", alpha=0.1)
+
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=20, fmt="o", color="green")
+    ax.scatter(x_pos[0]*np.ones(len(hits)), np.asarray(hits), edgecolor="green", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.scatter(x_pos[1]*np.ones(len(tries)), np.asarray(tries), edgecolor="orange", marker="o", facecolors='none')
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=20, fmt="o", color="red")
+    ax.scatter(x_pos[2]*np.ones(len(misses)), np.asarray(misses), edgecolor="red", marker="o", facecolors='none')
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist()); all_behaviour.extend(tries.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(hit_try_p))
+    significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=20)
+    plt.xlim((-0.5, len(objects)-0.5))
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
 
 def significance_bar(start,end,height,displaystring,linewidth = 1.2,markersize = 8,boxpad  =0.3,fontsize = 15,color = 'k'):
     # draw a line with downticks at the ends
@@ -1237,34 +1739,19 @@ def main():
     print('-------------------------------------------------------------')
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df_shuffle = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
-
-    combined_df = combined_df[combined_df["track_length"] == 200]
-    combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
-
     add_celltype_classifier(combined_df_shuffle, combined_df)
-    #plot_spatial_info_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    #plot_spatial_info_spatial_info_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    #plot_spatial_info_cum_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    #plot_cumhist_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    combined_df_M11 = combined_df[combined_df["mouse"] == "M11"]
-    combined_df_M14 = combined_df[combined_df["mouse"] == "M14"]
+    #combined_df = combined_df[combined_df["track_length"] == 200]
+    #combined_df = combined_df[combined_df["power_test_hit_miss_p"] < 0.05]
+    #combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
 
     # compare hit miss try according to lomb classifications using the pairwise trial correlations
-    plot_spatial_info_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/si/G/", CT="G", PDN="", tt="all")
-    plot_spatial_info_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/si/NG/", CT="NG", PDN="", tt="all")
+    plot_nfields_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/fields/G/Position/beaconed/", CT="G", PDN="Position", tt=0, pre_post_rz="")
+    plot_nfields_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/fields/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1, pre_post_rz="")
+    plot_nfields_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/fields/G/Position/probe/", CT="G", PDN="Position", tt=2, pre_post_rz="")
+    #plot_nfields_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/", CT="NG", PDN="", tt="all", pre_post_rz="")
 
-    # compare hit miss try according to lomb classifications using the pairwise trial correlations
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Position/", CT="G", PDN="Position")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Distance/", CT="G", PDN="Distance")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Null/", CT="G", PDN="Null")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Position/", CT="NG", PDN="Position")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Null/", CT="NG", PDN="Null")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Distance/", CT="NG", PDN="Distance")
+    plot_nfields_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/fields/G/Position/", CT="G", PDN="Position", hmt="hit", pre_post_rz="")
 
-
-    # compare hit miss try according to lomb classifications using the pairwise trial correlations
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/", CT="G", PDN="", tt="all")
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/", CT="NG", PDN="", tt="all")
 
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Position/", CT="G", PDN="Position", tt="all")
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Position/beaconed/", CT="G", PDN="Position", tt="beaconed")

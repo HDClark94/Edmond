@@ -8,6 +8,7 @@ import PostSorting.vr_cued
 import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
+from PostSorting.vr_spatial_firing import bin_fr_in_time, add_position_x
 from scipy import stats
 from scipy import signal
 from scipy.interpolate import interp1d
@@ -233,30 +234,65 @@ def add_hit_miss_try(processed_position_data, track_length):
     processed_position_data["avg_speed_in_rz"] = avg_speed_in_rz
     return processed_position_data, upper
 
-def calculate_grid_field_com(cluster_spike_data, position_data, track_length):
-    '''
-    :param spike_data:
-    :param prm:
-    :return:
+def calculate_putative_fields(cluster_spike_data, position_data, track_length):
+    firing_rate_maps_per_trial = cluster_spike_data["fr_binned_in_space"].iloc[0]
+    firing_rate_map_bin_centres_per_trial = cluster_spike_data["fr_binned_in_space_bin_centres"].iloc[0]
 
-    for each trial of each trial type we want to
-    calculate the centre of mass of all detected field
-    centre of mass is defined as
+    firing_rate_across_trials = np.array(firing_rate_maps_per_trial).flatten()
+    firing_rate_map_bin_centres_across_trials = np.array(firing_rate_map_bin_centres_per_trial).flatten()
 
-    '''
+    # define the global maximum
+    global_maxima_bin_idx = np.nanargmax(firing_rate_across_trials)
+    global_maxima = firing_rate_across_trials[global_maxima_bin_idx]
+    field_threshold = 0.2*global_maxima
 
-    firing_field_com = []
-    firing_field_com_trial_numbers = []
-    firing_field_com_trial_types = []
-    firing_rate_maps = []
-    firing_rates = []
+    # detect local maxima
+    local_maxima_idx, _ = signal.find_peaks(firing_rate_across_trials, height=0)
 
+    # detect fields
+    firing_fields = []
+    firing_field_sizes = []
+    for i in local_maxima_idx:
+        neighbouring_local_mins = find_neighbouring_minima(firing_rate_across_trials, i)
+        closest_minimum_bin_idx = neighbouring_local_mins[np.argmin(np.abs(neighbouring_local_mins-i))]
+        field_size_in_bins = neighbouring_local_mins[1]-neighbouring_local_mins[0]
+        field_size = field_size_in_bins*settings.vr_grid_analysis_bin_size
+
+        if firing_rate_across_trials[i] - firing_rate_across_trials[closest_minimum_bin_idx] > field_threshold:
+            # calculate the fields centre of mass
+            field = firing_rate_across_trials[neighbouring_local_mins[0]:neighbouring_local_mins[1]+1]
+            field_bins = firing_rate_map_bin_centres_across_trials[neighbouring_local_mins[0]:neighbouring_local_mins[1]+1]
+            field_weights = field/np.sum(field)
+            field_com = np.sum(field_weights*field_bins)
+            field_com = firing_rate_map_bin_centres_across_trials[i]
+            firing_fields.append(field_com)
+            firing_field_sizes.append(field_size)
+
+    firing_field_sizes = np.array(firing_field_sizes)
+    firing_field_locations_elapsed_distance = np.array(firing_fields)
+    firing_fields_trial_numbers = ((firing_field_locations_elapsed_distance//track_length)+1).astype(np.int64)
+    firing_field_locations = firing_field_locations_elapsed_distance%track_length
+
+    # assign fields to a trial number
+    firing_fields_per_trial = []
+    firing_field_sizes_per_trial = []
+    for tn in np.arange(1, max(position_data["trial_number"])+1):
+        firing_field_locations_per_trial = (firing_field_locations[firing_fields_trial_numbers == tn]).tolist()
+        firing_field_sizes_per_trial = (firing_field_sizes[firing_fields_trial_numbers == tn]).tolist()
+
+        firing_fields_per_trial.append(firing_field_locations_per_trial)
+        firing_field_sizes_per_trial.append(firing_field_sizes_per_trial)
+
+    # centre of mass of field used
+    return firing_fields_per_trial, firing_field_sizes_per_trial
+
+def calculate_putative_fields2(cluster_spike_data, position_data, track_length):
     firing_times=cluster_spike_data.firing_times/(settings.sampling_rate/1000) # convert from samples to ms
     if isinstance(firing_times, pd.Series):
         firing_times = firing_times.iloc[0]
     if len(firing_times)==0:
         firing_rate_maps = np.zeros(int(track_length))
-        return firing_field_com, firing_field_com_trial_numbers, firing_field_com_trial_types, firing_rate_maps
+        return [], []
 
     trial_numbers = np.array(position_data['trial_number'].to_numpy())
     trial_types = np.array(position_data['trial_type'].to_numpy())
@@ -283,10 +319,14 @@ def calculate_grid_field_com(cluster_spike_data, position_data, track_length):
     global_maxima = firing_rate_map[global_maxima_bin_idx]
     field_threshold = 0.2*global_maxima
 
+    # detect fields
+    firing_fields = []
+    firing_field_sizes = []
     for local_maximum_idx in local_maxima_bin_idx:
         neighbouring_local_mins = find_neighbouring_minima(firing_rate_map, local_maximum_idx)
         closest_minimum_bin_idx = neighbouring_local_mins[np.argmin(np.abs(neighbouring_local_mins-local_maximum_idx))]
         field_size_in_bins = neighbouring_local_mins[1]-neighbouring_local_mins[0]
+        field_size = field_size_in_bins*settings.vr_grid_analysis_bin_size
 
         if firing_rate_map[local_maximum_idx] - firing_rate_map[closest_minimum_bin_idx] > field_threshold:
             #firing_field.append(neighbouring_local_mins)
@@ -295,33 +335,26 @@ def calculate_grid_field_com(cluster_spike_data, position_data, track_length):
             field_bins = bin_centres[neighbouring_local_mins[0]:neighbouring_local_mins[1]+1]
             field_weights = field/np.sum(field)
             field_com = np.sum(field_weights*field_bins)
+            firing_fields.append(field_com)
+            firing_field_sizes.append(field_size)
 
-            # reverse calculate the field_com in cm from track start
-            trial_number = (field_com//track_length)+1
-            trial_type = stats.mode(trial_types[trial_numbers==trial_number])[0][0]
-            field_com = field_com%track_length
+    firing_field_sizes = np.array(firing_field_sizes)
+    firing_field_locations_elapsed_distance = np.array(firing_fields)
+    firing_fields_trial_numbers = ((firing_field_locations_elapsed_distance//track_length)+1).astype(np.int64)
+    firing_field_locations = firing_field_locations_elapsed_distance%track_length
 
-            firing_field_com.append(field_com)
-            firing_field_com_trial_numbers.append(trial_number)
-            firing_field_com_trial_types.append(trial_type)
+    # assign fields to a trial number
+    firing_fields_per_trial = []
+    firing_field_sizes_per_trial = []
+    for tn in np.arange(1, max(position_data["trial_number"])+1):
+        firing_field_locations_per_trial = (firing_field_locations[firing_fields_trial_numbers == tn]).tolist()
+        firing_field_sizes_per_trial = (firing_field_sizes[firing_fields_trial_numbers == tn]).tolist()
 
-    for trial_number in np.unique(trial_numbers):
-        trial_x_position_cm = x_position_cm[trial_numbers==trial_number]
-        trial_time_seconds = time_seconds[trial_numbers==trial_number]
-        time_elapsed = trial_time_seconds[-1] - trial_time_seconds[0]
-        number_of_spikes = len(trial_x_position_cm)
+        firing_fields_per_trial.append(firing_field_locations_per_trial)
+        firing_field_sizes_per_trial.append(firing_field_sizes_per_trial)
 
-        trial_instantaneous_firing_rate_per_ms = instantaneous_firing_rate_per_ms[trial_numbers==trial_number]
-
-        numerator, bin_edges = np.histogram(trial_x_position_cm, bins=int(track_length/settings.vr_grid_analysis_bin_size), range=(0, track_length), weights=trial_instantaneous_firing_rate_per_ms)
-        denominator, bin_edges = np.histogram(trial_x_position_cm, bins=int(track_length/settings.vr_grid_analysis_bin_size), range=(0, track_length))
-        mean_firing_rate = number_of_spikes/time_elapsed
-
-        firing_rate_map = numerator/denominator
-        firing_rate_maps.append(firing_rate_map)
-        firing_rates.append(mean_firing_rate)
-
-    return firing_field_com, firing_field_com_trial_numbers, firing_field_com_trial_types, firing_rate_maps, firing_rates
+    # centre of mass of field used
+    return firing_fields_per_trial, firing_field_sizes_per_trial
 
 
 def find_neighbouring_minima(firing_rate_map, local_maximum_idx):
@@ -395,60 +428,107 @@ def extract_instantaneous_firing_rate_for_spike3(cluster_data):
 
     return instantaneous_firing_rate
 
-def process_vr_grid(spike_data, position_data, track_length):
 
-    fields_com_cluster = []
-    fields_com_trial_numbers_cluster = []
-    fields_com_trial_types_cluster = []
-    firing_rate_maps_cluster = []
+def bin_fr_in_space_for_field_analysis(spike_data, raw_position_data, track_length):
 
-    minimum_distance_to_field_in_next_trial =[]
-    fields_com_next_trial_type = []
+    # make an empty list of list for all firing rates binned in time for each cluster
+    fr_binned_in_space = []
+    fr_binned_in_space_bin_centres = []
 
+    elapsed_distance_bins = np.arange(0, (track_length*max(raw_position_data["trial_number"]))+1,  settings.vr_grid_analysis_bin_size) # might be buggy with anything but 1cm space bins
+    trial_numbers_raw = np.array(raw_position_data['trial_number'], dtype=np.int64)
+    x_position_elapsed_cm = (track_length*(trial_numbers_raw-1))+np.array(raw_position_data['x_position_cm'], dtype="float64")
+    x_dwell_time = np.array(raw_position_data['dwell_time_ms'], dtype="float64")
+
+    for i, cluster_id in enumerate(spike_data.cluster_id):
+        if len(elapsed_distance_bins)>1:
+            spikes_x_position_cm = np.array(spike_data[spike_data["cluster_id"] == cluster_id]["x_position_cm"].iloc[0])
+            trial_numbers = np.array(spike_data[spike_data["cluster_id"] == cluster_id]["trial_number"].iloc[0])
+
+            # convert spike locations into elapsed distance
+            spikes_x_position_elapsed_cm = (track_length*(trial_numbers-1))+spikes_x_position_cm
+
+            # count the spikes in each space bin and normalise by the total time spent in that bin for the trial
+            fr_hist, bin_edges = np.histogram(spikes_x_position_elapsed_cm, elapsed_distance_bins)
+            fr_hist = fr_hist/(np.histogram(x_position_elapsed_cm, elapsed_distance_bins, weights=x_dwell_time)[0])
+
+            # get location bin centres and ascribe them to their trial numbers
+            bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+
+            # nans to zero and smooth
+            fr_hist[np.isnan(fr_hist)] = 0
+
+            fr_binned_in_space.append(fr_hist)
+            fr_binned_in_space_bin_centres.append(bin_centres)
+        else:
+            fr_binned_in_space.append([])
+            fr_binned_in_space_bin_centres.append([])
+
+    spike_data["fr_binned_in_space"] = fr_binned_in_space
+    spike_data["fr_binned_in_space_bin_centres"] = fr_binned_in_space_bin_centres
+
+    return spike_data
+
+def process_vr_grid(spike_data, raw_position_data, position_data, track_length):
+
+    # temporary steps to improve position resolution of spikes
+    #spike_data = add_position_x(spike_data, raw_position_data)
+    spike_data = bin_fr_in_space_for_field_analysis(spike_data, raw_position_data, track_length)
+
+    firing_fields_com = []
+    firing_field_sizes = []
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+        if len(cluster_df.firing_times.iloc[0])>1:
+            fields_com, field_sizes = calculate_putative_fields(cluster_df, position_data, track_length)
+            firing_fields_com.append(fields_com)
+            firing_field_sizes.append(field_sizes)
+        else:
+            firing_fields_com.append([])
+            firing_field_sizes.append([])
 
-        fields_com, field_com_trial_numbers, field_com_trial_types, firing_rate_maps, firing_rates = calculate_grid_field_com(cluster_df, position_data, track_length)
+    spike_data["firing_fields_com"] = firing_fields_com
+    spike_data["firing_field_sizes"] = firing_field_sizes
 
-        next_trial_type_cluster = []
-        minimum_distance_to_field_in_next_trial_cluster=[]
+    return spike_data
 
-        for i in range(len(fields_com)):
-            field = fields_com[i]
-            trial_number=field_com_trial_numbers[i]
-            trial_type = int(field_com_trial_types[i])
+def analyse_fields(spike_data, processed_position_data, track_length, pre_post_rz=""):
+    reward_zone_start = track_length-60-30-20
+    reward_zone_end = track_length-60-30
 
-            trial_type_tmp = position_data["trial_type"].to_numpy()
-            trial_number_tmp = position_data["trial_number"].to_numpy()
+    fields_per_trial_hmt_by_trial_type = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+        firing_field_coms = np.array(cluster_df["firing_fields_com"].iloc[0])
 
-            fields_in_next_trial = np.array(fields_com)[np.array(field_com_trial_numbers) == int(trial_number+1)]
-            fields_in_next_trial = fields_in_next_trial[(fields_in_next_trial>50) & (fields_in_next_trial<150)]
+        fields_per_trial_cluster = np.zeros((3,3))
+        for i, tt in enumerate([0,1,2]):
+            for j, hmt in enumerate(["hit", "miss", "try"]):
+                subset_processed_position_data = processed_position_data[(processed_position_data["trial_type"] == tt)]
+                subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["hit_miss_try"] == hmt)]
+                subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
 
-            if len(fields_in_next_trial)>0:
-                next_trial_type = int(np.unique(trial_type_tmp[trial_number_tmp == int(trial_number+1)])[0])
-                minimum_field_difference = min(np.abs(fields_in_next_trial-field))
+                n_fields = 0
+                if len(subset_trial_numbers)>0:
+                    for tn in subset_trial_numbers:
+                        firing_field_locations = np.array(firing_field_coms[tn-1])
 
-                minimum_distance_to_field_in_next_trial_cluster.append(minimum_field_difference)
-                next_trial_type_cluster.append(next_trial_type)
-            else:
-                minimum_distance_to_field_in_next_trial_cluster.append(np.nan)
-                next_trial_type_cluster.append(np.nan)
+                        # count only fields before or after reward zone if specified
+                        if pre_post_rz == "_pre_rz":
+                            firing_field_locations = firing_field_locations[firing_field_locations < reward_zone_start]
+                        elif pre_post_rz == "_post_rz":
+                            firing_field_locations = firing_field_locations[firing_field_locations > reward_zone_end]
 
-        fields_com_cluster.append(fields_com)
-        fields_com_trial_numbers_cluster.append(field_com_trial_numbers)
-        fields_com_trial_types_cluster.append(field_com_trial_types)
-        firing_rate_maps_cluster.append(firing_rate_maps)
+                        n_fields += len(firing_field_locations)
+                    fields_per_trial = n_fields/len(subset_trial_numbers)
+                else:
+                    fields_per_trial = np.nan
 
-        minimum_distance_to_field_in_next_trial.append(minimum_distance_to_field_in_next_trial_cluster)
-        fields_com_next_trial_type.append(next_trial_type_cluster)
+                fields_per_trial_cluster[i,j] = fields_per_trial
 
-    spike_data["fields_com"] = fields_com_cluster
-    spike_data["fields_com_trial_number"] = fields_com_trial_numbers_cluster
-    spike_data["fields_com_trial_type"] = fields_com_trial_types_cluster
-    spike_data["firing_rate_maps"] = firing_rate_maps_cluster
-    spike_data["minimum_distance_to_field_in_next_trial"] = minimum_distance_to_field_in_next_trial
-    spike_data["fields_com_next_trial_type"] = fields_com_next_trial_type
+        fields_per_trial_hmt_by_trial_type.append(fields_per_trial_cluster.tolist())
 
+    spike_data["fields_per_trial_hmt_by_trial_type"+pre_post_rz] = fields_per_trial_hmt_by_trial_type
     return spike_data
 
 def calculate_n_fields_per_trial(cluster_df, processed_position_data, trial_type):
@@ -579,7 +659,7 @@ def plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, positio
             fig = plt.figure(figsize=(6,6))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
             for f in range(1,6):
-                ax.axvline(x=track_length*f, color="gray", linewidth=2,linestyle="dashed")
+                ax.axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
             ax.axhline(y=0, color="black", linewidth=2,linestyle="dashed")
             ax.plot(lags, autocorrelogram, color="black")
             plt.ylabel('Spatial Autocorrelation', fontsize=20, labelpad = 10)
@@ -759,7 +839,7 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, po
             fig = plt.figure(figsize=(6,6))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
             for f in range(1,6):
-                ax.axvline(x=f, color="gray", linewidth=2,linestyle="dashed")
+                ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
             subset_trial_numbers = processed_position_data["trial_number"]
             subset_trial_numbers = np.asarray(subset_trial_numbers)
             subset_mask = np.isin(centre_trials, subset_trial_numbers)
@@ -1059,7 +1139,14 @@ def analyse_lomb_powers(spike_data, processed_position_data):
                         subset_powers = powers.copy()
                         subset_powers[subset_mask == False] = np.nan
                         avg_subset_powers = np.nanmean(subset_powers, axis=0)
-                        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_subset_powers)
+
+                        if ((tt== "all") and (hmt== "all")):
+                            max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_subset_powers)
+                            overall_max_SNR_freq = max_SNR_freq
+                        else:
+                            max_SNR_freq = overall_max_SNR_freq
+                            max_SNR = avg_subset_powers[frequency == overall_max_SNR_freq][0]
+
                     else:
                         max_SNR, max_SNR_freq = (np.nan, np.nan)
                 else:
@@ -1222,7 +1309,7 @@ def add_lomb_classifier(spatial_firing, suffix=""):
             lomb_SNR = row["ML_SNRs"+suffix]
             lomb_freq = row["ML_Freqs"+suffix]
 
-            lomb_classifier = get_lomb_classifier(lomb_SNR, lomb_freq, 0.03, 0.05, numeric=False)
+            lomb_classifier = get_lomb_classifier(lomb_SNR, lomb_freq, 0.023, 0.05, numeric=False)
         else:
             lomb_classifier = "Unclassifed"
 
@@ -1673,7 +1760,7 @@ def plot_field_com_histogram_radial(spike_data, output_path, track_length):
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_track_fields_hist_radial_Cluster_' + str(cluster_id) + '.png', dpi=200)
             plt.close()
 
-def plot_field_centre_of_mass_on_track(spike_data, output_path, track_length, plot_trials=["beaconed", "non_beaconed", "probe"]):
+def plot_field_centre_of_mass_on_track(spike_data, processed_position_data, output_path, track_length):
 
     print('plotting field rastas...')
     save_path = output_path + '/Figures/field_trajectories'
@@ -1681,47 +1768,39 @@ def plot_field_centre_of_mass_on_track(spike_data, output_path, track_length, pl
         os.makedirs(save_path)
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
-        firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
+        cluster_spike_data = spike_data[(spike_data["cluster_id"] == cluster_id)]
+        firing_times_cluster = cluster_spike_data.firing_times.iloc[0]
         if len(firing_times_cluster)>1:
+            cluster_firing_com = np.array(cluster_spike_data["firing_fields_com"].iloc[0])
 
-            x_max = max(np.array(spike_data.beaconed_trial_number.iloc[cluster_index]))
-            if x_max>100:
-                spikes_on_track = plt.figure(figsize=(4,(x_max/32)))
-            else:
-                spikes_on_track = plt.figure(figsize=(4,(x_max/20)))
+            x_max = len(processed_position_data)
+            fig = plt.figure(figsize=(6,6))
+            ax = fig.add_subplot(1, 1, 1)
+            # plot spikes first
+            ax.scatter(cluster_spike_data.iloc[0].x_position_cm, cluster_spike_data.iloc[0].trial_number, marker='|', color='black', zorder=-1)
 
-            ax = spikes_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            for i, tn in enumerate(processed_position_data[(processed_position_data["hit_miss_try"]=="hit") & (processed_position_data["trial_type"]==1)]["trial_number"]):
+                for j in range(len(cluster_firing_com[i])):
+                    ax.scatter(cluster_firing_com[i][j], tn, color="green", marker="s")
+            for i, tn in enumerate(processed_position_data[(processed_position_data["hit_miss_try"]=="try") & (processed_position_data["trial_type"]==1)]["trial_number"]):
+                for j in range(len(cluster_firing_com[i])):
+                    ax.scatter(cluster_firing_com[i][j], tn, color="orange", marker="s")
+            for i, tn in enumerate(processed_position_data[(processed_position_data["hit_miss_try"]=="miss") & (processed_position_data["trial_type"]==1)]["trial_number"]):
+                for j in range(len(cluster_firing_com[i])):
+                    ax.scatter(cluster_firing_com[i][j], tn, color="red", marker="s")
 
-            cluster_firing_com = np.array(spike_data["fields_com"].iloc[cluster_index])
-            cluster_firing_com_trial_numbers = np.array(spike_data["fields_com_trial_number"].iloc[cluster_index])
-            cluster_firing_com_trial_types = np.array(spike_data["fields_com_trial_type"].iloc[cluster_index])
-
-            if "beaconed" in plot_trials:
-                ax.plot(cluster_firing_com[cluster_firing_com_trial_types == 0], cluster_firing_com_trial_numbers[cluster_firing_com_trial_types == 0], "s", color='Black', markersize=4)
-            if "non_beaconed" in plot_trials:
-                ax.plot(cluster_firing_com[cluster_firing_com_trial_types == 1], cluster_firing_com_trial_numbers[cluster_firing_com_trial_types == 1], "s", color='Red', markersize=4)
-            if "probe" in plot_trials:
-                ax.plot(cluster_firing_com[cluster_firing_com_trial_types == 2], cluster_firing_com_trial_numbers[cluster_firing_com_trial_types == 2], "s", color='Blue', markersize=4)
-
-            #ax.plot(rewarded_locations, rewarded_trials, '>', color='Red', markersize=3)
             plt.ylabel('Field COM on trials', fontsize=12, labelpad = 10)
             plt.xlabel('Location (cm)', fontsize=12, labelpad = 10)
-            plt.xlim(0,200)
+            plt.xlim(0,track_length)
             ax.yaxis.set_ticks_position('left')
             ax.xaxis.set_ticks_position('bottom')
-
             Edmond.plot_utility2.style_track_plot(ax, track_length)
             Edmond.plot_utility2.style_vr_plot(ax, x_max)
             plt.locator_params(axis = 'y', nbins  = 4)
-            try:
-                plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-            except ValueError:
-                continue
-            if len(plot_trials)<3:
-                plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_track_fields_Cluster_' + str(cluster_id) + "_" + str("_".join(plot_trials)) + '.png', dpi=200)
-            else:
-                plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_track_fields_Cluster_' + str(cluster_id) + '.png', dpi=200)
+            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_track_fields_Cluster_' + str(cluster_id) + '.png', dpi=200)
             plt.close()
+    return
 
 def min_max_normlise(array, min_val, max_val):
     normalised_array = ((max_val-min_val)*((array-min(array))/(max(array)-min(array))))+min_val
@@ -2107,15 +2186,10 @@ def get_max_SNR(spatial_frequency, powers):
     max_SNR_freq = spatial_frequency[np.argmax(powers)]
     return max_SNR, max_SNR_freq
 
-
 def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     for recording in vr_recording_path_list:
         print("processing ", recording)
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50"
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
         try:
             output_path = recording+'/'+settings.sorterName
@@ -2124,6 +2198,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
             processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=get_track_length(recording))
@@ -2132,16 +2207,21 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
             processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
 
-            #spike_data = process_vr_grid(spike_data, position_data, track_length=get_track_length(recording))
+            # FIELD ANALYSIS
+            spike_data = process_vr_grid(spike_data, raw_position_data, position_data, track_length=get_track_length(recording))
+            plot_field_centre_of_mass_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #spike_data = analyse_fields(spike_data, processed_position_data, track_length=get_track_length(recording))
+            #spike_data = analyse_fields(spike_data, processed_position_data, track_length=get_track_length(recording), pre_post_rz="_pre_rz")
+            #spike_data = analyse_fields(spike_data, processed_position_data, track_length=get_track_length(recording), pre_post_rz="_post_rz")
 
             # MOVING LOMB PERIODOGRAMS
-            spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
-            spike_data = analyse_lomb_powers(spike_data, processed_position_data)
-            shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
+            #spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
+            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+            #shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
 
             # SPATIAL AUTO CORRELOGRAMS
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
-            spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            #spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
 
             # FIRING AND BEHAVIOURAL PLOTTING
             #plot_firing_rate_maps(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
@@ -2153,7 +2233,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
 
             spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
+            #shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -2193,8 +2273,8 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
-    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
-    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01']
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48']
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()]

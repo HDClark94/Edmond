@@ -101,6 +101,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
                 spatial_firing = add_full_session_id(spatial_firing, path)
                 track_length = get_track_length(path)
+                spatial_firing["track_length"] = track_length
 
                 if len(spatial_firing) > 0:
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
@@ -108,8 +109,14 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     #collumn_names_to_keep.append("random_snippets")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
-                    #if "miss_hit_transition_tt_012" in list(spatial_firing):
-                    #    collumn_names_to_keep.append("miss_hit_transition_tt_012")
+                    if "n_pi_trials_by_hmt" in list(spatial_firing):
+                        collumn_names_to_keep.append("n_pi_trials_by_hmt")
+                    if "fields_per_trial_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type")
+                    if "fields_per_trial_hmt_by_trial_type_pre_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_pre_rz")
+                    if "fields_per_trial_hmt_by_trial_type_post_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_post_rz")
                     spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
