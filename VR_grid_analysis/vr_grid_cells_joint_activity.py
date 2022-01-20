@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.signal import correlate
 import PostSorting.parameters
 import PostSorting.vr_stop_analysis
 import PostSorting.vr_time_analysis
@@ -8,6 +9,8 @@ import PostSorting.vr_cued
 import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
+from Edmond.VR_grid_analysis.vr_grid_stability_plots import add_hit_miss_try3, add_avg_track_speed, get_avg_correlation, \
+    get_reconstructed_trial_signal, plot_firing_rate_maps_per_trial_by_hmt_aligned, plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron, get_shifts
 from scipy import stats
 from scipy import signal
 from scipy.interpolate import interp1d
@@ -35,6 +38,26 @@ from scipy.stats.stats import pearsonr
 from scipy.stats import shapiro
 import samplerate
 plt.rc('axes', linewidth=3)
+
+def get_p_text(p, ns=True):
+
+    if p is not None:
+        if np.isnan(p):
+            return " "
+        if p<0.0001:
+            return "****"
+        elif p<0.001:
+            return "***"
+        elif p<0.01:
+            return "**"
+        elif p<0.05:
+            return "*"
+        elif ns:
+            return "ns"
+        else:
+            return " "
+    else:
+        return " "
 
 def add_avg_trial_speed(processed_position_data):
     avg_trial_speeds = []
@@ -251,6 +274,147 @@ def plot_joint_cell_cross_correlations(spike_data, output_path):
     plt.close()
     return
 
+def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, track_length):
+
+    spike_data = add_lomb_classifier(spike_data)
+    print('plotting joint cell correlations...')
+    save_path = output_path + '/Figures/joint_correlations'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell"]], on="cluster_id")
+    spike_data = spike_data.sort_values(by=["grid_cell"], ascending=False)
+    cluster_ids = pandas_collumn_to_numpy_array(spike_data["cluster_id"])
+    ids = cluster_ids
+    n_shuffles = 1
+    shuffled = np.ones((n_shuffles+1), dtype=bool); shuffled[0] = False
+
+    for m, hmt in enumerate(["hit", "try", "miss"]):
+        for n, tt in enumerate([0,1]):
+            hmt_processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
+            subset_processed_position_data = hmt_processed_position_data[hmt_processed_position_data["trial_type"] == tt]
+            subset_trial_numbers = pandas_collumn_to_numpy_array(subset_processed_position_data["trial_number"])
+            if len(subset_trial_numbers)>0:
+
+                cross_correlations = np.zeros((len(shuffled), len(ids), len(ids)))
+                for si, shuffle in enumerate(shuffled):
+                    for i in range(len(cross_correlations[0])):
+                        for j in range(len(cross_correlations[0][0])):
+                            cluster_j_df = spike_data[spike_data["cluster_id"] == ids[j]]
+                            cluster_i_df = spike_data[spike_data["cluster_id"] == ids[i]]
+                            shifts_i = get_shifts(cluster_i_df, hmt=hmt, tt=tt)
+                            if shuffle:
+                                #np.random.seed(j*i)
+                                np.random.shuffle(shifts_i)
+                                #shifts_i = np.random.randint(-100, 100, size=len(shifts_i))
+
+                            cluster_firing_maps_j = np.array(cluster_j_df["fr_binned_in_space"].iloc[0])
+                            where_are_NaNs2 = np.isnan(cluster_firing_maps_j)
+                            cluster_firing_maps_j[where_are_NaNs2] = 0
+                            cluster_firing_maps_j = min_max_normalize(cluster_firing_maps_j)
+                            hmt_cluster_firing_maps_j = cluster_firing_maps_j[subset_trial_numbers-1]
+                            avg_correlation = get_avg_correlation(hmt_cluster_firing_maps_j)
+
+                            # reconstruct avg spatial correlation using the newly aligned trials
+                            reconstructed_signal = []
+                            for ti, tn in enumerate(subset_trial_numbers):
+                                reconstructed_trial = get_reconstructed_trial_signal(shifts_i[ti], hmt_cluster_firing_maps_j[ti].flatten(),
+                                                                                     min_shift=min(shifts_i), max_shift=max(shifts_i))
+                                reconstructed_signal.append(reconstructed_trial.tolist())
+                            reconstructed_signal = np.array(reconstructed_signal)
+                            reconstructed_signal_corr = get_avg_correlation(reconstructed_signal)
+
+                            cross_correlations[si, i, j] = reconstructed_signal_corr - avg_correlation
+
+                fig, ax = plt.subplots()
+                cross_correlation = cross_correlations[0]-np.nanmean(cross_correlations[1:], axis=0)
+                np.fill_diagonal(cross_correlation, np.nan)
+
+                cross_correlation_rank = np.zeros((len(cross_correlation), len(cross_correlation[0])))
+                cross_correlation_values = cross_correlation.flatten()
+                cross_correlation_values = cross_correlation_values[~np.isnan(cross_correlation_values)]
+                for ii in range(len(cross_correlation)):
+                    for jj in range(len(cross_correlation[0])):
+                        cross_correlation_rank[ii, jj] = stats.percentileofscore(cross_correlation_values, cross_correlation[ii,jj])
+
+                im= ax.imshow(cross_correlation_rank, cmap="Purples", vmin=50, vmax=100)
+                ax.set_xticks(np.arange(len(ids)))
+                ax.set_yticks(np.arange(len(ids)))
+                ax.set_yticklabels(ids)
+                ax.set_xticklabels(ids)
+                ax.set_ylabel("Cluster ID: Reference", fontsize=20)
+                ax.set_xlabel("Cluster ID: Shifted", fontsize=20)
+                ax.tick_params(axis='both', which='major', labelsize=8)
+                fig.tight_layout()
+                fig.colorbar(im, ax=ax)
+                plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_cross_correlations_'+hmt+'_'+str(tt)+'.png', dpi=300)
+                plt.close()
+                print(hmt+" "+ str(np.nanmean(cross_correlations[0])))
+
+
+                fig, ax = plt.subplots(figsize=(6,6))
+                ax.axhline(y=0, linestyle="dashed", color="gray")
+                ax.axvline(x=0, linestyle="dashed", color="gray")
+                ax.plot(np.arange(-2, 2), np.arange(-2, 2), linestyle="solid", color="black")
+
+                grid_pairs_vs_shuffle = []
+                grid_non_grid_pairs_vs_shuffle = []
+                non_grid_non_grid_pairs_vs_shuffle = []
+                for i in range(len(cross_correlations[0])):
+                    for j in range(len(cross_correlations[0][0])):
+                        cluster_j_classifier = spike_data[spike_data["cluster_id"] == ids[j]]["grid_cell"].iloc[0]
+                        cluster_i_classifier = spike_data[spike_data["cluster_id"] == ids[i]]["grid_cell"].iloc[0]
+
+                        if ((cluster_j_classifier == True) and (cluster_i_classifier == True)):
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="red", zorder=10)
+                            grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
+                        elif ((cluster_j_classifier == True) or (cluster_i_classifier == True)):
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="blue", alpha=0.3, zorder=5)
+                            grid_non_grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
+                        else:
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="black", alpha=0.3, zorder=1)
+                            non_grid_non_grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
+
+                ax.set_ylabel("Shuffled delta R", fontsize=20)
+                ax.set_xlabel("Real delta R", fontsize=20)
+                ax.set_ylim([-0.5, 0.5])
+                ax.set_xlim([-0.5, 0.5])
+                ax.tick_params(axis='both', which='major', labelsize=15)
+                fig.tight_layout()
+                plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_correlations_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
+                plt.close()
+
+                grid_pairs_vs_shuffle = np.array(grid_pairs_vs_shuffle); gg_p = stats.wilcoxon(grid_pairs_vs_shuffle)[0]; gg_p= get_p_text(gg_p, ns=False)
+                grid_non_grid_pairs_vs_shuffle = np.array(grid_non_grid_pairs_vs_shuffle); gng_p = stats.wilcoxon(grid_non_grid_pairs_vs_shuffle)[0]; gng_p= get_p_text(gng_p, ns=False)
+                non_grid_non_grid_pairs_vs_shuffle = np.array(non_grid_non_grid_pairs_vs_shuffle); ngng_p = stats.wilcoxon(non_grid_non_grid_pairs_vs_shuffle)[0]; ngng_p= get_p_text(ngng_p, ns=False)
+                data = [grid_pairs_vs_shuffle, grid_non_grid_pairs_vs_shuffle, non_grid_non_grid_pairs_vs_shuffle];
+
+                fig, ax = plt.subplots(figsize=(6,6))
+                vp = ax.violinplot(data, [2, 4, 6], widths=2,
+                                   showmeans=False, showmedians=True, showextrema=False)
+                height =ax.get_ylim()[1]
+                ax.text(2, height, gg_p, ha="center", fontsize=15)
+                ax.text(4, height, gng_p, ha="center", fontsize=15)
+                ax.text(6, height, ngng_p, ha="center", fontsize=15)
+                ax.axhline(y=0, linestyle="dashed", color="black")
+                ax.set_xticks([2,4,6])
+                ax.set_yticks([-0.2, 0, 0.2, 0.4])
+                ax.set_ylim([-0.4, 0.6])
+                ax.set_xticklabels(["G-G", "G-NG", "NG-NG"])
+                ax.set_ylabel("Change in spatial\ncorrelation vs shuffle", fontsize=20, labelpad=10)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.xaxis.set_tick_params(length=0)
+                ax.tick_params(axis='both', which='major', labelsize=25)
+                fig.tight_layout()
+                plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_correlations_violin_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
+                plt.close()
+
+
+    return
+
+
 def plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length):
     spike_data = add_lomb_classifier(spike_data)
     print('plotting joint cell correlations...')
@@ -387,19 +551,24 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
 
             if paired_recording is not None:
                 of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-                spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
-                plot_joint_cell_cross_correlations(spike_data, output_path)
+                #spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
+                #plot_firing_rate_maps_per_trial_by_hmt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
 
-            spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                #plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording))
+                #plot_joint_cell_cross_correlations(spike_data, output_path)
+
+            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -590,16 +759,17 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24']
-
-    #process_recordings(vr_path_list, of_path_list)
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    process_recordings(vr_path_list, of_path_list)
 
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df = add_lomb_classifier(combined_df,suffix="")
     combined_df = add_percentage_for_lomb_classes(combined_df)
 
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
-    grid_cells_from_same_recording = get_grid_cells_from_same_recording(grid_cells)
-    plot_class_prection_credence(grid_cells_from_same_recording, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    #grid_cells = combined_df[combined_df["classifier"] == "G"]
+    #grid_cells_from_same_recording = get_grid_cells_from_same_recording(grid_cells)
+    #plot_class_prection_credence(grid_cells_from_same_recording, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     print("look now")
 
 if __name__ == '__main__':

@@ -931,14 +931,14 @@ def plot_SNR_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lo
     bc_p = stats.wilcoxon(np.compress(bad_bc, b), np.compress(bad_bc, c))[1]
 
     all_behaviour = []; all_behaviour.extend(a.tolist()); all_behaviour.extend(c.tolist()); all_behaviour.extend(b.tolist())
-    significance_bar(start=x_pos[0], end=x_pos[1], height=np.nanmax(all_behaviour)+0, displaystring=get_p_text(ab_p))
+    significance_bar(start=x_pos[0], end=x_pos[1], height=0.3, displaystring=get_p_text(ab_p))
     #significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(bc_p))
     #significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(ac_p))
 
     plt.xticks(x_pos, objects, fontsize=30)
     plt.xlim((-0.5, len(objects)-0.5))
-    ax.set_ylim(bottom=0)
-    #plt.xticks(rotation=-45)
+    ax.set_ylim(bottom=0, top=0.3)
+    ax.set_yticks([0, 0.1, 0.2, 0.3])
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -1087,6 +1087,368 @@ def plot_spatial_info_comparison(combined_df, save_path, CT="", PDN="", tt="", g
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
+def get_indices(hmt, tt):
+    i = tt
+    if hmt=="hit":
+        j = 0
+    elif hmt=="miss":
+        j = 1
+    elif hmt=="try":
+        j = 2
+    return i, j
+
+def get_avg_correlations(spike_data, hmt, tt):
+    i, j = get_indices(hmt, tt) # i is for tt and j is for hmt
+    avg_correlations = []
+    for index, cluster_data in spike_data.iterrows():
+        cluster_data = cluster_data.to_frame().T.reset_index(drop=True)
+        avg_correlation = cluster_data["avg_correlations_hmt_by_trial_type"].iloc[0][i][j]
+        avg_correlations.append(avg_correlation)
+    return np.array(avg_correlations)
+
+def get_avg_map_shifts(spike_data, hmt, tt):
+    i, j = get_indices(hmt, tt) # i is for tt and j is for hmt
+    avg_map_shifts = []
+    for index, cluster_data in spike_data.iterrows():
+        cluster_data = cluster_data.to_frame().T.reset_index(drop=True)
+        map_shifts = cluster_data["field_realignments_hmt_by_trial_type"].iloc[0][i][j]
+        avg_shift = np.nanmean(np.abs(map_shifts))
+        avg_map_shifts.append(avg_shift)
+    return np.array(avg_map_shifts)
+
+def plot_avg_correlation_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lomb_classifier=True):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    a = get_avg_correlations(grid_cells, hmt=hmt, tt=0)
+    b = get_avg_correlations(grid_cells, hmt=hmt, tt=1)
+    c = get_avg_correlations(grid_cells, hmt=hmt, tt=2)
+
+    x1 = 0 * np.ones(len(a[~np.isnan(a)]))
+    x2 = 1 * np.ones(len(b[~np.isnan(b)]))
+    x3 = 2 * np.ones(len(c[~np.isnan(c)]))
+    y1 = a[~np.isnan(a)]
+    y2 = b[~np.isnan(b)]
+    y3 = c[~np.isnan(c)]
+    #Combine the sampled data together
+    x = np.concatenate((x1, x2, x3), axis=0)
+    y = np.concatenate((y1, y2, y3), axis=0)
+    pts = np.linspace(0, np.pi * 2, 24)
+    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+    vert = np.r_[circ, circ[::-1] * .7]
+    open_circle = mpl.path.Path(vert)
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Avg R", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    objects = ["Cued", "PI"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(a)):
+        ax.plot(x_pos, [a[i], b[i]], color="black", alpha=0.1)
+
+    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
+    ax.errorbar(x_pos[0], np.nanmean(a), yerr=stats.sem(a, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
+    ax.bar(x_pos[0], np.nanmean(a), edgecolor="black", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[1], np.nanmean(b), yerr=stats.sem(b, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
+    ax.bar(x_pos[1], np.nanmean(b), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.plot(x_pos, [np.nanmean(a), np.nanmean(b)], color="black", linestyle="solid", linewidth=2)
+
+    bad_ac = ~np.logical_or(np.isnan(a), np.isnan(c))
+    bad_ab = ~np.logical_or(np.isnan(a), np.isnan(b))
+    bad_bc = ~np.logical_or(np.isnan(b), np.isnan(c))
+    ac_p = stats.wilcoxon(np.compress(bad_ac, a), np.compress(bad_ac, c))[1]
+    ab_p = stats.wilcoxon(np.compress(bad_ab, a), np.compress(bad_ab, b))[1]
+    bc_p = stats.wilcoxon(np.compress(bad_bc, b), np.compress(bad_bc, c))[1]
+
+    all_behaviour = []; all_behaviour.extend(a.tolist()); all_behaviour.extend(c.tolist()); all_behaviour.extend(b.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=0.45, displaystring=get_p_text(ab_p))
+    #significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(bc_p))
+    #significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(ac_p))
+
+    plt.xticks(x_pos, objects, fontsize=30)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.axhline(y=0, color="black", linewidth=3)
+    ax.set_ylim(bottom=-0.25, top=0.5)
+    plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+def plot_map_shifts_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lomb_classifier=True):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+    if PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    a = get_avg_map_shifts(grid_cells, hmt=hmt, tt=0)
+    b = get_avg_map_shifts(grid_cells, hmt=hmt, tt=1)
+    c = get_avg_map_shifts(grid_cells, hmt=hmt, tt=2)
+
+    x1 = 0 * np.ones(len(a[~np.isnan(a)]))
+    x2 = 1 * np.ones(len(b[~np.isnan(b)]))
+    x3 = 2 * np.ones(len(c[~np.isnan(c)]))
+    y1 = a[~np.isnan(a)]
+    y2 = b[~np.isnan(b)]
+    y3 = c[~np.isnan(c)]
+    #Combine the sampled data together
+    x = np.concatenate((x1, x2, x3), axis=0)
+    y = np.concatenate((y1, y2, y3), axis=0)
+    pts = np.linspace(0, np.pi * 2, 24)
+    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+    vert = np.r_[circ, circ[::-1] * .7]
+    open_circle = mpl.path.Path(vert)
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.set_ylabel("Map Shift (cm)", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    objects = ["Cued", "PI"]
+    x_pos = np.arange(len(objects))
+    for i in range(len(a)):
+        ax.plot(x_pos, [a[i], b[i]], color="black", alpha=0.1)
+
+    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
+    ax.errorbar(x_pos[0], np.nanmean(a), yerr=stats.sem(a, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
+    ax.bar(x_pos[0], np.nanmean(a), edgecolor="black", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[1], np.nanmean(b), yerr=stats.sem(b, nan_policy='omit'), ecolor='black', capsize=20, fmt="o", color="black")
+    ax.bar(x_pos[1], np.nanmean(b), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.plot(x_pos, [np.nanmean(a), np.nanmean(b)], color="black", linestyle="solid", linewidth=2)
+
+    bad_ac = ~np.logical_or(np.isnan(a), np.isnan(c))
+    bad_ab = ~np.logical_or(np.isnan(a), np.isnan(b))
+    bad_bc = ~np.logical_or(np.isnan(b), np.isnan(c))
+    ac_p = stats.wilcoxon(np.compress(bad_ac, a), np.compress(bad_ac, c))[1]
+    ab_p = stats.wilcoxon(np.compress(bad_ab, a), np.compress(bad_ab, b))[1]
+    bc_p = stats.wilcoxon(np.compress(bad_bc, b), np.compress(bad_bc, c))[1]
+
+    all_behaviour = []; all_behaviour.extend(a.tolist()); all_behaviour.extend(c.tolist()); all_behaviour.extend(b.tolist())
+    significance_bar(start=x_pos[0], end=x_pos[1], height=45, displaystring=get_p_text(ab_p))
+    #significance_bar(start=x_pos[1], end=x_pos[2], height=np.nanmax(all_behaviour)+0.1, displaystring=get_p_text(bc_p))
+    #significance_bar(start=x_pos[0], end=x_pos[2], height=np.nanmax(all_behaviour)+0.2, displaystring=get_p_text(ac_p))
+
+    plt.xticks(x_pos, objects, fontsize=30)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.axhline(y=0, color="black", linewidth=3)
+    ax.set_ylim(bottom=0, top=50)
+    plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+def plot_map_shifts_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
+
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    if PDN == "PD":
+        grid_cells = grid_cells[(grid_cells["Lomb_classifier_"] == "Position") |
+                                (grid_cells["Lomb_classifier_"] == "Distance")]
+    elif PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    hits = get_avg_map_shifts(grid_cells, hmt="hit", tt=tt)
+    misses = get_avg_map_shifts(grid_cells, hmt="miss", tt=tt)
+    tries = get_avg_map_shifts(grid_cells, hmt="try", tt=tt)
+
+    x1 = 0 * np.ones(len(hits[~np.isnan(hits)]))
+    x2 = 1 * np.ones(len(tries[~np.isnan(tries)]))
+    x3 = 2 * np.ones(len(misses[~np.isnan(misses)]))
+    y1 = hits[~np.isnan(hits)]
+    y2 = tries[~np.isnan(tries)]
+    y3 = misses[~np.isnan(misses)]
+    #Combine the sampled data together
+    x = np.concatenate((x1, x2, x3), axis=0)
+    y = np.concatenate((y1, y2, y3), axis=0)
+
+    pts = np.linspace(0, np.pi * 2, 24)
+    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+    vert = np.r_[circ, circ[::-1] * .7]
+    open_circle = mpl.path.Path(vert)
+
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_ylabel("Map Shift (cm)", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    objects = ['Hit', 'Try', 'Run']
+    x_pos = np.arange(len(objects))
+    ax.axhline(y=0, linewidth=3, color="black")
+
+    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=10, fmt="o", color="green", linewidth=3)
+    ax.bar(x_pos[0], np.nanmean(hits), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.bar(x_pos[1], np.nanmean(tries), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=10, fmt="o", color="red", linewidth=3)
+    ax.bar(x_pos[2], np.nanmean(misses), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+    #ax.errorbar(x_pos[2], np.nanmean(diff), yerr=stats.sem(diff, nan_policy='omit'), ecolor='black', capsize=10, fmt="o", color="black", linewidth=3)
+    #ax.bar(x_pos[2], np.nanmean(diff), edgecolor="black", color="None", facecolor="None", linewidth=3)
+    ax.plot(x_pos, [np.nanmean(hits), np.nanmean(tries), np.nanmean(misses)], color="black", linestyle="solid", linewidth=2)
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist())
+    #significance_bar(start=x_pos[0], end=x_pos[1], height=0.28, displaystring=get_p_text(hit_try_p))
+    #significance_bar(start=x_pos[1], end=x_pos[2], height=0.26, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=45, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=30)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.set_ylim(bottom=0, top=50)
+    plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['bottom'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+def plot_avg_correlation_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
+
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    if PDN == "PD":
+        grid_cells = grid_cells[(grid_cells["Lomb_classifier_"] == "Position") |
+                                (grid_cells["Lomb_classifier_"] == "Distance")]
+    elif PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    hits = get_avg_correlations(grid_cells, hmt="hit", tt=tt)
+    misses = get_avg_correlations(grid_cells, hmt="miss", tt=tt)
+    tries = get_avg_correlations(grid_cells, hmt="try", tt=tt)
+
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_xlabel("Avg R", fontsize=30, labelpad=10)
+    ax.set_ylabel("Cumulative Density", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.locator_params(axis='y', nbins=6)
+    plt.locator_params(axis='x', nbins=4)
+    _, _, patchesP = ax.hist(hits[~np.isnan(hits)], bins=500, color="green", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesA = ax.hist(misses[~np.isnan(misses)], bins=500, color="red", histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patchesS = ax.hist(tries[~np.isnan(tries)], bins=500, color="orange", histtype="step", density=True, cumulative=True, linewidth=2)
+    patchesP[0].set_xy(patchesP[0].get_xy()[:-1])
+    patchesA[0].set_xy(patchesA[0].get_xy()[:-1])
+    patchesS[0].set_xy(patchesS[0].get_xy()[:-1])
+    ax.set_ylim([0,1])
+    #ax.set_xlim([0,0.3])
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_cumhist_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+    x1 = 0 * np.ones(len(hits[~np.isnan(hits)]))
+    x2 = 1 * np.ones(len(tries[~np.isnan(tries)]))
+    x3 = 2 * np.ones(len(misses[~np.isnan(misses)]))
+    y1 = hits[~np.isnan(hits)]
+    y2 = tries[~np.isnan(tries)]
+    y3 = misses[~np.isnan(misses)]
+    #Combine the sampled data together
+    x = np.concatenate((x1, x2, x3), axis=0)
+    y = np.concatenate((y1, y2, y3), axis=0)
+
+    pts = np.linspace(0, np.pi * 2, 24)
+    circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+    vert = np.r_[circ, circ[::-1] * .7]
+    open_circle = mpl.path.Path(vert)
+
+    fig, ax = plt.subplots(figsize=(5,5))
+    ax.set_ylabel("Avg R", fontsize=30, labelpad=10)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=30)
+    objects = ['Hit', 'Try', 'Run']
+    x_pos = np.arange(len(objects))
+    ax.axhline(y=0, linewidth=3, color="black")
+
+    sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0)
+    ax.errorbar(x_pos[0], np.nanmean(hits), yerr=stats.sem(hits, nan_policy='omit'), ecolor='green', capsize=10, fmt="o", color="green", linewidth=3)
+    ax.bar(x_pos[0], np.nanmean(hits), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[1], np.nanmean(tries), yerr=stats.sem(tries, nan_policy='omit'), ecolor='orange', capsize=20, fmt="o", color="orange")
+    ax.bar(x_pos[1], np.nanmean(tries), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+
+    ax.errorbar(x_pos[2], np.nanmean(misses), yerr=stats.sem(misses, nan_policy='omit'), ecolor='red', capsize=10, fmt="o", color="red", linewidth=3)
+    ax.bar(x_pos[2], np.nanmean(misses), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+    #ax.errorbar(x_pos[2], np.nanmean(diff), yerr=stats.sem(diff, nan_policy='omit'), ecolor='black', capsize=10, fmt="o", color="black", linewidth=3)
+    #ax.bar(x_pos[2], np.nanmean(diff), edgecolor="black", color="None", facecolor="None", linewidth=3)
+    ax.plot(x_pos, [np.nanmean(hits), np.nanmean(tries), np.nanmean(misses)], color="black", linestyle="solid", linewidth=2)
+
+    bad_hm = ~np.logical_or(np.isnan(hits), np.isnan(misses))
+    bad_ht = ~np.logical_or(np.isnan(hits), np.isnan(tries))
+    bad_tm = ~np.logical_or(np.isnan(tries), np.isnan(misses))
+    hit_miss_p = stats.wilcoxon(np.compress(bad_hm, hits), np.compress(bad_hm, misses))[1]
+    hit_try_p = stats.wilcoxon(np.compress(bad_ht, hits), np.compress(bad_ht, tries))[1]
+    try_miss_p = stats.wilcoxon(np.compress(bad_tm, tries), np.compress(bad_tm, misses))[1]
+
+    all_behaviour = []; all_behaviour.extend(hits.tolist()); all_behaviour.extend(misses.tolist())
+    #significance_bar(start=x_pos[0], end=x_pos[1], height=0.28, displaystring=get_p_text(hit_try_p))
+    #significance_bar(start=x_pos[1], end=x_pos[2], height=0.26, displaystring=get_p_text(try_miss_p))
+    significance_bar(start=x_pos[0], end=x_pos[2], height=0.45, displaystring=get_p_text(hit_miss_p))
+
+    plt.xticks(x_pos, objects, fontsize=30)
+    plt.xlim((-0.5, len(objects)-0.5))
+    ax.set_ylim(bottom=-0.25, top=0.5)
+    plt.locator_params(axis='y', nbins=5)
+    #plt.xticks(rotation=-45)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['bottom'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
 def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
 
     if get_lomb_classifier:
@@ -1182,8 +1544,7 @@ def plot_SNR_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_c
     plt.xticks(x_pos, objects, fontsize=30)
     plt.xlim((-0.5, len(objects)-0.5))
     ax.set_ylim(bottom=0, top=0.31)
-    plt.locator_params(axis='y', nbins=5)
-    #plt.xticks(rotation=-45)
+    ax.set_yticks([0, 0.1, 0.2, 0.3])
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.tight_layout()
@@ -1238,7 +1599,7 @@ def main():
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df_shuffle = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
 
-    combined_df = combined_df[combined_df["track_length"] == 200]
+    #combined_df = combined_df[combined_df["track_length"] == 200]
     combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
 
     add_celltype_classifier(combined_df_shuffle, combined_df)
@@ -1261,8 +1622,17 @@ def main():
     plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Null/", CT="NG", PDN="Null")
     plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Distance/", CT="NG", PDN="Distance")
 
+    plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1)
+    plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt=1)
+    plot_avg_correlation_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/avg_correlation/G/Position/hit/", CT="G", PDN="Position", hmt="hit")
+    plot_avg_correlation_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/avg_correlation/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit")
 
-    # compare hit miss try according to lomb classifications using the pairwise trial correlations
+    plot_map_shifts_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/map_shifts/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1)
+    plot_map_shifts_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/map_shifts/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt=1)
+    plot_map_shifts_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/map_shifts/G/Position/hit/", CT="G", PDN="Position", hmt="hit")
+    plot_map_shifts_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/map_shifts/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit")
+
+# compare hit miss try according to lomb classifications using the pairwise trial correlations
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/", CT="G", PDN="", tt="all")
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/", CT="NG", PDN="", tt="all")
 
@@ -1300,6 +1670,7 @@ def main():
     # compare hit miss try according to shuffle lomb classifications using the power
     plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/", CT="G", PDN="", tt="all")
     plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/", CT="NG", PDN="", tt="all")
+
 
     plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/", CT="G", PDN="Position", get_lomb_classifier=False, tt="all")
     plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/beaconed/", CT="G", PDN="Position", get_lomb_classifier=False, tt="beaconed")

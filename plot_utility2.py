@@ -213,12 +213,6 @@ def style_vr_plot(ax, x_max=None):
         left=True,
         labelleft=True,
         labelbottom=True)  # labels along the bottom edge are off
-
-    #ax.set_aspect('equal')
-
-    ax.axvline(0, linewidth=2.5, color='black') # bold line on the y axis
-    ax.axhline(0, linewidth=2.5, color='black') # bold line on the x axis
     if x_max is not None:
         plt.ylim(0, x_max)
-
     return ax
