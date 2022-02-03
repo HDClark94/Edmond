@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pickle
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 from matplotlib.markers import TICKDOWN
 import PostSorting.parameters
 from astropy.nddata import block_reduce
@@ -271,8 +273,8 @@ def plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_s
     tries = processed_position_data[processed_position_data["hit_miss_try"] == "try"]
 
     axes[0].hist(pandas_collumn_to_numpy_array(hits["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(g[0],g[1],g[2], 0.3), edgecolor=(g[0],g[1],g[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
-    axes[1].hist(pandas_collumn_to_numpy_array(tries["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(r[0],r[1],r[2], 0.3), edgecolor=(r[0],r[1],r[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
-    axes[1].hist(pandas_collumn_to_numpy_array(misses["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(o[0],o[1],o[2], 0.3), edgecolor=(o[0],o[1],o[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
+    axes[1].hist(pandas_collumn_to_numpy_array(tries["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(o[0],o[1],o[2], 0.3), edgecolor=(o[0],o[1],o[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
+    axes[1].hist(pandas_collumn_to_numpy_array(misses["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(r[0],r[1],r[2], 0.3), edgecolor=(r[0],r[1],r[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
 
     #plt.ylabel('Trial', fontsize=20, labelpad = 10)
     plt.xlabel('Avg Speed in RZ (cm/s)', fontsize=20, labelpad = 10)
@@ -575,38 +577,39 @@ def plot_lomb_classifiers(concantenated_dataframe, suffix="", save_path=""):
 
     #fig, (ax1, ax2) = plt.subplots(2, 3, figsize=(7,6), gridspec_kw={'width_ratios': [1, 0.3]})
     fig, ((ax4, ax5, ax6), (ax1, ax2, ax3)) = plt.subplots(2, 3, figsize=(9,9), gridspec_kw={'width_ratios': [1, 0.3, 0.3], 'height_ratios': [0.3, 1]})
-    ax1.set_ylabel("Peak Power",color="black",fontsize=20, labelpad=10)
-    ax1.set_xlabel("Track Frequency", color="black", fontsize=20, labelpad=10)
+    ax1.set_ylabel("Peak Power",color="black",fontsize=25, labelpad=10)
+    ax1.set_xlabel("Track Frequency", color="black", fontsize=25, labelpad=10)
     ax1.set_xticks(np.arange(0, 11, 1.0))
     ax4.set_xticks(np.arange(0, 11, 1.0))
     ax1.set_yticks([0, 0.1, 0.2, 0.3])
     ax2.set_xticks([0, 0.5])
     ax4.set_xticks([0, 0.5])
     ax2.set_yticks([])
-    ax4.set_ylabel("Density", color="black", fontsize=20, labelpad=10)
-    ax3.set_xlabel("Density", color="black", fontsize=20, labelpad=10)
-    plt.setp(ax1.get_xticklabels(), fontsize=15)
-    plt.setp(ax2.get_xticklabels(), fontsize=15)
-    plt.setp(ax1.get_yticklabels(), fontsize=15)
+    ax4.set_ylabel("Density", color="black", fontsize=25, labelpad=10)
+    ax3.set_xlabel("Density", color="black", fontsize=25, labelpad=10)
+    plt.setp(ax1.get_xticklabels(), fontsize=20)
+    plt.setp(ax2.get_xticklabels(), fontsize=20)
+    plt.setp(ax1.get_yticklabels(), fontsize=20)
     ax1.yaxis.set_ticks_position('left')
     ax1.xaxis.set_ticks_position('bottom')
     for f in range(1,6):
         ax1.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
         ax4.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
-    plt.xticks(fontsize=15)
-    plt.yticks(fontsize=15)
-    ax1.scatter(x=null_cells["ML_Freqs"+suffix], y=null_cells["ML_SNRs"+suffix], color="black", marker="o", alpha=0.3)
-    ax1.scatter(x=distance_cells["ML_Freqs"+suffix], y=distance_cells["ML_SNRs"+suffix], color="orange", marker="o", alpha=0.3)
-    ax1.scatter(x=position_cells["ML_Freqs"+suffix], y=position_cells["ML_SNRs"+suffix], color="turquoise", marker="o", alpha=0.3)
-    ax3.hist(position_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color="turquoise", orientation="horizontal")
-    ax3.hist(distance_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color="orange", orientation="horizontal")
-    ax3.hist(null_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color="gray", orientation="horizontal")
-    ax4.hist(position_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color="turquoise")
-    ax4.hist(distance_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color="orange")
-    ax4.hist(null_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color="gray")
-    ax5.hist(distance_from_integer(position_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color="turquoise")
-    ax5.hist(distance_from_integer(distance_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color="orange")
-    ax5.hist(distance_from_integer(null_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color="gray")
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax1.scatter(x=null_cells["ML_Freqs"+suffix], y=null_cells["ML_SNRs"+suffix], color=Settings.null_color, marker="o")
+    ax1.scatter(x=distance_cells["ML_Freqs"+suffix], y=distance_cells["ML_SNRs"+suffix], color=Settings.egocentric_color, marker="o")
+    ax1.scatter(x=position_cells["ML_Freqs"+suffix], y=position_cells["ML_SNRs"+suffix], color=Settings.allocentric_color, marker="o")
+    ax1.axhline(y=0.024, color="red", linewidth=3,linestyle="dashed")
+    ax3.hist(position_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color=Settings.allocentric_color, orientation="horizontal")
+    ax3.hist(distance_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color=Settings.egocentric_color, orientation="horizontal")
+    ax3.hist(null_cells["ML_SNRs"+suffix], density=True, range=(0,0.4), bins=40, histtype="stepfilled", alpha=0.5, color=Settings.null_color, orientation="horizontal")
+    ax4.hist(position_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color=Settings.allocentric_color)
+    ax4.hist(distance_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color=Settings.egocentric_color)
+    ax4.hist(null_cells["ML_Freqs"+suffix], density=True, range=(0,5), bins=100, histtype="stepfilled", alpha=0.5, color=Settings.null_color)
+    ax5.hist(distance_from_integer(position_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color=Settings.allocentric_color)
+    ax5.hist(distance_from_integer(distance_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color=Settings.egocentric_color)
+    ax5.hist(distance_from_integer(null_cells["ML_Freqs"+suffix]), density=True, range=(0,0.5), bins=10, histtype="stepfilled", alpha=0.5, color=Settings.null_color)
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
     ax2.spines['right'].set_visible(False)
@@ -640,10 +643,11 @@ def plot_lomb_classifiers(concantenated_dataframe, suffix="", save_path=""):
     ax2.set_ylim([0,0.3])
     ax3.set_ylim([0,0.3])
     ax5.set_xlim([-0.05,0.55])
-    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=20, labelpad=10)
-    ax2.scatter(x=distance_from_integer(position_cells["ML_Freqs"+suffix]), y=position_cells["ML_SNRs"+suffix], color="turquoise", marker="o", alpha=0.3)
-    ax2.scatter(x=distance_from_integer(distance_cells["ML_Freqs"+suffix]), y=distance_cells["ML_SNRs"+suffix], color="orange", marker="o", alpha=0.3)
-    ax2.scatter(x=distance_from_integer(null_cells["ML_Freqs"+suffix]), y=null_cells["ML_SNRs"+suffix], color="black", marker="o", alpha=0.3)
+    ax2.set_xlabel(r'$\Delta$ from Integer', color="black", fontsize=25, labelpad=10)
+    ax2.scatter(x=distance_from_integer(position_cells["ML_Freqs"+suffix]), y=position_cells["ML_SNRs"+suffix], color=Settings.allocentric_color, marker="o")
+    ax2.scatter(x=distance_from_integer(distance_cells["ML_Freqs"+suffix]), y=distance_cells["ML_SNRs"+suffix], color=Settings.egocentric_color, marker="o")
+    ax2.scatter(x=distance_from_integer(null_cells["ML_Freqs"+suffix]), y=null_cells["ML_SNRs"+suffix], color=Settings.null_color, marker="o")
+    ax2.axhline(y=0.024, color="red", linewidth=3,linestyle="dashed")
     plt.tight_layout()
     plt.savefig(save_path + '/lomb_classifiers_PDN_'+suffix+'.png', dpi=200)
     plt.close()
@@ -677,7 +681,7 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
             ng_position_cells[~np.isnan(ng_position_cells)],
             ng_distance_cells[~np.isnan(ng_distance_cells)],
             ng_null_cells[~np.isnan(ng_null_cells)]]
-    colors=["turquoise", "orange", "gray", "turquoise", "orange", "gray"]
+    colors=[Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
@@ -791,8 +795,8 @@ def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_p
     non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
 
     fig, ax = plt.subplots(figsize=(4,6))
-    groups = ["Position", "Distance", "Null"]
-    colors_lm = ["turquoise", "orange", "gray"]
+    groups = ["Position", "Distance", "Null", "Unclassifed"]
+    colors_lm = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color, "black"]
     objects = ["G", "NG"]
     x_pos = np.arange(len(objects))
     for object, x in zip(objects, x_pos):
@@ -1037,6 +1041,176 @@ def plot_lomb_classifiers_proportions_by_mouse(concantenated_dataframe, suffix="
         plt.close()
     return
 
+
+def extract_hit_success(df):
+    b=[];nb=[];p=[]
+    for index, cell in df.iterrows():
+        cell = cell.to_frame().T.reset_index(drop=True)
+        b_hit = cell["percentage_hits"].iloc[0][0]
+        nb_hit = cell["percentage_hits"].iloc[0][1]
+        p_hit = cell["percentage_hits"].iloc[0][2]
+        b.append(b_hit);nb.append(nb_hit); p.append(p_hit)
+    df["percentage_b_hits"] = b
+    df["percentage_nb_hits"] = nb
+    df["percentage_p_hits"] = p
+    return df
+
+def add_session_number(df):
+    session_number = []
+    for index, cell in df.iterrows():
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        D = str(session_id.split("_")[1].split("D")[-1])
+        session_number.append(D)
+    df["session_number"] = session_number
+    return df
+
+
+def plot_lomb_classifiers_proportions_by_hit_success2(concantenated_dataframe, suffix="", save_path=""):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix=suffix)
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+    p_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    d_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+    n_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Null"]
+
+    groups = ["Position", "Distance", "Null"]
+    colors_lm = ["turquoise", "orange", "gray"]
+
+    objects = ["0-10", "10-20", "20-30", "30-40", "40-50", "50-60", "60-70", "70-80", "80-90", "90-100"]
+    obj_lim = [(0,10), (10,20), (20,30), (30,40), (40,50), (50,60), (60,70), (70,80), (80,90), (90,100)]
+    objects = ["0-25", "25-50", "50-75", "75-100"]
+    obj_lim = [(0,25), (25,50), (50,75), (75,100)]
+    x_pos = np.arange(len(objects))
+
+    for tt in [0,1]:
+        fig, ax = plt.subplots(figsize=(6,6))
+        for group_grid_cell, color in zip([p_grid_cells, d_grid_cells, n_grid_cells], [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]):
+
+            percentage_over_limits = []
+            for limits in obj_lim:
+                if tt ==0:
+                    column = "percentage_b_hits"
+                elif tt == 1:
+                    column = "percentage_nb_hits"
+
+                percentage_cells = (len(group_grid_cell[((group_grid_cell[column]>limits[0]) & (group_grid_cell[column]<limits[1]))])/\
+                                   len(grid_cells[((grid_cells[column]>limits[0]) & (grid_cells[column]<limits[1]))]))*100
+                percentage_over_limits.append(percentage_cells)
+            percentage_over_limits = np.array(percentage_over_limits)
+            ax.plot(x_pos, percentage_over_limits, "o-", color=color, linewidth=2)
+
+        plt.xticks(x_pos, objects, fontsize=15)
+        plt.yticks(fontsize=20)
+        plt.ylabel("Percent of neurons",  fontsize=25)
+        plt.xlabel("Percentage hit trials\n in session",  fontsize=25)
+        plt.xlim((-0.5, len(objects)-0.5))
+        plt.ylim((0,100))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        #plt.tight_layout()
+        plt.subplots_adjust(left=0.4, bottom=0.2)
+        #ax.tick_params(axis='both', which='major', labelsize=25)
+        plt.savefig(save_path + "/lomb_classifiers_proportions_by_hits_tt_"+str(tt)+".png", dpi=200)
+        plt.close()
+    return
+
+def plot_lomb_classifiers_proportions_by_hit_success(concantenated_dataframe, suffix="", save_path=""):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix=suffix)
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+
+    groups = ["Position", "Distance", "Null"]
+    colors_lm = [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+
+    objects = ["0-10", "10-20", "20-30", "30-40", "40-50", "50-60", "60-70", "70-80", "80-90", "90-100"]
+    obj_lim = [(0,10), (10,20), (20,30), (30,40), (40,50), (50,60), (60,70), (70,80), (80,90), (90,100)]
+    objects = ["0-25", "25-50", "50-75", "75-100"]
+    obj_lim = [(0,25), (25,50), (50,75), (75,100)]
+    x_pos = np.arange(len(objects))
+
+    for tt in [0,1]:
+        fig, ax = plt.subplots(figsize=(6,6))
+        for object, limits, x in zip(objects, obj_lim, x_pos):
+            if tt ==0:
+                df = grid_cells[((grid_cells["percentage_b_hits"]>limits[0]) & (grid_cells["percentage_b_hits"]<limits[1]))]
+            elif tt == 1:
+                df = grid_cells[((grid_cells["percentage_nb_hits"]>limits[0]) & (grid_cells["percentage_nb_hits"]<limits[1]))]
+
+            bottom=0
+            for color, group in zip(colors_lm, groups):
+                count = len(df[(df["Lomb_classifier_"] == group)])
+                if count>0:
+                    percent = (count/len(df))*100
+                    ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+                    ax.text(x,bottom+2, str(count), color="k", fontsize=10, ha="center")
+                    bottom = bottom+percent
+
+        plt.xticks(x_pos, objects, fontsize=15)
+        plt.yticks(fontsize=25)
+        plt.ylabel("Percent of neurons",  fontsize=25)
+        plt.xlabel("Percentage hit trials\n in session",  fontsize=25)
+        plt.xlim((-0.5, len(objects)-0.5))
+        plt.ylim((0,100))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        #plt.tight_layout()
+        plt.subplots_adjust(left=0.4, bottom=0.2)
+        #ax.tick_params(axis='both', which='major', labelsize=25)
+        plt.savefig(save_path + "/lomb_classifiers_proportions_by_hits_tt_"+str(tt)+".png", dpi=200)
+        plt.close()
+
+
+        fig, ax = plt.subplots(figsize=(6,6))
+        scalar=40
+        for session_id in np.unique(grid_cells["session_id"]):
+            grid_cell_session = grid_cells[grid_cells["session_id"]==session_id]
+            grid_cell_session_number = int(grid_cell_session["session_number"].iloc[0])
+            if tt==0:
+                grid_cell_percentage = grid_cell_session["percentage_b_hits"].iloc[0]
+            elif tt==1:
+                grid_cell_percentage = grid_cell_session["percentage_nb_hits"].iloc[0]
+
+            n_p = len(grid_cell_session[grid_cell_session["Lomb_classifier_"] == "Position"])
+            n_d = len(grid_cell_session[grid_cell_session["Lomb_classifier_"] == "Distance"])
+            n_n = len(grid_cell_session[grid_cell_session["Lomb_classifier_"] == "Null"])
+
+            if n_p>0:
+                jitter_x, jitter_y = getjitterr(scalar=1,grid_cell_percentage=grid_cell_percentage, grid_cell_session_number=grid_cell_session_number, grid_cells=grid_cells)
+                ax.scatter(grid_cell_session_number+jitter_x, grid_cell_percentage+jitter_y, s=n_p*scalar, marker="o", alpha=0.6, color=Settings.allocentric_color, edgecolor='none', clip_on=False)
+            if n_d>0:
+                jitter_x, jitter_y = getjitterr(scalar=1,grid_cell_percentage=grid_cell_percentage, grid_cell_session_number=grid_cell_session_number, grid_cells=grid_cells)
+                ax.scatter(grid_cell_session_number+jitter_x, grid_cell_percentage+jitter_y, s=n_d*scalar, marker="o", alpha=0.6, color=Settings.egocentric_color, edgecolor='none', clip_on=False)
+            if n_n>0:
+                jitter_x, jitter_y = getjitterr(scalar=1,grid_cell_percentage=grid_cell_percentage, grid_cell_session_number=Settings.null_color, grid_cells=grid_cells)
+                ax.scatter(grid_cell_session_number+jitter_x, grid_cell_percentage+jitter_y, s=n_n*scalar, marker="o", alpha=0.6, color="gray", edgecolor='none', clip_on=False)
+
+        ax.set_ylabel("Percentage hit trials\n in session",  fontsize=25)
+        plt.xlabel("Session number",  fontsize=25)
+        plt.yticks(fontsize=20)
+        plt.xticks(fontsize=20)
+        ax.set_xticks([0,10, 20, 30, 40])
+        plt.ylim(0,100)
+        plt.xlim(0, max(np.asarray(grid_cells["session_number"]).astype(np.int64)))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plt.subplots_adjust(left=0.4, bottom=0.2)
+        #ax.tick_params(axis='both', which='major', labelsize=25)
+        plt.savefig(save_path + "/lomb_classifiers_session_by_hits_session_tt_"+str(tt)+".png", dpi=200)
+        plt.close()
+    return
+
+def getjitterr(scalar,grid_cell_percentage, grid_cell_session_number,grid_cells):
+    jitter_x=np.random.uniform(low=-0.3, high=0.3)*scalar
+    jitter_y=np.random.uniform(low=-0.6, high=0.6)*scalar
+    if grid_cell_percentage == 0:
+        jitter_y=0
+    if (grid_cell_session_number == max(np.asarray(grid_cells["session_number"]).astype(np.int64))):
+        jitter_x=0
+    return jitter_x, jitter_y
+
 def plot_snr_vs_RZbias_regression(spike_data, processed_position_data, output_path, track_length):
     print('plotting TI vs SNR regressions...')
     save_path = output_path + '/Figures/TI_regressions'
@@ -1129,6 +1303,152 @@ def get_lomb_color(modal_class):
     else:
         return "purple"
 
+def get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05):
+    local_maxima_idx, _ = signal.find_peaks(avg_subset_powers, height=0, distance=5)
+    power = 0; freq=0; i_max=0
+    for i in local_maxima_idx:
+        if (distance_from_integer(frequency[i])<=tolerance) and (avg_subset_powers[i]>power):
+            freq = frequency[i]
+            power = avg_subset_powers[i]
+            i_max = i
+    return freq, power, i_max
+
+def get_egocentric_peak(frequency, avg_subset_powers, tolerance=0.05):
+    local_maxima_idx, _ = signal.find_peaks(avg_subset_powers, height=0, distance=5)
+    power = 0; freq=0; i_max=0
+    for i in local_maxima_idx:
+        if (distance_from_integer(frequency[i])>=tolerance) and (avg_subset_powers[i]>power):
+            freq = frequency[i]
+            power = avg_subset_powers[i]
+            i_max = i
+    return freq, power, i_max
+
+def plot_allo_vs_ego_power(spike_data, processed_position_data, output_path, track_length):
+    print('plotting moving lomb_scargle periodogram...')
+    save_path = output_path + '/Figures/moving_lomb_scargle_periodograms'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    step = 0.02
+    frequency = np.arange(0.1, 5+step, step)
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        modal_frequency = cluster_spike_data['ML_Freqs'].iloc[0]
+        modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
+
+        fig, axes = plt.subplots(1, 3, figsize=(9,3), sharey=True)
+        subset_trial_numbers = np.asarray(processed_position_data["trial_number"])
+
+        if len(firing_times_cluster)>1:
+            if len(subset_trial_numbers)>0:
+                subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                subset_powers = powers.copy()
+                subset_powers[subset_mask == False] = np.nan
+                avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                allocentric_peak_freq, allocentric_peak_power, allo_i = get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
+                egocentric_peak_freq, egocentric_peak_power, ego_i = get_egocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
+
+                for ax, hmt in zip(axes, ["hit", "miss", "try"]):
+                    subset_processed_position_data = processed_position_data[(processed_position_data["hit_miss_try"] == hmt)]
+                    subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
+                    subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                    subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                    subset_powers = powers.copy()
+                    subset_powers[subset_mask == False] = np.nan
+
+                    allo_powers = subset_powers[:, allo_i]
+                    ego_powers = subset_powers[:, ego_i]
+                    ax.scatter(allo_powers, ego_powers, color=get_hmt_color(hmt), marker="o", alpha=0.1)
+
+                    ax.set_xlabel('Allocentric Power', fontsize=20, labelpad = 10)
+                    if hmt=="hit":
+                        ax.set_ylabel("Egocentric Power", fontsize=20, labelpad = 10)
+                    #ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+                    #ax.set_xticks([0, np.round(ax.get_xlim()[1], 2)])
+                    ax.set_ylim(bottom=0, top=np.nanmax(subset_powers))
+                    ax.set_xlim(left=0, right=np.nanmax(subset_powers))
+                    ax.yaxis.set_ticks_position('left')
+                    ax.xaxis.set_ticks_position('bottom')
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    ax.xaxis.set_tick_params(labelsize=20)
+                    ax.yaxis.set_tick_params(labelsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_allo_vs_ego_power_' + str(cluster_id) + '.png', dpi=300)
+        plt.close()
+    return
+
+def get_modal_color(modal_class):
+    if modal_class == "Position":
+        return Settings.allocentric_color
+    elif modal_class == "Distance":
+        return Settings.egocentric_color
+    elif modal_class == "Null":
+        return Settings.null_color
+
+def plot_snr(spike_data, processed_position_data, output_path, track_length):
+    print('plotting moving lomb_scargle periodogram...')
+    save_path = output_path + '/Figures/moving_lomb_scargle_periodograms'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    step = 0.02
+    frequency = np.arange(0.1, 5+step, step)
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        modal_frequency = cluster_spike_data['ML_Freqs'].iloc[0]
+        modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
+        modal_class_color = get_modal_color(modal_class)
+
+        stops_on_track = plt.figure(figsize=(6,6))
+        ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for f in range(1,6):
+            ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+        ax.axvline(x=modal_frequency, color=modal_class_color, linewidth=3,linestyle="solid")
+
+        subset_trial_numbers = np.asarray(processed_position_data["trial_number"])
+
+        if len(firing_times_cluster)>1:
+            if len(subset_trial_numbers)>0:
+                subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                subset_powers = powers.copy()
+                subset_powers[subset_mask == False] = np.nan
+                avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                sem_subset_powers = scipy.stats.sem(subset_powers, axis=0, nan_policy="omit")
+                ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3)
+                ax.plot(frequency, avg_subset_powers, color="black", linewidth=3)
+                #ax.scatter(frequency[np.argmax(avg_subset_powers)], avg_subset_powers[np.argmax(avg_subset_powers)], color=get_trial_color(tt), marker="v")
+                allocentric_peak_freq, allocentric_peak_power, allo_i = get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
+                egocentric_peak_freq, egocentric_peak_power, ego_i = get_egocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
+                #ax.scatter(allocentric_peak_freq, allocentric_peak_power, color="turquoise", marker="x", zorder=10)
+                #ax.scatter(egocentric_peak_freq, egocentric_peak_power, color="orange", marker="x", zorder=10)
+
+        plt.ylabel('Periodic Power', fontsize=25, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
+        plt.xlim(0,5.05)
+        ax.set_xticks([0,5])
+        ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+        ax.set_ylim(bottom=0)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        #ax.set_yticks([0, 10, 20, 30])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_moving_lomb_scargle_avg_periodogram_Cluster_' + str(cluster_id) + '.png', dpi=300)
+        plt.close()
+    return
+
 def plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length):
     print('plotting the power by hmt...')
     save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
@@ -1145,12 +1465,13 @@ def plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_l
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
         modal_frequency = cluster_spike_data['ML_Freqs'].iloc[0]
         modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
+        modal_class_color = get_modal_color(modal_class)
 
         stops_on_track = plt.figure(figsize=(6,6))
         ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         for f in range(1,6):
             ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
-        ax.axvline(x=modal_frequency, color="black", linewidth=2,linestyle="solid")
+        ax.axvline(x=modal_frequency, color=modal_class_color, linewidth=3,linestyle="solid")
 
         for tt, tt_color in zip([0, 1], ["black", "blue"]):
             for hmt in ["hit"]:
@@ -1173,8 +1494,8 @@ def plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_l
                         ax.plot(frequency, avg_subset_powers, color=tt_color)
                         #ax.scatter(frequency[np.argmax(avg_subset_powers)], avg_subset_powers[np.argmax(avg_subset_powers)], color=get_trial_color(tt), marker="v")
 
-        plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
-        plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        plt.ylabel('Periodic Power', fontsize=25, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
         plt.xlim(0,5.05)
         ax.set_xticks([0,5])
         ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
@@ -1191,15 +1512,44 @@ def plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_l
         plt.close()
     return
 
-def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length):
+
+def find_neighbouring_minima(firing_rate_map, local_maximum_idx):
+    # walk right
+    local_min_right = local_maximum_idx
+    local_min_right_found = False
+    for i in np.arange(local_maximum_idx, len(firing_rate_map)): #local max to end
+        if local_min_right_found == False:
+            if np.isnan(firing_rate_map[i]):
+                continue
+            elif firing_rate_map[i] < firing_rate_map[local_min_right]:
+                local_min_right = i
+            elif firing_rate_map[i] > firing_rate_map[local_min_right]:
+                local_min_right_found = True
+
+    # walk left
+    local_min_left = local_maximum_idx
+    local_min_left_found = False
+    for i in np.arange(0, local_maximum_idx)[::-1]: # local max to start
+        if local_min_left_found == False:
+            if np.isnan(firing_rate_map[i]):
+                continue
+            elif firing_rate_map[i] < firing_rate_map[local_min_left]:
+                local_min_left = i
+            elif firing_rate_map[i] > firing_rate_map[local_min_left]:
+                local_min_left_found = True
+
+    return local_min_left, local_min_right
+
+def plot_snr_peaks_by_hmt(spike_data, processed_position_data, output_path, track_length):
     print('plotting the power by hmt...')
     save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
+    gauss_kernel = Gaussian1DKernel(stddev=3)
     step = 0.02
     frequency = np.arange(0.1, 5+step, step)
-    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == 1) | (processed_position_data["trial_type"] == 2)]
+    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == 1)]
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
@@ -1210,35 +1560,103 @@ def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_leng
         modal_frequency = cluster_spike_data['ML_Freqs'].iloc[0]
         modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
 
+        fig, axes = plt.subplots(3, 1, figsize=(6,6), sharex=True)
+        for ax, hmt, ylab in zip(axes, ["hit", "try", "miss"], ["Hit", "Try", "Run"]):
+            for f in range(1,6):
+                ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+            ax.axvline(x=modal_frequency, color="black", linewidth=2,linestyle="solid")
+
+            subset_processed_position_data = processed_position_data[(processed_position_data["hit_miss_try"] == hmt)]
+            subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
+
+            if len(firing_times_cluster)>1:
+                if len(subset_trial_numbers)>0:
+                    subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                    subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                    subset_powers = powers.copy()
+                    subset_powers[subset_mask == False] = np.nan
+                    nan_row_mask = np.all(np.isnan(subset_powers), axis=1)
+                    subset_powers = subset_powers[~nan_row_mask]
+                    freq_peaks = frequency[np.nanargmax(subset_powers, axis=1)]
+                    freq_powers = np.nanmax(subset_powers, axis=1)
+                    hist, bin_edges = np.histogram(freq_peaks, bins=len(frequency)+1, range=[min(frequency), max(frequency)])
+                    bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+                    smoothened_hist = convolve(hist, gauss_kernel)
+
+                    local_maxima_idx, _ = signal.find_peaks(smoothened_hist, height=0, distance=5)
+                    for i in local_maxima_idx:
+                    #    min_left_i, min_right_i = find_neighbouring_minima(smoothened_hist, i)
+                        ax.scatter(bin_centres[i], smoothened_hist[i], color="black", marker="x", zorder=10)
+                    #    ax.scatter(bin_centres[min_left_i], smoothened_hist[min_left_i], color="blue", marker="x", zorder=10)
+                    #    ax.scatter(bin_centres[min_right_i], smoothened_hist[min_right_i], color="blue", marker="x", zorder=10)
+
+                    #ax.bar(bin_centres, hist, width=np.diff(bin_centres)[0], color=get_hmt_color(hmt))
+                    ax.plot(bin_centres, smoothened_hist, color=get_hmt_color(hmt), linewidth=3, zorder=0)
+
+                    ax.set_ylabel(ylab, fontsize=20, labelpad = 10)
+                    ax.set_xlim([0, 5.05])
+                    ax.set_xticks([1,2,3,4,5])
+                    ax.set_xticklabels(["", "", "", "", ""])
+                    ax.set_yticks([0, int(ax.get_ylim()[1])])
+                    ax.set_ylim(bottom=0)
+                    ax.spines['top'].set_visible(False)
+                    ax.spines['right'].set_visible(False)
+                    ax.yaxis.set_tick_params(labelsize=20)
+
+        ax.set_xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        ax.set_xticklabels(["1", "2", "3", "4", "5"])
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        plt.xticks(fontsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/hmt_peak_histogram_'+str(cluster_id)+'.png', dpi=200)
+        plt.close()
+    return
+
+def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length):
+    print('plotting the power by hmt...')
+    save_path = output_path + '/Figures/moving_lomb_power_by_hmt'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    step = 0.02
+    frequency = np.arange(0.1, 5+step, step)
+    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == 1)]
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+        centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+        centre_trials = np.round(centre_trials).astype(np.int64)
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        modal_frequency = cluster_spike_data['ML_Freqs'].iloc[0]
+        modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
+        modal_class_color = get_modal_color(modal_class)
+
         stops_on_track = plt.figure(figsize=(6,6))
         ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         for f in range(1,6):
             ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
-        ax.axvline(x=modal_frequency, color="black", linewidth=2,linestyle="solid")
+        ax.axvline(x=modal_frequency, color=modal_class_color, linewidth=3,linestyle="solid")
 
-        for tt in ["all"]:
-            for hmt in ["hit", "miss", "try"]:
-                subset_processed_position_data = processed_position_data.copy()
-                if tt != "all":
-                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["trial_type"] == tt)]
-                if hmt != "all":
-                    subset_processed_position_data = subset_processed_position_data[(subset_processed_position_data["hit_miss_try"] == hmt)]
-                subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
+        for hmt in ["hit", "miss", "try"]:
+            subset_processed_position_data = processed_position_data[(processed_position_data["hit_miss_try"] == hmt)]
+            subset_trial_numbers = np.asarray(subset_processed_position_data["trial_number"])
 
-                if len(firing_times_cluster)>1:
-                    if len(subset_trial_numbers)>0:
-                        subset_mask = np.isin(centre_trials, subset_trial_numbers)
-                        subset_mask = np.vstack([subset_mask]*len(powers[0])).T
-                        subset_powers = powers.copy()
-                        subset_powers[subset_mask == False] = np.nan
-                        avg_subset_powers = np.nanmean(subset_powers, axis=0)
-                        sem_subset_powers = scipy.stats.sem(subset_powers, axis=0, nan_policy="omit")
-                        ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=get_hmt_color(hmt), alpha=0.3)
-                        ax.plot(frequency, avg_subset_powers, color=get_hmt_color(hmt))
-                        #ax.scatter(frequency[np.argmax(avg_subset_powers)], avg_subset_powers[np.argmax(avg_subset_powers)], color=get_hmt_color(hmt), marker="v")
+            if len(firing_times_cluster)>1:
+                if len(subset_trial_numbers)>0:
+                    subset_mask = np.isin(centre_trials, subset_trial_numbers)
+                    subset_mask = np.vstack([subset_mask]*len(powers[0])).T
+                    subset_powers = powers.copy()
+                    subset_powers[subset_mask == False] = np.nan
+                    avg_subset_powers = np.nanmean(subset_powers, axis=0)
+                    sem_subset_powers = scipy.stats.sem(subset_powers, axis=0, nan_policy="omit")
+                    ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=get_hmt_color(hmt), alpha=0.3)
+                    ax.plot(frequency, avg_subset_powers, color=get_hmt_color(hmt))
+                    #ax.scatter(frequency[np.argmax(avg_subset_powers)], avg_subset_powers[np.argmax(avg_subset_powers)], color=get_hmt_color(hmt), marker="v")
 
-        plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
-        plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
+        plt.ylabel('Periodic Power', fontsize=25, labelpad = 10)
+        plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
         plt.xlim(0,5.05)
         ax.set_xticks([0,5])
         ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
@@ -1254,6 +1672,7 @@ def plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_leng
         plt.savefig(save_path + '/hmt_powers_'+str(cluster_id)+'.png', dpi=200)
         plt.close()
     return
+
 
 def plot_hit_power_by_tt(spike_data, processed_position_data, output_path, track_length):
     print('plotting the hit power by tt...')
@@ -2015,7 +2434,7 @@ def plot_mean_firing_rates_vr_vs_of(concatenated_dataframe, save_path):
     grid_cells = concatenated_dataframe[concatenated_dataframe["classifier"] == "G"]
     non_grid_cells = concatenated_dataframe[concatenated_dataframe["classifier"] != "G"]
 
-    fig, ax = plt.subplots(figsize=(4,4))
+    fig, ax = plt.subplots(figsize=(6,6))
     ax.plot([0,50], [0,50], color="black", linestyle="dashed", linewidth=2)
     for group in ["Position", "Distance", "Null"]:
         grids = grid_cells[grid_cells["Lomb_classifier_"] == group]
@@ -2027,7 +2446,7 @@ def plot_mean_firing_rates_vr_vs_of(concatenated_dataframe, save_path):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     r = stats.pearsonr(grid_cells["mean_firing_rate_vr"], grid_cells["mean_firing_rate_of"])[0]
-    ax.text(x=1, y=12, s="R = "+str(np.round(r, decimals=2)), color="black", fontsize=20)
+    ax.text(x=1, y=12, s="R = "+str(np.round(r, decimals=2)), color="black", fontsize=25)
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
     plt.xticks(fontsize=20)
@@ -2037,8 +2456,8 @@ def plot_mean_firing_rates_vr_vs_of(concatenated_dataframe, save_path):
     #ax.set_xticks([-1, 0, 1])
     fig.tight_layout()
     plt.subplots_adjust(left=0.25, bottom=0.2)
-    ax.set_xlabel("VR Mean Rate (Hz)", fontsize=20)
-    ax.set_ylabel("OF Mean Rate (Hz)", fontsize=20)
+    ax.set_xlabel("VR Mean Rate (Hz)", fontsize=25)
+    ax.set_ylabel("OF Mean Rate (Hz)", fontsize=25)
     plt.savefig(save_path + '/mean_firing_rate_vr_vs_of.png', dpi=300)
     plt.close()
     return
@@ -2473,7 +2892,7 @@ def plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data, proc
                     ax.set_yticks([len(hmt_processed_position_data)-1])
                     ax.set_yticklabels([len(hmt_processed_position_data)])
                     ax.set_ylabel(ytitle, fontsize=25, labelpad = 15)
-                    ax.set_title(("before align R:"+str(np.round(avg_correlation, decimals=2))+ ", after align R:"+str(np.round(reconstructed_signal_corr, decimals=2))), fontsize=8)
+                    ax.set_title(("before align R:"+str(np.round(avg_correlation, decimals=2))+ ", after align R:"+str(np.round(reconstructed_signal_corr, decimals=2))), fontsize=13)
                     plt.xlabel('Location (cm)', fontsize=25, labelpad = 20)
                 tick_spacing = 100
                 ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
@@ -2822,51 +3241,44 @@ def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
         if len(firing_times_cluster)>1:
-            cluster_firing_maps = np.array(spike_data["firing_rate_maps"].iloc[cluster_index])
-            where_are_NaNs = np.isnan(cluster_firing_maps)
-            cluster_firing_maps[where_are_NaNs] = 0
+            cluster_firing_maps2 = np.array(spike_data["fr_binned_in_space"].iloc[cluster_index])
+            where_are_NaNs2 = np.isnan(cluster_firing_maps2)
+            cluster_firing_maps2[where_are_NaNs2] = 0
+            cluster_firing_maps = min_max_normalize(cluster_firing_maps2)
+            vmin, vmax = get_vmin_vmax(cluster_firing_maps)
 
-            if len(cluster_firing_maps) == 0:
-                print("stop here")
-
-            cluster_firing_maps = min_max_normalize(cluster_firing_maps)
-
-            cmap = plt.cm.get_cmap("jet")
-            cmap.set_bad(color='white')
-            bin_size = settings.vr_grid_analysis_bin_size
-
-            tmp = []
-            for i in range(len(cluster_firing_maps[0])):
-                for j in range(int(settings.vr_grid_analysis_bin_size)):
-                    tmp.append(cluster_firing_maps[:, i].tolist())
-            cluster_firing_maps = np.array(tmp).T
 
             x_max = len(processed_position_data)
             spikes_on_track = plt.figure()
             spikes_on_track.set_size_inches(5, 5, forward=True)
             ax = spikes_on_track.add_subplot(1, 1, 1)
-            c = ax.imshow(cluster_firing_maps, interpolation='none', cmap=cmap, vmin=0, vmax=np.max(cluster_firing_maps), origin='lower', aspect="auto")
-
+            locations = np.arange(0, len(cluster_firing_maps[0]))
+            ordered = np.arange(0, len(processed_position_data), 1)
+            X, Y = np.meshgrid(locations, ordered)
+            cmap = plt.cm.get_cmap("jet")
+            ax.pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
             plt.ylabel('Trial Number', fontsize=20, labelpad = 20)
             plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
             plt.xlim(0, track_length)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            plt.xlabel('Location (cm)', fontsize=25, labelpad = 20)
+            ax.set_xlim([0, track_length])
+            ax.set_ylim([0, len(processed_position_data)-1])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
             tick_spacing = 100
+            plt.locator_params(axis='y', nbins=3)
             ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
             ax.yaxis.set_ticks_position('left')
             ax.xaxis.set_ticks_position('bottom')
-            #Edmond.plot_utility2.style_track_plot(ax, track_length)
-            Edmond.plot_utility2.style_vr_plot(ax, x_max)
-            plt.locator_params(axis = 'y', nbins  = 4)
-            plt.xticks(fontsize=20)
-            plt.yticks(fontsize=20)
+            spikes_on_track.tight_layout(pad=2.0)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
 
-            cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
-            cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
-            cbar.set_ticks([0,np.max(cluster_firing_maps)])
-            cbar.set_ticklabels(["0", "Max"])
-            cbar.ax.tick_params(labelsize=20)
-
-            plt.tight_layout()
+            #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+            #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+            #cbar.set_ticks([0,np.max(cluster_firing_maps)])
+            #cbar.set_ticklabels(["0", "Max"])
+            #cbar.ax.tick_params(labelsize=20)
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_map_trials_' + str(cluster_id) + '.png', dpi=300)
             plt.close()
 
@@ -3303,6 +3715,8 @@ def calculate_rewarded_trials(processed_position_data):
     processed_position_data["rewarded"] = rewarded_trials
     return processed_position_data
 
+
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     shuffle_df = pd.DataFrame()
@@ -3327,16 +3741,13 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             if len(spike_data)>0:
                 #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
                 position_data = add_time_elapsed_collumn(position_data)
-
-                processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=get_track_length(recording))
                 processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-                processed_position_data = add_RZ_bias(processed_position_data)
                 processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
 
                 #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording))
                 if len(spike_data.fr_binned_in_space.iloc[0][0])<200:
                     print("stop here")
-                spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
+                #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
 
                 #spike_data = plot_firing_rate_maps(spike_data=spike_data, processed_position_data=processed_position_data, raw_position_data=raw_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_firing_rate_maps_per_trial(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
@@ -3359,8 +3770,10 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, suffix="")
                 #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
-                #plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                #plot_snr_peaks_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                plot_snr(spike_data, processed_position_data, output_path, track_length =get_track_length(recording))
+                plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #spike_data = plot_power_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #spike_data = plot_hit_power_by_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #spike_data = add_n_trial(spike_data, processed_position_data)
@@ -3377,7 +3790,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #del shuffle_data["MOVING_LOMB_all_powers"]
                 #del shuffle_data['MOVING_LOMB_all_centre_trials']
                 #shuffle_df = pd.concat([shuffle_df, shuffle_data], ignore_index=True)
-                spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
                 print("")
 
         except Exception as ex:
@@ -3401,18 +3814,18 @@ def main():
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()]
 
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22', '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D4_2021-05-13_09-20-38', '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53',
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D4_2021-05-13_09-20-38', '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D23_2021-06-09_10-44-25',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D25_2021-06-11_10-55-17', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D27_2021-06-15_10-33-47', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D30_2021-06-18_10-46-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D33_2021-06-23_11-08-03',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D35_2021-06-25_12-02-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D37_2021-06-29_11-50-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D38_2021-06-30_11-54-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D41_2021-07-05_12-05-02',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D41_2021-07-05_12-05-02','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D5_2021-05-14_09-38-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D7_2021-05-18_09-51-25', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D11_2021-05-24_10-35-27',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D14_2021-05-27_09-55-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D4_2021-05-13_10-30-16', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D6_2021-05-17_10-26-15',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D25_2021-06-11_12-03-07',
@@ -3420,14 +3833,15 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D5_2021-05-14_10-53-55', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D19_2021-06-03_12-45-13', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D29_2021-06-17_12-30-32', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D29_2021-06-17_12-30-32',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02']
     #vr_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
+    #vr_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02"]
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     process_recordings(vr_path_list, of_path_list)
 
@@ -3443,26 +3857,29 @@ def main():
     #plot_mean_firing_rates_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/mean_firing_rate")
     #plot_trial_type_hmt_difference(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/trial_type_differences")
     #plot_trial_type_hmt_difference_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/trial_type_differences")
-    #plot_hit_miss_transitions(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/hit_miss_transitions")
     #plot_proportion_significant_to_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
     #plot_mean_firing_rates_vr_vs_of(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_max_freq_histogram(combined_df, combined_shuffle_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_overview_ordered(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_spatial_info_vs_pearson(combined_df, output_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    #plot_lomb_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    #plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     #for suffix in ["", "_all_beaconed", "_all_nonbeaconed", "_all_probe", "_all_hits", "_all_tries", "_all_misses"]:
         #combined_df = add_lomb_classifier(combined_df,suffix=suffix)
-    #plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     #plot_lomb_classifiers_by_trial_type(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_classifiers_by_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions_by_hit_success(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions_by_hit_success2(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_grid_scores_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_of_stability_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_of_stability_vs_grid_score_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+
     print("look now")
+
 
 if __name__ == '__main__':
     main()

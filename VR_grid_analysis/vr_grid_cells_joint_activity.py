@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import correlate
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 import PostSorting.parameters
 import PostSorting.vr_stop_analysis
 import PostSorting.vr_time_analysis
@@ -8,6 +9,7 @@ import PostSorting.vr_make_plots
 import PostSorting.vr_cued
 import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
+from matplotlib.markers import TICKDOWN
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
 from Edmond.VR_grid_analysis.vr_grid_stability_plots import add_hit_miss_try3, add_avg_track_speed, get_avg_correlation, \
     get_reconstructed_trial_signal, plot_firing_rate_maps_per_trial_by_hmt_aligned, plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron, get_shifts
@@ -44,6 +46,8 @@ def get_p_text(p, ns=True):
     if p is not None:
         if np.isnan(p):
             return " "
+        if p<0.00001:
+            return 'p < 1e'+('{:.1e}'.format(p)).split("e")[-1]
         if p<0.0001:
             return "****"
         elif p<0.001:
@@ -274,7 +278,7 @@ def plot_joint_cell_cross_correlations(spike_data, output_path):
     plt.close()
     return
 
-def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, track_length):
+def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, track_length, matched_recording_df):
 
     spike_data = add_lomb_classifier(spike_data)
     print('plotting joint cell correlations...')
@@ -375,8 +379,10 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                             ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="black", alpha=0.3, zorder=1)
                             non_grid_non_grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
 
-                ax.set_ylabel("Shuffled delta R", fontsize=20)
-                ax.set_xlabel("Real delta R", fontsize=20)
+                ax.set_ylabel("Change in R (Shuffle)", fontsize=20)
+                ax.set_xlabel("Change in R (Real)", fontsize=20)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
                 ax.set_ylim([-0.5, 0.5])
                 ax.set_xlim([-0.5, 0.5])
                 ax.tick_params(axis='both', which='major', labelsize=15)
@@ -384,9 +390,9 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                 plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_correlations_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
                 plt.close()
 
-                grid_pairs_vs_shuffle = np.array(grid_pairs_vs_shuffle); gg_p = stats.wilcoxon(grid_pairs_vs_shuffle)[0]; gg_p= get_p_text(gg_p, ns=False)
-                grid_non_grid_pairs_vs_shuffle = np.array(grid_non_grid_pairs_vs_shuffle); gng_p = stats.wilcoxon(grid_non_grid_pairs_vs_shuffle)[0]; gng_p= get_p_text(gng_p, ns=False)
-                non_grid_non_grid_pairs_vs_shuffle = np.array(non_grid_non_grid_pairs_vs_shuffle); ngng_p = stats.wilcoxon(non_grid_non_grid_pairs_vs_shuffle)[0]; ngng_p= get_p_text(ngng_p, ns=False)
+                grid_pairs_vs_shuffle = np.array(grid_pairs_vs_shuffle); gg_p = stats.wilcoxon(grid_pairs_vs_shuffle)[1]; gg_p= get_p_text(gg_p, ns=False)
+                grid_non_grid_pairs_vs_shuffle = np.array(grid_non_grid_pairs_vs_shuffle); gng_p = stats.wilcoxon(grid_non_grid_pairs_vs_shuffle)[1]; gng_p= get_p_text(gng_p, ns=False)
+                non_grid_non_grid_pairs_vs_shuffle = np.array(non_grid_non_grid_pairs_vs_shuffle); ngng_p = stats.wilcoxon(non_grid_non_grid_pairs_vs_shuffle)[1]; ngng_p= get_p_text(ngng_p, ns=False)
                 data = [grid_pairs_vs_shuffle, grid_non_grid_pairs_vs_shuffle, non_grid_non_grid_pairs_vs_shuffle];
 
                 fig, ax = plt.subplots(figsize=(6,6))
@@ -411,8 +417,17 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                 plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_correlations_violin_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
                 plt.close()
 
+                session_df = pd.DataFrame()
+                session_df["session_id"] = [spike_data.session_id.iloc[0]]
+                session_df["trial_type"] = [tt]
+                session_df["hit_miss_try"] = [hmt]
+                session_df["grid_pairs_vs_shuffle"] = [grid_pairs_vs_shuffle]
+                session_df["grid_non_grid_pairs_vs_shuffle"] = [grid_non_grid_pairs_vs_shuffle]
+                session_df["non_grid_non_grid_pairs_vs_shuffle"] = [non_grid_non_grid_pairs_vs_shuffle]
+                # save the session_df and append to the global matched recording df
+                matched_recording_df = pd.concat([matched_recording_df, session_df], ignore_index=True)
 
-    return
+    return matched_recording_df
 
 
 def plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length):
@@ -538,45 +553,6 @@ def get_cell_type_color(cell_type):
     else:
         return "dashed"
 
-def process_recordings(vr_recording_path_list, of_recording_path_list):
-
-    for recording in vr_recording_path_list:
-        print("processing ", recording)
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03"
-        #recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50"
-        paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
-        try:
-            output_path = recording+'/'+settings.sorterName
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
-
-            position_data = add_time_elapsed_collumn(position_data)
-            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
-
-            if paired_recording is not None:
-                of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-                #spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
-                #plot_firing_rate_maps_per_trial_by_hmt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
-
-                #plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
-                plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording))
-                #plot_joint_cell_cross_correlations(spike_data, output_path)
-
-            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-
-            print("successfully processed and saved vr_grid analysis on "+recording)
-        except Exception as ex:
-            print('This is what Python says happened:')
-            print(ex)
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            traceback.print_tb(exc_traceback)
-            print("couldn't process vr_grid analysis on "+recording)
 
 def add_percentage_for_lomb_classes(combined_df):
     # this function calculates the percentage of concurrently recorded cells
@@ -730,6 +706,257 @@ def plot_class_prection_credence(spatial_firing, save_path):
 
     return
 
+def significance_bar(ax, start,end,height,displaystring,linewidth = 1.2,markersize = 8,boxpad  =0.3,fontsize = 15,color = 'k'):
+    # draw a line with downticks at the ends
+    ax.plot([start,end],[height]*2,'-',color = color,lw=linewidth,marker = TICKDOWN,markeredgewidth=linewidth,markersize = markersize)
+    # draw the text with a bounding box covering up the line
+    ax.text(0.5*(start+end),height,displaystring,ha = 'center',va='center',bbox=dict(facecolor='1.', edgecolor='none',boxstyle='Square,pad='+str(boxpad)),size = fontsize)
+
+
+
+def plot_all_paired_vs_shuffle(df, output_path):
+    for hmt in ["hit", "miss", "try"]:
+        for tt in [0, 1]:
+            subset_df = df[((df["hit_miss_try"]==hmt) & (df["trial_type"]==tt))]
+            grid_pairs_vs_shuffle = np.array([])
+            grid_non_grid_pairs_vs_shuffle = np.array([])
+            non_grid_non_grid_pairs_vs_shuffle = np.array([])
+
+            for index, session_row in subset_df.iterrows():
+                session_row = session_row.to_frame().T.reset_index(drop=True)
+                grid_pairs_vs_shuffle = np.concatenate((grid_pairs_vs_shuffle, session_row.iloc[0]["grid_pairs_vs_shuffle"]))
+                grid_non_grid_pairs_vs_shuffle = np.concatenate((grid_non_grid_pairs_vs_shuffle, session_row.iloc[0]["grid_non_grid_pairs_vs_shuffle"]))
+                non_grid_non_grid_pairs_vs_shuffle = np.concatenate((non_grid_non_grid_pairs_vs_shuffle, session_row.iloc[0]["non_grid_non_grid_pairs_vs_shuffle"]))
+
+            grid_pairs_vs_shuffle = grid_pairs_vs_shuffle[~np.isnan(grid_pairs_vs_shuffle)]
+            grid_non_grid_pairs_vs_shuffle = grid_non_grid_pairs_vs_shuffle[~np.isnan(grid_non_grid_pairs_vs_shuffle)]
+            non_grid_non_grid_pairs_vs_shuffle = non_grid_non_grid_pairs_vs_shuffle[~np.isnan(non_grid_non_grid_pairs_vs_shuffle)]
+
+            data = [grid_pairs_vs_shuffle, grid_non_grid_pairs_vs_shuffle, non_grid_non_grid_pairs_vs_shuffle];
+            gg_p = stats.wilcoxon(grid_pairs_vs_shuffle)[1]; gg_p= get_p_text(gg_p, ns=False)
+            gng_p = stats.wilcoxon(grid_non_grid_pairs_vs_shuffle)[1]; gng_p= get_p_text(gng_p, ns=False)
+            ngng_p = stats.wilcoxon(non_grid_non_grid_pairs_vs_shuffle)[1]; ngng_p= get_p_text(ngng_p, ns=False)
+
+            gg_ngng_p = stats.mannwhitneyu(grid_pairs_vs_shuffle, non_grid_non_grid_pairs_vs_shuffle)[1]
+            gg_gng_p = stats.mannwhitneyu(grid_pairs_vs_shuffle, grid_non_grid_pairs_vs_shuffle)[1]
+            gng_ngng_p = stats.mannwhitneyu(grid_non_grid_pairs_vs_shuffle, non_grid_non_grid_pairs_vs_shuffle)[1]
+
+            fig, ax = plt.subplots(figsize=(6,6))
+            vp = ax.violinplot(data, [2, 4, 6], widths=2,
+                               showmeans=False, showmedians=True, showextrema=False)
+            ax.axhline(y=0, linestyle="dashed", color="black")
+            significance_bar(ax, start=2, end=4, height=0.5, displaystring=get_p_text(gg_gng_p))
+            significance_bar(ax, start=4, end=6, height=0.55, displaystring=get_p_text(gng_ngng_p))
+            significance_bar(ax, start=2, end=6, height=0.6, displaystring=get_p_text(gg_ngng_p))
+            ax.set_xticks([2,4,6])
+            ax.set_yticks([-0.4, -0.2, 0, 0.2, 0.4, 0.6])
+            ax.set_ylim([-0.4, 0.6])
+            ax.set_xticklabels(["G-G", "G-NG", "NG-NG"])
+            ax.set_ylabel("Change in spatial\ncorrelation vs shuffle", fontsize=20, labelpad=10)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.xaxis.set_tick_params(length=0)
+            ax.tick_params(axis='both', which='major', labelsize=25)
+            fig.tight_layout()
+            plt.savefig(output_path + '/joint_alignment_correlations_violin_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
+            plt.close()
+
+
+def plot_paired_vs_shuffle_by_tt(df, output_path):
+    df = df[df["hit_miss_try"]=="hit"]
+    b_df = df[df["trial_type"]==0]
+    nb_df = df[df["trial_type"]==1]
+    for collumn in ["grid_pairs_vs_shuffle", "grid_non_grid_pairs_vs_shuffle", "non_grid_non_grid_pairs_vs_shuffle"]:
+        b_pairs_vs_shuffle = np.array([])
+        nb_pairs_vs_shuffle = np.array([])
+
+        for index, session_row in b_df.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            b_pairs_vs_shuffle = np.concatenate((b_pairs_vs_shuffle, session_row.iloc[0][collumn]))
+        for index, session_row in nb_df.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            nb_pairs_vs_shuffle = np.concatenate((nb_pairs_vs_shuffle, session_row.iloc[0][collumn]))
+
+        b_pairs_vs_shuffle = b_pairs_vs_shuffle[~np.isnan(b_pairs_vs_shuffle)]
+        nb_pairs_vs_shuffle = nb_pairs_vs_shuffle[~np.isnan(nb_pairs_vs_shuffle)]
+
+        data = [b_pairs_vs_shuffle, nb_pairs_vs_shuffle];
+        b_p = stats.wilcoxon(b_pairs_vs_shuffle)[1]; b_p= get_p_text(b_p, ns=False)
+        nb_p = stats.wilcoxon(nb_pairs_vs_shuffle)[1]; nb_p= get_p_text(nb_p, ns=False)
+
+        bnb_p = stats.mannwhitneyu(b_pairs_vs_shuffle, nb_pairs_vs_shuffle)[1]
+
+        fig, ax = plt.subplots(figsize=(6,6))
+        vp = ax.violinplot(data, [2, 4], widths=2,
+                           showmeans=False, showmedians=True, showextrema=False)
+        ax.axhline(y=0, linestyle="dashed", color="black")
+        significance_bar(ax, start=2, end=4, height=0.6, displaystring=get_p_text(bnb_p))
+        ax.set_xticks([2,4])
+        ax.set_yticks([-0.4, -0.2, 0, 0.2, 0.4, 0.6])
+        ax.set_ylim([-0.4, 0.6])
+        ax.set_xticklabels(["Cued", "PI"])
+        ax.set_ylabel("Change in spatial\ncorrelation vs shuffle", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+        fig.tight_layout()
+        plt.savefig(output_path + '/joint_alignment_correlations_violin_shuffle_vs_real_'+collumn+'_by_tt.png', dpi=300)
+        plt.close()
+
+def plot_paired_vs_shuffle_by_hmt(df, output_path):
+    df = df[df["trial_type"]==1]
+    hit_df = df[df["hit_miss_try"]=="hit"]
+    try_df = df[df["hit_miss_try"]=="try"]
+    miss_df = df[df["hit_miss_try"]=="miss"]
+    for collumn in ["grid_pairs_vs_shuffle", "grid_non_grid_pairs_vs_shuffle", "non_grid_non_grid_pairs_vs_shuffle"]:
+        hit_pairs_vs_shuffle = np.array([])
+        try_pairs_vs_shuffle = np.array([])
+        miss_pairs_vs_shuffle = np.array([])
+
+        for index, session_row in hit_df.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            hit_pairs_vs_shuffle = np.concatenate((hit_pairs_vs_shuffle, session_row.iloc[0][collumn]))
+        for index, session_row in try_df.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            try_pairs_vs_shuffle = np.concatenate((try_pairs_vs_shuffle, session_row.iloc[0][collumn]))
+        for index, session_row in miss_df.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            miss_pairs_vs_shuffle = np.concatenate((miss_pairs_vs_shuffle, session_row.iloc[0][collumn]))
+
+        hit_pairs_vs_shuffle = hit_pairs_vs_shuffle[~np.isnan(hit_pairs_vs_shuffle)]
+        try_pairs_vs_shuffle = try_pairs_vs_shuffle[~np.isnan(try_pairs_vs_shuffle)]
+        miss_pairs_vs_shuffle = miss_pairs_vs_shuffle[~np.isnan(miss_pairs_vs_shuffle)]
+
+        data = [hit_pairs_vs_shuffle, try_pairs_vs_shuffle, miss_pairs_vs_shuffle];
+        h_p = stats.wilcoxon(hit_pairs_vs_shuffle)[1]; h_p= get_p_text(h_p, ns=False)
+        t_p = stats.wilcoxon(try_pairs_vs_shuffle)[1]; t_p= get_p_text(t_p, ns=False)
+        m_p = stats.wilcoxon(miss_pairs_vs_shuffle)[1]; m_p= get_p_text(m_p, ns=False)
+
+        hm_p = stats.mannwhitneyu(hit_pairs_vs_shuffle, miss_pairs_vs_shuffle)[1]
+        ht_p = stats.mannwhitneyu(hit_pairs_vs_shuffle, try_pairs_vs_shuffle)[1]
+        mt_p = stats.mannwhitneyu(miss_pairs_vs_shuffle, try_pairs_vs_shuffle)[1]
+
+        fig, ax = plt.subplots(figsize=(6,6))
+        vp = ax.violinplot(data, [2, 4, 6], widths=2,
+                           showmeans=False, showmedians=True, showextrema=False)
+        ax.axhline(y=0, linestyle="dashed", color="black")
+        significance_bar(ax, start=2, end=4, height=0.5, displaystring=get_p_text(ht_p))
+        significance_bar(ax, start=4, end=6, height=0.55, displaystring=get_p_text(mt_p))
+        significance_bar(ax, start=2, end=6, height=0.6, displaystring=get_p_text(hm_p))
+        ax.set_xticks([2,4,6])
+        ax.set_yticks([-0.4, -0.2, 0, 0.2, 0.4, 0.6])
+        ax.set_ylim([-0.4, 0.6])
+        ax.set_xticklabels(["Hit", "Try", "Miss"])
+        ax.set_ylabel("Change in spatial\ncorrelation vs shuffle", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+        fig.tight_layout()
+        plt.savefig(output_path + '/joint_alignment_correlations_violin_shuffle_vs_real_'+collumn+'_by_hmt.png', dpi=300)
+        plt.close()
+
+
+def get_n_simultaneously_recorded_cells(grid_cells, group1, group2):
+    #how many group2 cells have been simulatenously recorded with group1 cells
+    n =0
+    session_ids = np.unique(grid_cells["session_id"])
+    for i in range(len(session_ids)):
+        session_id = session_ids[i]
+        single_session = grid_cells[grid_cells["session_id"]==session_id]
+        n_group1 = len(single_session[single_session["Lomb_classifier_"] == group1])
+        n_group2 = len(single_session[single_session["Lomb_classifier_"] == group2])
+
+        if group1==group2:
+            if n_group1>1:
+               n+=n_group1
+        else:
+            if n_group1>0:
+                n+=n_group2
+    return n
+
+def plot_n_cells_simulatenously_recorded(concantenated_dataframe,  save_path, normalised=False):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix="")
+
+    P_proportion = len(grid_cells[grid_cells["Lomb_classifier_"] == "Position"])/len(grid_cells)
+    D_proportion = len(grid_cells[grid_cells["Lomb_classifier_"] == "Distance"])/len(grid_cells)
+    N_proportion = len(grid_cells[grid_cells["Lomb_classifier_"] == "Null"])/len(grid_cells)
+    if not normalised:
+        P_proportion = 1
+        D_proportion = 1
+        N_proportion = 1
+
+    objects = ["Position", "Distance", "Null"]
+    x_pos = np.arange(len(objects))
+    fig, axes = plt.subplots(3, 1, figsize=(6,6), sharex=True)
+    for ax, group, color in zip(axes, objects, ["turquoise", "orange", "gray"]):
+        n_p = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Position")/P_proportion
+        n_d = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Distance")/D_proportion
+        n_n = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Null")/N_proportion
+
+        ax.bar(x_pos[0], n_p, color=Settings.allocentric_color, edgecolor="black")
+        ax.bar(x_pos[1], n_d, color=Settings.egocentric_color, edgecolor="black")
+        ax.bar(x_pos[2], n_n, color=Settings.null_color, edgecolor="black")
+
+        Edmond.plot_utility2.style_vr_plot(ax)
+        ax.tick_params(axis='both', which='both', labelsize=20)
+        ax.set_ylabel(group, fontsize=25)
+        ax.set_yticks([0, int(np.round(ax.get_ylim()[1]))])
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(["P", "D", "N"])
+    fig.tight_layout(pad=2.0)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    if normalised:
+        plt.savefig(save_path + '/simulatenous_recorded_cell_number_normalised.png', dpi=300)
+    else:
+        plt.savefig(save_path + '/simulatenous_recorded_cell_numbers.png', dpi=300)
+    plt.close()
+
+    return
+
+def process_recordings(vr_recording_path_list, of_recording_path_list):
+
+    matched_recording_df = pd.DataFrame()
+    for recording in vr_recording_path_list:
+        print("processing ", recording)
+        paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
+        try:
+            output_path = recording+'/'+settings.sorterName
+            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+
+            position_data = add_time_elapsed_collumn(position_data)
+            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+
+            if paired_recording is not None:
+                of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                #spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
+                plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                matched_recording_df = plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording), matched_recording_df)
+                matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
+                #plot_joint_cell_cross_correlations(spike_data, output_path)
+
+
+            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+
+            print("successfully processed and saved vr_grid analysis on "+recording)
+        except Exception as ex:
+            print('This is what Python says happened:')
+            print(ex)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_tb(exc_traceback)
+            print("couldn't process vr_grid analysis on "+recording)
+
 
 def main():
     print('-------------------------------------------------------------')
@@ -761,15 +988,22 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24']
     vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
-    process_recordings(vr_path_list, of_path_list)
+    #process_recordings(vr_path_list, of_path_list)
 
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df = add_lomb_classifier(combined_df,suffix="")
     combined_df = add_percentage_for_lomb_classes(combined_df)
 
+    # load df for plot_all_paired_vs_shuffle
+    #plot_all_paired_vs_shuffle(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    #plot_paired_vs_shuffle_by_hmt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    #plot_paired_vs_shuffle_by_tt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+
     #grid_cells = combined_df[combined_df["classifier"] == "G"]
     #grid_cells_from_same_recording = get_grid_cells_from_same_recording(grid_cells)
     #plot_class_prection_credence(grid_cells_from_same_recording, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity", normalised=True)
     print("look now")
 
 if __name__ == '__main__':

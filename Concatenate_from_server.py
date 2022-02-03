@@ -133,6 +133,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("avg_correlations_hmt_by_trial_type")
                     if "field_realignments_hmt_by_trial_type" in list(spatial_firing):
                         collumn_names_to_keep.append("field_realignments_hmt_by_trial_type")
+                    if "percentage_hits" in list(spatial_firing):
+                        collumn_names_to_keep.append("percentage_hits")
 
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]

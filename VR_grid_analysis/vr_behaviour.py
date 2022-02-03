@@ -512,6 +512,8 @@ def plot_hit_avg_speeds_by_block(processed_position_data, save_path):
     ax.set_xlim(left=0, right=80)
     ax.set_xticks([0, 20, 40, 60, 80])
     ax.axvline(x=20, linestyle="dashed", color="black")
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     fig.tight_layout()
     plt.subplots_adjust(left=0.2, bottom=0.2, top=0.9, right=0.9)
     ax.set_ylabel("Number of Hit Trials", fontsize=25)
@@ -552,6 +554,8 @@ def plot_hit_avg_speeds_by_block(processed_position_data, save_path):
     ax.set_ylabel("Speed (cm/s)", fontsize=25)
     ax.set_xlabel("Track Position", fontsize=25)
     ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     style_track_plot(ax, 200)
     tick_spacing = 100
     ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
@@ -577,6 +581,8 @@ def plot_hit_avg_speeds_by_block(processed_position_data, save_path):
     ax.set_ylim(bottom=0)
     ax.set_xlim(left=0, right=80)
     ax.set_xticks([0, 20, 40, 60, 80])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     fig.tight_layout()
     ax.axvline(x=20, linestyle="dashed", color="black")
     plt.subplots_adjust(left=0.2, bottom=0.2, top=0.9, right=0.9)
@@ -592,81 +598,6 @@ def add_RZ_bias(processed_position_data):
     processed_position_data["RZ_stop_bias"] =RZ_stop_bias
     return processed_position_data
 
-def plot_trial_discriminant(processed_position_data, save_path):
-    hits = processed_position_data[(processed_position_data["rewarded"] == 1) & (processed_position_data["avg_speed_on_track"] > 20)]
-    ejected_hits = processed_position_data[(processed_position_data["rewarded"] == 1) & (processed_position_data["avg_speed_on_track"] < 20)]
-    misses = processed_position_data[(processed_position_data["rewarded"] == 0) & (processed_position_data["avg_speed_on_track"] > 20)]
-
-    misses_plus = misses[misses["RZ_stop_bias"]<1]
-    misses_minus = misses[misses["RZ_stop_bias"]>1]
-
-    hits_discrim = pandas_collumn_to_numpy_array(hits["RZ_stop_bias"])
-    ejected_hits_discrim = pandas_collumn_to_numpy_array(ejected_hits["RZ_stop_bias"])
-    misses_discrim = pandas_collumn_to_numpy_array(misses["RZ_stop_bias"])
-    misses_plus_discrim = pandas_collumn_to_numpy_array(misses_plus["RZ_stop_bias"])
-    misses_minus_discrim = pandas_collumn_to_numpy_array(misses_minus["RZ_stop_bias"])
-
-    hits_discrim = hits_discrim[~np.isnan(hits_discrim)]
-    #ejected_hits_discrim = ejected_hits_discrim[~np.isnan(ejected_hits_discrim)]
-    misses_discrim = misses_discrim[~np.isnan(misses_discrim)]
-    misses_plus_discrim = misses_plus_discrim[~np.isnan(misses_plus_discrim)]
-    misses_minus_discrim = misses_minus_discrim[~np.isnan(misses_minus_discrim)]
-
-    data = [hits_discrim, misses_discrim]
-    fig, ax = plt.subplots(figsize=(3,6))
-    parts = ax.violinplot(data, positions=[1,2], showmeans=False, showmedians=False,showextrema=False)
-    hm_colors=["green", "red"]
-    for pc, hm_color in zip(parts['bodies'], hm_colors):
-        pc.set_facecolor(hm_color)
-        pc.set_edgecolor('black')
-        pc.set_alpha(1)
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.set_ylim(bottom=0, top=2)
-    ax.set_xlim(left=0.5, right=2.5)
-    quartile1, medians, quartile3 = np.percentile(data[0], [25, 50, 75], axis=0)
-    ax.vlines(1, medians-0.01, medians+0.01, color='k', linestyle='-', lw=35)
-    quartile1, medians, quartile3 = np.percentile(data[1], [25, 50, 75], axis=0)
-    ax.vlines(2, medians-0.01, medians+0.01, color='k', linestyle='-', lw=35)
-    ax.axhline(y=1, linestyle="dashed", color="black", linewidth=2)
-    ax.set_xticks([1,2])
-    ax.set_yticks([0,1,2])
-    ax.set_xticklabels(["Hit", "Miss"])
-    fig.tight_layout()
-    plt.subplots_adjust(left=0.25, bottom=0.2)
-    ax.set_xlabel("Trial Blocks", fontsize=25)
-    ax.set_ylabel("Task Index", fontsize=25)
-    plt.savefig(save_path + '/dicrimination_index_hit_and_miss.png', dpi=300)
-    plt.close()
-
-    data = [misses_plus_discrim, misses_minus_discrim]
-    fig, ax = plt.subplots(figsize=(3,6))
-    parts = ax.violinplot(data, positions=[1,2], showmeans=False, showmedians=False,showextrema=False)
-    hm_colors=["orange", "red"]
-    for pc, hm_color in zip(parts['bodies'], hm_colors):
-        pc.set_facecolor(hm_color)
-        pc.set_edgecolor('black')
-        pc.set_alpha(1)
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.set_ylim(bottom=0, top=2)
-    ax.set_xlim(left=0.5, right=2.5)
-    ax.set_yticks([])
-    quartile1, medians, quartile3 = np.percentile(data[0], [25, 50, 75], axis=0)
-    ax.vlines(1, medians-0.01, medians+0.01, color='k', linestyle='-', lw=35)
-    quartile1, medians, quartile3 = np.percentile(data[1], [25, 50, 75], axis=0)
-    ax.vlines(2, medians-0.01, medians+0.01, color='k', linestyle='-', lw=35)
-    ax.axhline(y=1, linestyle="dashed", color="black", linewidth=2)
-    ax.set_xticks([1,2])
-    ax.set_xticklabels(["Miss+", "Miss-"])
-    fig.tight_layout()
-    plt.subplots_adjust(left=0.25, bottom=0.2)
-    ax.set_xlabel("Trial Blocks", fontsize=25)
-    plt.savefig(save_path + '/dicrimination_index_miss_and_miss.png', dpi=300)
-    plt.close()
 
 def compute_p_map(save_path):
     x = np.linspace(0.0001, 120, 1000)
@@ -712,33 +643,42 @@ def get_hmt_color(hmt):
     else:
         return "SOMETING IS WRONGG"
 
-
-def plot_average_hmt_speed_trajectories(processed_position_data, hmt, save_path):
+def plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(processed_position_data, hmt, save_path):
     hmt_processed = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
 
-    trajectories = pandas_collumn_to_2d_numpy_array(hmt_processed["speeds_binned_in_space"])
-    trajectories_avg = np.nanmean(trajectories, axis=0)[30:170]
-    trajectories_sem = np.nanstd(trajectories, axis=0)[30:170]
-    #trajectories_sem = stats.sem(trajectories, axis=0, nan_policy="omit")[30:170]
-    locations = np.asarray(processed_position_data['position_bin_centres'].iloc[0])[30:170]
+    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
+        t_processed = hmt_processed[hmt_processed["trial_type"] == tt]
 
-    fig, ax = plt.subplots(figsize=(6,6))
-    ax.fill_between(locations, trajectories_avg-trajectories_sem, trajectories_avg+trajectories_sem, color=get_hmt_color(hmt), alpha=0.3)
-    ax.plot(locations, trajectories_avg, color="black")
-    ax.set_ylabel("Speed (cm/s)", fontsize=25)
-    ax.set_xlabel("Track Position", fontsize=25)
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    style_track_plot(ax, 200)
-    tick_spacing = 100
-    ax.set_yticks([0,40, 80])
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-    Edmond.plot_utility2.style_vr_plot(ax, x_max=80)
-    fig.tight_layout()
-    plt.subplots_adjust(right=0.9)
-    ax.set_ylim(bottom=0)
-    ax.set_xlim(left=0, right=200)
-    plt.savefig(save_path + '/average_speed_trajectory_'+hmt+'.png', dpi=300)
-    plt.close()
+        speed_histogram = plt.figure(figsize=(6,6))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+            trajectories = pandas_collumn_to_2d_numpy_array(mouse_processed["speeds_binned_in_space"])
+            trajectories_avg = np.nanmean(trajectories, axis=0)[30:170]
+            trajectories_sem = np.nanstd(trajectories, axis=0)[30:170]
+            locations = np.asarray(processed_position_data['position_bin_centres'].iloc[0])[30:170]
+            #ax.fill_between(locations, trajectories_avg-trajectories_sem, trajectories_avg+trajectories_sem, color=get_hmt_color(hmt), alpha=0.3)
+            ax.plot(locations, trajectories_avg, label=mouse_id)
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        ax.legend(title='Mouse')
+        plt.ylabel('Speed (cm/s)', fontsize=25, labelpad = 10)
+        plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+        if tt == 0:
+            style_track_plot(ax, 200)
+        else:
+            style_track_plot_no_RZ(ax, 200)
+        tick_spacing = 100
+        ax.set_yticks([0, 50, 100])
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=115)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=0, right=200)
+        plt.savefig(save_path + '/average_speed_trajectory_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
+        plt.close()
 
 def plot_average_hmt_speed_trajectories_by_trial_type(processed_position_data, hmt, save_path):
     hmt_processed = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
@@ -864,17 +804,15 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            session_id = recording.split("/")[-1]
+            mouse_id = session_id.split("_")[0]
+            session_number = int(session_id.split("_")[1].split("D")[-1])
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data, _ = add_hit_miss_try(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_avg_trial_speed(processed_position_data)
-            processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=get_track_length(recording))
             processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            PI_hits_processed_position_data = extract_PI_trials(processed_position_data, hmt="hit")
-            PI_misses_processed_position_data = extract_PI_trials(processed_position_data, hmt="miss")
-            PI_tries_position_data = extract_PI_trials(processed_position_data, hmt="try")
-            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
-
-            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data["session_number"] = session_number
+            processed_position_data["mouse_id"] = mouse_id
 
             if (get_track_length(recording)) == 200:
                 all_behaviour = pd.concat([all_behaviour, processed_position_data], ignore_index=True)
@@ -891,17 +829,6 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 def main():
     print('-------------------------------------------------------------')
 
-    for session_id in ['M11_D5_2021-05-14_09-38-08', 'M11_D33_2021-06-23_11-08-03', 'M11_D33_2021-06-23_11-08-03', 'M11_D37_2021-06-29_11-50-02', 'M11_D33_2021-06-23_11-08-03', 'M11_D30_2021-06-18_10-46-48', 'M11_D33_2021-06-23_11-08-03', 'M14_D33_2021-06-23_12-22-49', 'M11_D29_2021-06-17_10-35-48', 'M11_D29_2021-06-17_10-35-48', 'M11_D37_2021-06-29_11-50-02', 'M11_D7_2021-05-18_09-51-25', 'M11_D18_2021-06-02_10-36-39', 'M11_D38_2021-06-30_11-54-56', 'M11_D38_2021-06-30_11-54-56', 'M10_D5_2021-05-14_08-59-54', 'M11_D38_2021-06-30_11-54-56', 'M11_D38_2021-06-30_11-54-56', 'M11_D29_2021-06-17_10-35-48', 'M11_D33_2021-06-23_11-08-03', 'M11_D37_2021-06-29_11-50-02', 'M11_D37_2021-06-29_11-50-02', 'M14_D29_2021-06-17_12-30-32', 'M11_D18_2021-06-02_10-36-39', 'M11_D33_2021-06-23_11-08-03', 'M11_D18_2021-06-02_10-36-39', 'M14_D27_2021-06-15_12-21-58', 'M11_D30_2021-06-18_10-46-48', 'M11_D11_2021-05-24_10-00-53', 'M11_D19_2021-06-03_10-50-41', 'M14_D37_2021-06-29_12-33-24', 'M11_D35_2021-06-25_12-02-52', 'M11_D35_2021-06-25_12-02-52', 'M14_D27_2021-06-15_12-21-58', 'M11_D44_2021-07-08_12-03-21', 'M11_D35_2021-06-25_12-02-52', 'M11_D35_2021-06-25_12-02-52', 'M14_D20_2021-06-04_12-20-57', 'M11_D35_2021-06-25_12-02-52', 'M11_D44_2021-07-08_12-03-21', 'M14_D16_2021-05-31_12-01-35', 'M14_D12_2021-05-25_11-03-39', 'M11_D36_2021-06-28_12-04-36', 'M14_D17_2021-06-01_12-47-02', 'M11_D11_2021-05-24_10-00-53', 'M14_D37_2021-06-29_12-33-24', 'M11_D44_2021-07-08_12-03-21', 'M14_D31_2021-06-21_12-07-01', 'M11_D22_2021-06-08_10-55-28', 'M11_D20_2021-06-04_10-38-58', 'M11_D23_2021-06-09_10-44-25', 'M14_D25_2021-06-11_12-36-04', 'M14_D15_2021-05-28_12-29-15', 'M11_D36_2021-06-28_12-04-36', 'M14_D20_2021-06-04_12-20-57', 'M11_D45_2021-07-09_11-39-02', 'M14_D11_2021-05-24_11-44-50', 'M12_D6_2021-05-17_10-26-15', 'M11_D36_2021-06-28_12-04-36', 'M14_D12_2021-05-25_11-03-39', 'M11_D35_2021-06-25_12-02-52', 'M14_D28_2021-06-16_12-26-51', 'M12_D14_2021-05-27_09-55-54', 'M14_D16_2021-05-31_12-01-35', 'M11_D39_2021-07-01_11-47-10', 'M11_D32_2021-06-22_11-08-56', 'M14_D14_2021-05-27_11-46-30', 'M11_D36_2021-06-28_12-04-36', 'M11_D34_2021-06-24_11-52-48', 'M11_D43_2021-07-07_11-51-08', 'M14_D31_2021-06-21_12-07-01', 'M14_D35_2021-06-25_12-41-16', 'M14_D31_2021-06-21_12-07-01', 'M11_D28_2021-06-16_10-34-52', 'M11_D11_2021-05-24_10-00-53', 'M14_D19_2021-06-03_12-45-13', 'M11_D27_2021-06-15_10-33-47', 'M14_D15_2021-05-28_12-29-15', 'M11_D35_2021-06-25_12-02-52', 'M11_D26_2021-06-14_10-34-14', 'M11_D26_2021-06-14_10-34-14', 'M11_D22_2021-06-08_10-55-28', 'M14_D42_2021-07-06_12-38-31', 'M11_D24_2021-06-10_10-45-20', 'M11_D40_2021-07-02_12-58-24', 'M14_D26_2021-06-14_12-22-50', 'M11_D41_2021-07-05_12-05-02', 'M11_D25_2021-06-11_10-55-17', 'M11_D45_2021-07-09_11-39-02', 'M12_D4_2021-05-13_10-30-16', 'M12_D11_2021-05-24_10-35-27', 'M14_D35_2021-06-25_12-41-16', 'M14_D34_2021-06-24_12-48-57', 'M12_D6_2021-05-17_10-26-15', 'M11_D36_2021-06-28_12-04-36', 'M14_D39_2021-07-01_12-28-46', 'M11_D41_2021-07-05_12-05-02', 'M11_D41_2021-07-05_12-05-02', 'M11_D41_2021-07-05_12-05-02', 'M11_D41_2021-07-05_12-05-02']:
-        s = session_id
-        df = pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/vr/"+session_id+"/MountainSort/DataFrames/processed_position_data.pkl")
-        df = add_avg_track_speed(processed_position_data=df, track_length=get_track_length("/mnt/datastore/Harry/cohort8_may2021/vr/"+session_id))
-        df, _ = add_hit_miss_try3(processed_position_data=df, track_length=get_track_length("/mnt/datastore/Harry/cohort8_may2021/vr/"+session_id))
-        e = len(df)
-        d = len(df[df["hit_miss_try"] == "rejected"])
-        a = len(df[df["hit_miss_try"] == "hit"])
-        b = len(df[df["hit_miss_try"] == "miss"])
-        c = len(df[df["hit_miss_try"] == "try"])
-
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
@@ -914,13 +841,10 @@ def main():
     #all_behaviour200cm_tracks.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_cohort8_200cm.pkl")
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_cohort8_200cm.pkl")
     #all_behaviour200cm_tracks = add_RZ_bias(all_behaviour200cm_tracks)
-    #plot_trial_discriminant(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    #plot_trial_discriminant_schematic(save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    #plot_trial_discriminant_histogram(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    #plot_hit_avg_speeds_by_block(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_hit_avg_speeds_by_block(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #all_behaviour200cm_tracks = add_hit_miss_try2(all_behaviour200cm_tracks, track_length=200)
 
     #plot_average_hmt_speed_trajectories(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
@@ -929,6 +853,9 @@ def main():
     plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
 
     #compute_p_map(save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
 
