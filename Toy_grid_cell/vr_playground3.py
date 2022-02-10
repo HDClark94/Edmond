@@ -3,6 +3,8 @@ import numpy as np
 from astropy.timeseries import LombScargle
 from scipy.interpolate import interp1d
 from astropy.convolution import convolve, Gaussian1DKernel
+from scipy import stats
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 from Edmond.VR_grid_analysis.vr_grid_cells import get_max_int_SNR, get_max_SNR, reduce_digits, get_first_peak
 plt.rc('axes', linewidth=2)
 
@@ -216,9 +218,9 @@ def plot_linear_grid_cell_lomb_anchored(n_trials, save_path, bin_size_cm=1, samp
             set_fr = convolve(set_fr, gauss_kernel)
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
@@ -245,15 +247,6 @@ def plot_linear_grid_cell_lomb_anchored(n_trials, save_path, bin_size_cm=1, samp
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-            fig2, ax = plt.subplots(figsize=(8,8))
-            ax.plot(frequency, avg_power, color="black", linewidth=8)
-            ax.set_xlim(0,max(frequency))
-            ax.set_ylim(0,1)
-            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
-            plot_path = save_path + '/______toy_grid_assay_anchored_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
-            plt.close(fig2)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -287,9 +280,9 @@ def plot_linear_grid_cell_lomb_null(n_trials, save_path, bin_size_cm=1, sampling
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
 
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
@@ -316,17 +309,6 @@ def plot_linear_grid_cell_lomb_null(n_trials, save_path, bin_size_cm=1, sampling
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-
-            fig2, ax = plt.subplots(figsize=(8,8))
-            ax.plot(frequency, avg_power, color="black", linewidth=8)
-            ax.set_xlim(0,max(frequency))
-            ax.set_ylim(0,1)
-            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
-            plot_path = save_path + '/______toy_grid_assay_null_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
-            plt.close(fig2)
-
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -363,9 +345,9 @@ def plot_linear_grid_cell_lomb(n_trials, save_path, bin_size_cm=1, sampling_rate
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
 
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
@@ -392,15 +374,6 @@ def plot_linear_grid_cell_lomb(n_trials, save_path, bin_size_cm=1, sampling_rate
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-            fig2, ax = plt.subplots(figsize=(8,8))
-            ax.plot(frequency, avg_power, color="black", linewidth=8)
-            ax.set_xlim(0,max(frequency))
-            ax.set_ylim(0,1)
-            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
-            plot_path = save_path + '/______toy_grid_assay_non_anchored_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
-            plt.close(fig2)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -435,13 +408,12 @@ def find_set(a,b):
 def plot_linear_grid_cells_spatial_autocorreologram(n_trials, save_path, bin_size_cm=1, sampling_rate=100, avg_speed_cmps=10, p_scalar=1):
 
     track_lengths = [10, 20, 30, 40, 50, 60, 70, 80, 90]
-    track_lengths = [100,110]
+    #track_lengths = [100,110]
     grid_spacing = 30
     offsets = [10, 20, 30, 40, 50, 60]
 
     fig, axes = plt.subplots(len(offsets), len(track_lengths), figsize=(8, 6))
 
-    first_peaks = np.zeros((len(offsets), len(track_lengths)))
     for n, track_length in enumerate(track_lengths):
         for m, offset in enumerate(offsets):
             distance_covered = n_trials*track_length
@@ -466,32 +438,39 @@ def plot_linear_grid_cells_spatial_autocorreologram(n_trials, save_path, bin_siz
             x_position_cluster = x_position_cluster[~np.isnan(x_position_cluster)]
             x_position_cluster_bins = np.floor(x_position_cluster).astype(int)
 
-            autocorr_window_size = int(2*track_length)
-            lags = np.arange(0, autocorr_window_size, 1).astype(int) # were looking at 10 timesteps back and 10 forward
+            numerator, bin_edges = np.histogram(x_position_cluster, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+            fr = numerator
+            elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+            trial_numbers_by_bin=((0.5*(bin_edges[1:]+bin_edges[:-1])//track_length)+1).astype(np.int32)
+            gauss_kernel = Gaussian1DKernel(stddev=1)
 
-            autocorrelogram = np.array([])
-            for lag in lags:
-                correlated = len(find_set(x_position_cluster_bins+lag, x_position_cluster_bins))
-                autocorrelogram = np.append(autocorrelogram, correlated)
+            # remove nan values that coincide with start and end of the track before convolution
+            fr = convolve(fr, gauss_kernel)
+            fr = moving_sum(fr, window=2)/2
+            fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+            normalised_elapsed_distance = elapsed_distance/track_length
 
-            #first_peaks[m, n] = get_first_peak(lags[1:], autocorrelogram[1:])
-            axes[m, n].bar(lags[1:], autocorrelogram[1:], color="blue", edgecolor="blue", align="edge")
+            autocorr_window_size = track_length*2
+            lags = np.arange(0, autocorr_window_size, 1) # were looking at 10 timesteps back and 10 forward
+            autocorrelogram = []
+            for i in range(len(lags)):
+                fr_lagged = fr[i:]
+                corr = stats.pearsonr(fr_lagged, fr[:len(fr_lagged)])[0]
+                autocorrelogram.append(corr)
+            autocorrelogram= np.array(autocorrelogram)
+
+            for f in range(1,6):
+                axes[m, n].axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+            axes[m, n].axhline(y=0, color="black", linewidth=2,linestyle="dashed")
+            axes[m, n].plot(lags, autocorrelogram, color="blue")
             axes[m, n].set_xlim(1,autocorr_window_size)
-            axes[m, n].set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
-
+            axes[m, n].set_ylim([-1,1])
             if m == 0:
                 x_title = "L="+str(track_length)
                 axes[m, n].set_title(x_title, fontsize=10)
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-            fig, ax = plt.subplots(figsize=(8,8))
-            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
-            ax.set_xlim(1, autocorr_window_size)
-            ax.set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
-            plot_path = save_path + '/______toy_grid_assay_non_anchored_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -517,9 +496,7 @@ def plot_linear_grid_cells_spatial_autocorreologram_null(n_trials, save_path, bi
 
             firing_p = np.ones(len(locations))*0.5
             firing_p = firing_p*p_scalar
-
             spikes_at_locations = np.zeros(len(locations))
-
             for i in range(len(locations)):
                 spikes_at_locations[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
 
@@ -531,32 +508,37 @@ def plot_linear_grid_cells_spatial_autocorreologram_null(n_trials, save_path, bi
             x_position_cluster = x_position_cluster[~np.isnan(x_position_cluster)]
             x_position_cluster_bins = np.floor(x_position_cluster).astype(int)
 
-            autocorr_window_size = int(2*track_length)
-            lags = np.arange(0, autocorr_window_size, 1).astype(int) # were looking at 10 timesteps back and 10 forward
+            numerator, bin_edges = np.histogram(x_position_cluster, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+            fr = numerator
+            elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+            trial_numbers_by_bin=((0.5*(bin_edges[1:]+bin_edges[:-1])//track_length)+1).astype(np.int32)
+            gauss_kernel = Gaussian1DKernel(stddev=1)
+            # remove nan values that coincide with start and end of the track before convolution
+            fr = convolve(fr, gauss_kernel)
+            fr = moving_sum(fr, window=2)/2
+            fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+            normalised_elapsed_distance = elapsed_distance/track_length
+            autocorr_window_size = track_length*2
+            lags = np.arange(0, autocorr_window_size, 1) # were looking at 10 timesteps back and 10 forward
+            autocorrelogram = []
+            for i in range(len(lags)):
+                fr_lagged = fr[i:]
+                corr = stats.pearsonr(fr_lagged, fr[:len(fr_lagged)])[0]
+                autocorrelogram.append(corr)
+            autocorrelogram= np.array(autocorrelogram)
 
-            autocorrelogram = np.array([])
-            for lag in lags:
-                correlated = len(find_set(x_position_cluster_bins+lag, x_position_cluster_bins))
-                autocorrelogram = np.append(autocorrelogram, correlated)
-
-            #first_peaks[m, n] = get_first_peak(lags[1:], autocorrelogram[1:])
-            axes[m, n].bar(lags[1:], autocorrelogram[1:], color="blue", edgecolor="blue", align="edge")
+            for f in range(1,6):
+                axes[m, n].axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+            axes[m, n].axhline(y=0, color="black", linewidth=2,linestyle="dashed")
+            axes[m, n].plot(lags, autocorrelogram, color="blue")
             axes[m, n].set_xlim(1,autocorr_window_size)
-            axes[m, n].set_ylim(0, max(autocorrelogram[1:]*2))
-
+            axes[m, n].set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
             if m == 0:
                 x_title = "L="+str(track_length)
                 axes[m, n].set_title(x_title, fontsize=10)
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-            fig, ax = plt.subplots(figsize=(8,8))
-            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
-            ax.set_xlim(1, autocorr_window_size)
-            ax.set_ylim(0, max(autocorrelogram[1:])*2)
-            plot_path = save_path + '/______toy_grid_assay_null_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -567,25 +549,24 @@ def plot_linear_grid_cells_spatial_autocorreologram_null(n_trials, save_path, bi
 
 def plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials, save_path, bin_size_cm=1, sampling_rate=100, avg_speed_cmps=10, p_scalar=1):
 
-    track_lengths = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    track_lengths = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
     grid_spacing = 30
     offsets = [10, 20, 30, 40, 50, 60]
 
     fig, axes = plt.subplots(len(offsets), len(track_lengths), figsize=(8, 6))
 
-    first_peaks = np.zeros((len(offsets), len(track_lengths)))
     for n, track_length in enumerate(track_lengths):
         for m, offset in enumerate(offsets):
             distance_covered = n_trials*track_length
 
             locations = np.linspace(0, distance_covered-0.000001, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
             trial_numbers = (locations//track_length)+1
-            spikes_at_locations = []
 
+            spikes_at_locations = []
             for trial_number in np.unique(trial_numbers):
                 trial_locations = (locations%track_length)[trial_numbers==trial_number]
                 firing_p = np.sin((2*np.pi*(1/grid_spacing)*trial_locations)+offset)
-                firing_p = np.clip(firing_p, a_min=0.8, a_max=1)
+                firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)
                 firing_p = min_max_normlise(firing_p, 0, 1)
                 firing_p = firing_p*p_scalar
 
@@ -595,7 +576,6 @@ def plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials, save_path
                 spikes_at_locations.extend(spikes_at_locations_trial.tolist())
 
             spikes_at_locations = np.array(spikes_at_locations)
-
             spike_locations_abs = locations[spikes_at_locations==1]
             trial_numbers = (spike_locations_abs//track_length)+1
             x_position_cluster = spike_locations_abs%track_length
@@ -604,32 +584,39 @@ def plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials, save_path
             x_position_cluster = x_position_cluster[~np.isnan(x_position_cluster)]
             x_position_cluster_bins = np.floor(x_position_cluster).astype(int)
 
-            autocorr_window_size = int(2*track_length)
-            lags = np.arange(0, autocorr_window_size, 1).astype(int) # were looking at 10 timesteps back and 10 forward
+            numerator, bin_edges = np.histogram(x_position_cluster, bins=int(track_length/1)*n_trials, range=(0, track_length*n_trials))
+            fr = numerator
+            elapsed_distance = 0.5*(bin_edges[1:]+bin_edges[:-1])/track_length
+            trial_numbers_by_bin=((0.5*(bin_edges[1:]+bin_edges[:-1])//track_length)+1).astype(np.int32)
+            gauss_kernel = Gaussian1DKernel(stddev=1)
 
-            autocorrelogram = np.array([])
-            for lag in lags:
-                correlated = len(find_set(x_position_cluster_bins+lag, x_position_cluster_bins))
-                autocorrelogram = np.append(autocorrelogram, correlated)
+            # remove nan values that coincide with start and end of the track before convolution
+            fr = convolve(fr, gauss_kernel)
+            fr = moving_sum(fr, window=2)/2
+            fr = np.append(fr, np.zeros(len(elapsed_distance)-len(fr)))
+            normalised_elapsed_distance = elapsed_distance/track_length
 
-            #first_peaks[m, n] = get_first_peak(lags[1:], autocorrelogram[1:])
-            axes[m, n].bar(lags[1:], autocorrelogram[1:], color="blue", edgecolor="blue", align="edge")
+            autocorr_window_size = track_length*2
+            lags = np.arange(0, autocorr_window_size, 1) # were looking at 10 timesteps back and 10 forward
+            autocorrelogram = []
+            for i in range(len(lags)):
+                fr_lagged = fr[i:]
+                corr = stats.pearsonr(fr_lagged, fr[:len(fr_lagged)])[0]
+                autocorrelogram.append(corr)
+            autocorrelogram= np.array(autocorrelogram)
+
+            for f in range(1,6):
+                axes[m, n].axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+            axes[m, n].axhline(y=0, color="black", linewidth=2,linestyle="dashed")
+            axes[m, n].plot(lags, autocorrelogram, color="blue")
             axes[m, n].set_xlim(1,autocorr_window_size)
-            axes[m, n].set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
-
+            axes[m, n].set_ylim([-1, 1])
             if m == 0:
                 x_title = "L="+str(track_length)
                 axes[m, n].set_title(x_title, fontsize=10)
             if n == 0:
                 y_title = "P= "+str(offset)
                 axes[m, n].set_ylabel(y_title, fontsize=10)
-
-            fig, ax = plt.subplots(figsize=(8,8))
-            ax.bar(lags[1:], autocorrelogram[1:], color="black", edgecolor="black", align="edge")
-            ax.set_xlim(1, autocorr_window_size)
-            ax.set_ylim(min(autocorrelogram[1:]), max(autocorrelogram[1:]))
-            plot_path = save_path + '/______toy_grid_assay_anchored_spatial_autocorrelograms_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -750,7 +737,7 @@ def plot_linear_grid_cell_anchored(n_trials, save_path, bin_size_cm=1, sampling_
             for trial_number in np.unique(trial_numbers):
                 trial_locations = (locations%track_length)[trial_numbers==trial_number]
                 firing_p = np.sin((2*np.pi*(1/grid_spacing)*trial_locations)+offset)
-                firing_p = np.clip(firing_p, a_min=0.8, a_max=1)
+                firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)
                 firing_p = min_max_normlise(firing_p, 0, 1)
                 firing_p = firing_p*p_scalar
 
@@ -794,9 +781,9 @@ def plot_lomb_power_vs_p_scalar_by_coding_scheme(n_trials, save_path, bin_size_c
     offset=0
     p_scalars = [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1]
 
-    step = 0.02
-    frequency = np.arange(0.1, 5+step, step)
-    sliding_window_size=track_length*3
+    step = Settings.frequency_step
+    frequency = Settings.frequency
+    sliding_window_size=track_length*Settings.window_length_in_laps
 
     distance_max_peaks = []
     position_max_peaks = []
@@ -1028,9 +1015,9 @@ def plot_lomb_power_vs_p_scalar(n_trials, save_path, bin_size_cm=1, sampling_rat
             set_fr = moving_sum(set_fr, window=2)/2
             set_fr = np.append(set_fr, np.zeros(len(set_elapsed_distance)-len(set_fr)))
 
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             indices_to_test = np.arange(0, len(set_fr)-sliding_window_size, 1, dtype=np.int64)[::10]
@@ -1058,15 +1045,6 @@ def plot_lomb_power_vs_p_scalar(n_trials, save_path, bin_size_cm=1, sampling_rat
                 y_title = "PDF= "+str(reduce_digits(np.round(p_scalar, decimals=2), n_digits=6))
                 axes[m, n].set_ylabel(y_title, fontsize=8)
 
-            fig2, ax = plt.subplots(figsize=(8,8))
-            ax.plot(frequency, avg_power, color="black", linewidth=8)
-            ax.set_xlim(0,max(frequency))
-            ax.set_ylim(0,1)
-            ax.axhline(y=far, xmin=0, xmax=max(frequency), linestyle="dashed", color="red", linewidth=8) # change method to "bootstrap" when you have time
-            plot_path = save_path + '/______toy_grid_assay_non_anchored_p_scalar_assay_lomb_p_scalar-' + str(float2str(p_scalar)) + '_ntrials-' +str(n_trials) + "_L-"+str(track_length) + "_P-"+str(offset)+'.png'
-            plt.savefig(plot_path, dpi=300)
-            plt.close(fig2)
-
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     plt.setp(plt.gcf().get_axes(), xticks=[], yticks=[]);
@@ -1082,17 +1060,17 @@ def main():
 
     for p_scalar in [1.0]:
         for n_trials in [500]:
-            #plot_linear_grid_cell_rates(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell_rates(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cells_spatial_autocorreologram(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cell(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cell_lomb(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell_lomb(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 
     for p_scalar in [1.0]:
         for n_trials in [500]:
-            #plot_linear_grid_cell_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cell_rates_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             #plot_linear_grid_cell_lomb_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 

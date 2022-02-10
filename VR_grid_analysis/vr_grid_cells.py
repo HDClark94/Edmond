@@ -10,6 +10,7 @@ import PostSorting.vr_spatial_data
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
 from PostSorting.vr_spatial_firing import bin_fr_in_time, add_position_x
 from scipy import stats
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 from scipy import signal
 from scipy.interpolate import interp1d
 from astropy.convolution import convolve, Gaussian1DKernel, Gaussian2DKernel
@@ -814,9 +815,9 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, po
             elapsed_distance = elapsed_distance[set_mask]
 
             # construct the lomb-scargle periodogram
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             centre_distances = []
@@ -1138,9 +1139,9 @@ def plot_moving_lomb_scargle_periodogram_by_trial_condition(spike_data, processe
                     elapsed_distance = elapsed_distance[set_mask]
 
                     # construct the lomb-scargle periodogram
-                    step = 0.02
-                    frequency = np.arange(0.1, 5+step, step)
-                    sliding_window_size=track_length*3
+                    step = Settings.frequency_step
+                    frequency = Settings.frequency
+                    sliding_window_size=track_length*Settings.window_length_in_laps
 
                     powers = []
                     centre_distances = []
@@ -1247,8 +1248,8 @@ def analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data):
     '''
 
     for code in ["_allo", "_ego"]:
-        step = 0.02
-        frequency = np.arange(0.1, 5+step, step)
+        step = Settings.frequency_step
+        frequency = Settings.frequency
 
         SNRs = [];                     Freqs = []
         SNRs_all_beaconed = [];        Freqs_all_beaconed = []
@@ -1388,8 +1389,8 @@ def analyse_lomb_powers(spike_data, processed_position_data):
     :return:
     '''
 
-    step = 0.02
-    frequency = np.arange(0.1, 5+step, step)
+    step = Settings.frequency_step
+    frequency = Settings.frequency
 
     SNRs_by_trial_number = [];     Freqs_by_trial_number = []
 
@@ -1991,7 +1992,7 @@ def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_
 
             cluster_firing_maps = min_max_normalize(cluster_firing_maps)
 
-            cmap = plt.cm.get_cmap("jet")
+            cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
             cmap.set_bad(color='white')
             bin_size = settings.vr_grid_analysis_bin_size
 
@@ -2354,7 +2355,7 @@ def plot_speed_per_trial(processed_position_data, output_path, track_length=200)
     plt.savefig(output_path + '/Figures/behaviour/speed_heat_map' + '.png', dpi=200)
     plt.close()
 
-def plot_speed_histogram(processed_position_data, output_path, track_length=200, suffix=""):
+def plot_speed_histogram(processed_position_data, output_path, track_length=200):
     if len(processed_position_data)>0:
         trial_averaged_beaconed_speeds, trial_averaged_non_beaconed_speeds, trial_averaged_probe_speeds = \
             PostSorting.vr_spatial_data.trial_average_speed(processed_position_data)
@@ -2399,7 +2400,7 @@ def plot_speed_histogram(processed_position_data, output_path, track_length=200,
 
         Edmond.plot_utility2.style_vr_plot(ax, x_max)
         plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.12, right = 0.87, top = 0.92)
-        plt.savefig(output_path + '/Figures/behaviour/speed_histogram_' +suffix+ '.png', dpi=200)
+        plt.savefig(output_path + '/Figures/behaviour/speed_histogram.png', dpi=200)
         plt.close()
 
 def plot_allo_vs_ego_firing(vr_recording_path_list, of_recording_path_list, save_path):
@@ -2521,6 +2522,72 @@ def add_percentage_hits(spike_data, processed_position_data):
     spike_data["percentage_hits"] = percentage_hits
     return spike_data
 
+
+def add_rolling_lomb_classifier_percentages(spike_data):
+
+    percentage_ego = []
+    percentage_allo = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        if len(firing_times_cluster)>1:
+            powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+            centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+            centre_trials = np.round(centre_trials).astype(np.int64)
+            rolling_lomb_classifier, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers)
+
+            allo = (len(rolling_lomb_classifier[rolling_lomb_classifier==0.5])/len(centre_trials))*100
+            ego = (len(rolling_lomb_classifier[rolling_lomb_classifier==1.5])/len(centre_trials))*100
+        else:
+            allo = np.nan
+            ego = np.nan
+
+        percentage_allo.append(allo)
+        percentage_ego.append(ego)
+
+    spike_data["percentage_allocentric"] = percentage_allo
+    spike_data["percentage_egocentric"] = percentage_ego
+    return spike_data
+
+
+def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
+    frequency = Settings.frequency
+
+    trial_points = []
+    peak_frequencies = []
+    rolling_lomb_classifier = []
+    rolling_lomb_classifier_colors = []
+    for i in range(len(centre_trials)):
+        centre_trial = centre_trials[i]
+
+        if i<int(n_window_size/2):
+            power_window = powers[:i+int(n_window_size/2), :]
+        elif i+int(n_window_size/2)>len(centre_trials):
+            power_window = powers[i-int(n_window_size/2):, :]
+        else:
+            power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
+
+        avg_power = np.nanmean(power_window, axis=0)
+        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+
+        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, 0.023, 0.05, numeric=False)
+        peak_frequencies.append(max_SNR_freq)
+        trial_points.append(centre_trial)
+        if lomb_classifier == "Position":
+            rolling_lomb_classifier.append(0.5)
+            rolling_lomb_classifier_colors.append(Settings.allocentric_color)
+        elif lomb_classifier == "Distance":
+            rolling_lomb_classifier.append(1.5)
+            rolling_lomb_classifier_colors.append(Settings.egocentric_color)
+        elif lomb_classifier == "Null":
+            rolling_lomb_classifier.append(2.5)
+            rolling_lomb_classifier_colors.append(Settings.null_color)
+        else:
+            rolling_lomb_classifier.append(3.5)
+            rolling_lomb_classifier_colors.append("black")
+    return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
+
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     for recording in vr_recording_path_list:
@@ -2529,27 +2596,28 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
+            #shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
             # BEHAVIOURAL
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
-            spike_data = add_percentage_hits(spike_data, processed_position_data)
+            #processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            #processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+            #spike_data = add_percentage_hits(spike_data, processed_position_data)
 
             # MOVING LOMB PERIODOGRAMS
             #spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
+            spike_data = add_rolling_lomb_classifier_percentages(spike_data)
             #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
             #spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
             #shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
 
             # SPATIAL AUTO CORRELOGRAMS
             #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
-            spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            #spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
 
             # FIRING AND BEHAVIOURAL PLOTTING
             #plot_firing_rate_maps(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
@@ -2557,10 +2625,10 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
             #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
             #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_speed_histogram(processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            #plot_speed_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
             #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
 
-            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             #shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
@@ -2577,10 +2645,10 @@ def main():
 
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22',
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D23_2021-06-09_10-44-25',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D25_2021-06-11_10-55-17', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D27_2021-06-15_10-33-47', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48',
@@ -2604,6 +2672,7 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48']
+
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()]

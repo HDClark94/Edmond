@@ -2,12 +2,15 @@ import numpy as np
 import os
 import pandas as pd
 import open_ephys_IO
+import samplerate
+import OpenEphys
 import PostSorting.parameters
 import math
 import gc
 import sys
 from scipy import stats
 import PostSorting.vr_stop_analysis
+import PostSorting.post_process_sorted_data_vr
 import PostSorting.vr_make_plots
 import PostSorting.vr_cued
 import settings
@@ -49,15 +52,6 @@ def get_raw_location(recording_folder):
 def calculate_track_location(position_data, recording_folder, track_length):
     recorded_location = get_raw_location(recording_folder) # get raw location from DAQ pin
     print('Converting raw location input to cm...')
-
-    fig = plt.figure(figsize=(4,4))
-    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-    #ax.plot(recorded_location)
-    hist, bin_edges = np.histogram(recorded_location, bins=1000)
-    bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
-    ax.plot(bin_centres, hist)
-    plt.savefig('/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03/MountainSort/tmp.png', dpi=200)
-    plt.close()
 
     recorded_startpoint = min(recorded_location)
     recorded_endpoint = max(recorded_location)
@@ -300,21 +294,175 @@ def get_track_length(recording_path):
     stop_threshold, track_length, cue_conditioned_goal = PostSorting.post_process_sorted_data_vr.process_running_parameter_tag(parameter_file_path)
     return track_length
 
-def process_recordings(vr_recording_path_list, of_recording_path_list):
+def hotfix_recording(broken_recording, log_file):
 
-    for recording in vr_recording_path_list:
+    '''
+    if os.path.exists(broken_recording):
+        file_path = broken_recording + '/' + settings.first_trial_channel
+        ch = OpenEphys.loadContinuous(file_path)
+        ch['data'][:] = 0
+        OpenEphys.writeContinuousFile(file_path, ch['header'], ch['timestamps'], ch['data'], ch['recordingNumber'])
+    '''
+    return
+
+
+def pad_shorter_array_with_0s(array1, array2):
+    if len(array1) < len(array2):
+        array1 = np.pad(array1, (0, len(array2)-len(array1)), 'constant')
+    if len(array2) < len(array1):
+        array2 = np.pad(array2, (0, len(array1)-len(array2)), 'constant')
+    return array1, array2
+
+def hotfix2(recording, log):
+
+    log_numpy = np.loadtxt(log,comments='#',delimiter=';',skiprows=4)
+    log_numpy[:, 1] = log_numpy[:, 1]*10
+    # trial y position is collumn 8
+    # position is collum 1
+
+    mean_blender_sampling_rate = 1/np.mean(np.diff(log_numpy[:,0]))
+    ephys_sampling_rate = 30000
+    raw_position_data, position_data = syncronise_position_data(recording, track_length=200)
+
+    position_data = pd.DataFrame()
+    downsample_factor = int(ephys_sampling_rate/ mean_blender_sampling_rate)
+    position_data["x_position_cm"] = raw_position_data["x_position_cm"][::downsample_factor]
+    position_data["time_seconds"] =  raw_position_data["time_seconds"][::downsample_factor]
+    position_data["speed_per200ms"] = raw_position_data["speed_per200ms"][::downsample_factor]
+    position_data["trial_number"] = raw_position_data["trial_number"][::downsample_factor]
+    position_data["trial_type"] = raw_position_data["trial_type"][::downsample_factor]
+
+    log_locations = log_numpy[:, 1]
+    ephys_locations = np.asarray(position_data["x_position_cm"])
+    log_locations, ephys_locations = pad_shorter_array_with_0s(log_locations, ephys_locations)
+    corr = np.correlate(log_locations, ephys_locations, "full")  # this is the correlation array between the sync pulse series
+    lag = (np.argmax(corr) - (corr.size + 1)/2)/mean_blender_sampling_rate  # lag between sync pulses is based on max correlation
+    lag_in_sampling_frequency = int(lag*mean_blender_sampling_rate)
+
+    #log_tn_transitions = np.diff(log_numpy[:, 9])
+    #ephys_tn_transitions = np.diff(np.asarray(position_data["trial_number"]))
+    #log_tn_transitions, ephys_tn_transitions = pad_shorter_array_with_0s(log_tn_transitions, ephys_tn_transitions)
+    #corr = np.correlate(log_tn_transitions, ephys_tn_transitions, "full")  # this is the correlation array between the sync pulse series
+    #lag = (np.argmax(corr) - (corr.size + 1)/2)/mean_blender_sampling_rate  # lag between sync pulses is based on max correlation
+    #lag_in_sampling_frequency = int(lag*mean_blender_sampling_rate)
+
+    log_numpy_pseudo_tt = log_numpy[:, -6]
+    log_numpy_tt = (log_numpy_pseudo_tt/10).astype(np.int64)
+
+    trial_types_for_position_data = log_numpy_tt[lag_in_sampling_frequency:]
+    trial_types_for_position_data = trial_types_for_position_data[:len(position_data)]
+
+    a = log_locations[lag_in_sampling_frequency:]
+    b = a[:len(position_data)]
+    b = np.repeat(b, len(raw_position_data)/len(b))
+    b = np.concatenate([b, np.zeros(len(raw_position_data)-len(b))])
+    b_ephys = np.asarray(raw_position_data["x_position_cm"])
+
+    pearson = stats.pearsonr(b, b_ephys)[0]
+
+    tts = np.repeat(trial_types_for_position_data, len(raw_position_data)/len(trial_types_for_position_data))
+    tts_same_length_as_raw = np.concatenate([tts, tts[-1]*np.ones(len(raw_position_data)-len(tts))])
+
+    to_voltages = tts_same_length_as_raw*3
+
+    # now we need to rewrite channel 2
+    if os.path.exists(recording):
+        file_path = recording + '/' + settings.second_trial_channel
+        ch = OpenEphys.loadContinuous(file_path)
+        ch['data'] = to_voltages
+        OpenEphys.writeContinuousFile(file_path, ch['header'], ch['timestamps'], ch['data'], ch['recordingNumber'])
+
+    print("I hOPE THAT WORKED LOLLLLLLLLLL")
+
+def min_max_normlise(array, min_val, max_val):
+    normalised_array = ((max_val-min_val)*((array-min(array))/(max(array)-min(array))))+min_val
+    return normalised_array
+
+
+def hotfix3(recording, log):
+    recorded_location = get_raw_location(recording) # get raw location from DAQ pin
+    print('Converting raw location input to cm...')
+
+    recorded_startpoint = min(recorded_location)
+    recorded_endpoint = max(recorded_location)
+    recorded_track_length = recorded_endpoint - recorded_startpoint
+    distance_unit = recorded_track_length/200  # Obtain distance unit (cm) by dividing recorded track length to actual track length
+    location_in_cm = (recorded_location - recorded_startpoint) / distance_unit
+
+    log_numpy = np.loadtxt(log,comments='#',delimiter=';',skiprows=4)
+    log_numpy[:, 1] = log_numpy[:, 1]*10
+    # trial y position is collumn 8
+    # position is collum 1
+
+    mean_blender_sampling_rate = 1/np.mean(np.diff(log_numpy[:,0]))
+    ephys_sampling_rate = 30000
+    raw_position_data, position_data = syncronise_position_data(recording, track_length=200)
+
+    position_data = pd.DataFrame()
+    downsample_factor = int(ephys_sampling_rate/ mean_blender_sampling_rate)
+    position_data["x_position_cm"] = raw_position_data["x_position_cm"][::downsample_factor]
+    position_data["time_seconds"] =  raw_position_data["time_seconds"][::downsample_factor]
+    position_data["speed_per200ms"] = raw_position_data["speed_per200ms"][::downsample_factor]
+    position_data["trial_number"] = raw_position_data["trial_number"][::downsample_factor]
+    position_data["trial_type"] = raw_position_data["trial_type"][::downsample_factor]
+
+    log_locations = log_numpy[:, 1]
+    ephys_locations = np.asarray(position_data["x_position_cm"])
+    log_locations, ephys_locations = pad_shorter_array_with_0s(log_locations, ephys_locations)
+    corr = np.correlate(log_locations, ephys_locations, "full")  # this is the correlation array between the sync pulse series
+    lag = (np.argmax(corr) - (corr.size + 1)/2)/mean_blender_sampling_rate  # lag between sync pulses is based on max correlation
+    lag_in_sampling_frequency = int(lag*mean_blender_sampling_rate)
+
+    #log_tn_transitions = np.diff(log_numpy[:, 9])
+    #ephys_tn_transitions = np.diff(np.asarray(position_data["trial_number"]))
+    #log_tn_transitions, ephys_tn_transitions = pad_shorter_array_with_0s(log_tn_transitions, ephys_tn_transitions)
+    #corr = np.correlate(log_tn_transitions, ephys_tn_transitions, "full")  # this is the correlation array between the sync pulse series
+    #lag = (np.argmax(corr) - (corr.size + 1)/2)/mean_blender_sampling_rate  # lag between sync pulses is based on max correlation
+    #lag_in_sampling_frequency = int(lag*mean_blender_sampling_rate)
+
+    log_locations = min_max_normlise(log_locations, min_val=recorded_startpoint, max_val=recorded_endpoint)
+    log_locations_for_position_data = log_locations[lag_in_sampling_frequency:]
+    log_locations_for_position_data = log_locations_for_position_data[:len(position_data)]
+
+    a = log_locations[lag_in_sampling_frequency:]
+    b = a[:len(position_data)]
+    b = np.repeat(b, len(raw_position_data)/len(b))
+    b = np.concatenate([b, np.zeros(len(raw_position_data)-len(b))])
+    b_ephys = np.asarray(raw_position_data["x_position_cm"])
+
+    pearson = stats.pearsonr(b, b_ephys)[0]
+
+    tts = np.repeat(log_locations_for_position_data, len(raw_position_data)/len(log_locations_for_position_data))
+    tts_same_length_as_raw = np.concatenate([tts, tts[-1]*np.ones(len(raw_position_data)-len(tts))])
+
+    to_voltages = tts_same_length_as_raw
+
+    # now we need to rewrite channel 2
+    if os.path.exists(recording):
+        file_path = recording + '/' + settings.movement_channel
+        ch = OpenEphys.loadContinuous(file_path)
+        ch['data'] = to_voltages
+        OpenEphys.writeContinuousFile(file_path, ch['header'], ch['timestamps'], ch['data'], ch['recordingNumber'])
+
+    print("I hOPE THAT WORKED LOLLLLLLLLLL")
+
+
+def process_recordings(vr_recording_path_list, log_files):
+
+    for recording, log in zip(vr_recording_path_list, log_files):
         print("processing ", recording)
-        recording = "/mnt/datastore/Harry/cohort8_may2021/vr/M14_D45_2021-07-09_12-15-03"
         try:
             output_path = recording+'/'+settings.sorterName
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-
             track_length = get_track_length(recording)
-            raw_position_data, position_data = syncronise_position_data(recording, track_length)
+            processed_position_data= pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
+            #hotfix2(recording, log)
+            hotfix3(recording, log)
+            #raw_position_data, position_data = syncronise_position_data(recording, track_length)
 
-
-            #spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            raw_position_data, processed_position_data, position_data = PostSorting.post_process_sorted_data_vr.process_position_data(recording, output_path, track_length, stop_threshold=4.7)
+            processed_position_data.to_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            position_data.to_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -328,14 +476,19 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 def main():
     print('-------------------------------------------------------------')
 
-    # give a path for a directory of recordings or path of a single recording
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
-    of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
-    #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()]
-    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
-    #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()]
-    process_recordings(vr_path_list, of_path_list)
+    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
+    #vr_path_list = ["/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26_fixed"]
+
+    vr_path_list = ["/mnt/datastore/Harry/cohort6_july2020/vr/M1_D2_2020-08-04_14-36-46", "/mnt/datastore/Harry/cohort6_july2020/vr/M1_D3_2020-08-05_14-42-27", "/mnt/datastore/Harry/cohort6_july2020/vr/M1_D4_2020-08-06_14-42-00",
+                    "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D2_2020-08-04_15-13-39", "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D3_2020-08-05_15-18-24", "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D4_2020-08-06_15-16-09"]
+    log_files = ["/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200804_1422.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200805_1411.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200806_1428.csv",
+                 "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200804_1456.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200805_1503.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200806_1503.csv"]
+    #vr_path_list = vr_path_list[7:]
+    #log_files = log_files[7:]
+    process_recordings(vr_path_list, log_files)
+
+
 
     print("look now`")
 

@@ -368,15 +368,22 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                     for j in range(len(cross_correlations[0][0])):
                         cluster_j_classifier = spike_data[spike_data["cluster_id"] == ids[j]]["grid_cell"].iloc[0]
                         cluster_i_classifier = spike_data[spike_data["cluster_id"] == ids[i]]["grid_cell"].iloc[0]
+                        tetrode_j = spike_data[spike_data["cluster_id"] == ids[j]]["tetrode"].iloc[0]
+                        tetrode_i = spike_data[spike_data["cluster_id"] == ids[i]]["tetrode"].iloc[0]
+
+                        if tetrode_i == tetrode_j:
+                            marker="x"
+                        else:
+                            marker="o"
 
                         if ((cluster_j_classifier == True) and (cluster_i_classifier == True)):
-                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="red", zorder=10)
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker=marker, color="red", zorder=10)
                             grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
                         elif ((cluster_j_classifier == True) or (cluster_i_classifier == True)):
-                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="blue", alpha=0.3, zorder=5)
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker=marker, color="blue", alpha=0.3, zorder=5)
                             grid_non_grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
                         else:
-                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker="o", color="black", alpha=0.3, zorder=1)
+                            ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker=marker, color="black", alpha=0.3, zorder=1)
                             non_grid_non_grid_pairs_vs_shuffle.append(cross_correlations[0, i, j]-np.nanmean(cross_correlations[1:]))
 
                 ax.set_ylabel("Change in R (Shuffle)", fontsize=20)
@@ -494,9 +501,9 @@ def plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_d
             elapsed_distance = elapsed_distance[set_mask]
 
             # construct the lomb-scargle periodogram
-            step = 0.02
-            frequency = np.arange(0.1, 5+step, step)
-            sliding_window_size=track_length*3
+            step = Settings.frequency_step
+            frequency = Settings.frequency
+            sliding_window_size=track_length*Settings.window_length_in_laps
 
             powers = []
             centre_distances = []
@@ -894,7 +901,7 @@ def plot_n_cells_simulatenously_recorded(concantenated_dataframe,  save_path, no
     objects = ["Position", "Distance", "Null"]
     x_pos = np.arange(len(objects))
     fig, axes = plt.subplots(3, 1, figsize=(6,6), sharex=True)
-    for ax, group, color in zip(axes, objects, ["turquoise", "orange", "gray"]):
+    for ax, group, color in zip(axes, objects, [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]):
         n_p = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Position")/P_proportion
         n_d = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Distance")/D_proportion
         n_n = get_n_simultaneously_recorded_cells(grid_cells, group1=group, group2="Null")/N_proportion
@@ -921,6 +928,7 @@ def plot_n_cells_simulatenously_recorded(concantenated_dataframe,  save_path, no
 
     return
 
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     matched_recording_df = pd.DataFrame()
@@ -941,7 +949,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             if paired_recording is not None:
                 of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
                 #spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
-                plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                #plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
                 matched_recording_df = plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording), matched_recording_df)
                 matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
                 #plot_joint_cell_cross_correlations(spike_data, output_path)
@@ -995,15 +1003,16 @@ def main():
     combined_df = add_percentage_for_lomb_classes(combined_df)
 
     # load df for plot_all_paired_vs_shuffle
-    #plot_all_paired_vs_shuffle(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
-    #plot_paired_vs_shuffle_by_hmt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
-    #plot_paired_vs_shuffle_by_tt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    plot_all_paired_vs_shuffle(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    plot_paired_vs_shuffle_by_hmt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
+    plot_paired_vs_shuffle_by_tt(pd.read_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl"), output_path= "/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
 
     #grid_cells = combined_df[combined_df["classifier"] == "G"]
     #grid_cells_from_same_recording = get_grid_cells_from_same_recording(grid_cells)
     #plot_class_prection_credence(grid_cells_from_same_recording, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity", normalised=True)
+
     print("look now")
 
 if __name__ == '__main__':

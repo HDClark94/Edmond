@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import settings
 from numpy import inf
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
 from Edmond.Concatenate_from_server import *
 from scipy import stats
@@ -1367,7 +1368,7 @@ def plot_coding_power_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="
     plt.xticks(x_pos, objects, fontsize=30)
     ax.axhline(y=0, linewidth=3, color="black")
 
-    for coding, bar_offset, sig_bar_y, bar_color in zip(["_allo", "_ego"], [-0.125, 0.125], [0.25, 0.3], ["turquoise", "orange"]):
+    for coding, bar_offset, sig_bar_y, bar_color in zip(["_allo", "_ego"], [-0.125, 0.125], [0.25, 0.3], [Settings.allocentric_color, Settings.egocentric_color]):
         x_pos = np.arange(len(objects))+bar_offset
 
         a = np.asarray(grid_cells[hmt2collumn(hmt=hmt, tt="beaconed")+coding], dtype=np.float64)
@@ -1419,6 +1420,49 @@ def plot_coding_power_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
 
+
+def plot_allo_vs_ego_coding(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
+    if get_lomb_classifier:
+        combined_df = add_lomb_classifier(combined_df)
+    if CT=="G":
+        grid_cells = combined_df[combined_df["classifier"] == "G"]
+    elif CT=="NG":
+        grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    if PDN == "PD":
+        grid_cells = grid_cells[(grid_cells["Lomb_classifier_"] == "Position") |
+                                (grid_cells["Lomb_classifier_"] == "Distance")]
+    elif PDN != "":
+        grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == PDN]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    for hmt, hmt_c, y_pos in zip(["hit", "try", "miss"], ["green", "orange", "red"], [0.98, 0.94, 0.9]):
+        allo = np.asarray(grid_cells[hmt2collumn(hmt=hmt, tt=tt)+"_allo"], dtype=np.float64)
+        ego = np.asarray(grid_cells[hmt2collumn(hmt=hmt, tt=tt)+"_ego"], dtype=np.float64)
+        ax.scatter(allo, ego, c=hmt_c)
+        bad =  ~np.logical_or(np.isnan(allo), np.isnan(ego))
+        allo = np.compress(bad, allo); ego = np.compress(bad, ego)
+        plot_regression(ax, allo, ego, hmt_c, y_text_pos=y_pos)
+
+    plt.xlim((0, 0.3))
+    plt.ylim((0, 0.3))
+    ax.set_yticks([0, 0.1, 0.2, 0.3])
+    ax.set_xticks([0, 0.1, 0.2, 0.3])
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    ax.set_xlabel("Allocentric Power", fontsize=25, labelpad=10)
+    ax.set_ylabel("Egocentric Power", fontsize=25, labelpad=10)
+
+    plt.tight_layout()
+    plt.savefig(save_path+"allo_vs_ego"+CT+"_"+PDN+".png", dpi=300)
+    plt.close()
+
+
+
+
 def plot_coding_power_comparison(combined_df, save_path, CT="", PDN="", tt="", get_lomb_classifier=True):
     if get_lomb_classifier:
         combined_df = add_lomb_classifier(combined_df)
@@ -1444,7 +1488,7 @@ def plot_coding_power_comparison(combined_df, save_path, CT="", PDN="", tt="", g
     plt.xticks(x_pos, objects, fontsize=30)
     ax.axhline(y=0, linewidth=3, color="black")
 
-    for coding, bar_offset, sig_bar_y, bar_color in zip(["_allo", "_ego"], [-0.125, 0.125], [0.25, 0.3], ["turquoise", "orange"]):
+    for coding, bar_offset, sig_bar_y, bar_color in zip(["_allo", "_ego"], [-0.125, 0.125], [0.25, 0.3], [Settings.allocentric_color, Settings.egocentric_color]):
         x_pos = np.arange(len(objects))+bar_offset
 
         hits = np.asarray(grid_cells[hmt2collumn(hmt="hit", tt=tt)+coding], dtype=np.float64)
@@ -1498,6 +1542,11 @@ def plot_coding_power_comparison(combined_df, save_path, CT="", PDN="", tt="", g
     plt.tight_layout()
     plt.savefig(save_path+"MOVING_LOMB_bar_"+CT+"_"+PDN+".png", dpi=300)
     plt.close()
+
+
+
+
+
 
 
 
@@ -1820,6 +1869,31 @@ def add_celltype_classifier(df_shuffle, spike_data):
     return df_shuffle
 
 
+def plot_regression(ax, x, y, c, y_text_pos):
+
+    x = x[~np.isnan(y)].reshape(-1, 1)
+    y = y[~np.isnan(y)].reshape(-1, 1)
+
+    pearson_r = stats.pearsonr(x.flatten(),y.flatten())
+
+    linear_regressor = LinearRegression()  # create object for the class
+    linear_regressor.fit(x,y)  # perform linear regression
+
+    x_test = np.linspace(min(x), max(x), 100)
+
+    Y_pred = linear_regressor.predict(x_test.reshape(-1, 1))  # make predictions
+    #ax.text(6, 0.65, "R= "+str(np.round(pearson_r[0], decimals=2))+ ", p = "+str(np.round(pearson_r[1], decimals=2)))
+
+    ax.text(  # position text relative to Axes
+        0.05, y_text_pos, "R= "+str(np.round(pearson_r[0], decimals=2))+ ", p = "+str(np.round(pearson_r[1], decimals=4)),
+        ha='left', va='top', color=c,
+        transform=ax.transAxes, fontsize=10)
+
+    ax.plot(x_test, Y_pred, color=c)
+
+
+
+
 def main():
     print('-------------------------------------------------------------')
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
@@ -1829,27 +1903,19 @@ def main():
     combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
     add_celltype_classifier(combined_df_shuffle, combined_df)
 
-    # compare hit miss try according to lomb classifications using the pairwise trial correlations
-    plot_spatial_info_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/si/G/", CT="G", PDN="", tt="all")
-    plot_spatial_info_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/si/NG/", CT="NG", PDN="", tt="all")
-
-    # compare hit miss try according to lomb classifications using the pairwise trial correlations
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Position/", CT="G", PDN="Position")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Distance/", CT="G", PDN="Distance")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/G/Null/", CT="G", PDN="Null")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Position/", CT="NG", PDN="Position")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Null/", CT="NG", PDN="Null")
-    plot_pairwise_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/pairwise/NG/Distance/", CT="NG", PDN="Distance")
-
     # periodic power of ego and allocentric peaks
     plot_coding_power_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Position/nonbeaconed/", CT="G", PDN="Position", tt="non_beaconed")
     plot_coding_power_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt="non_beaconed")
+    plot_allo_vs_ego_coding(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Position/nonbeaconed/", CT="G", PDN="Position", tt="non_beaconed")
+    plot_allo_vs_ego_coding(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt="non_beaconed")
     plot_coding_power_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/coding_scheme/G/Position/hit/", CT="G", PDN="Position", hmt="hit")
     plot_coding_power_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/coding_scheme/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit")
 
     # avg correlations
     plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1)
     plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt=1)
+    plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Position/probe/", CT="G", PDN="Position", tt=2)
+    plot_avg_correlation_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/avg_correlation/G/Distance/probe/", CT="G", PDN="Distance", tt=2)
     plot_avg_correlation_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/avg_correlation/G/Position/hit/", CT="G", PDN="Position", hmt="hit")
     plot_avg_correlation_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/avg_correlation/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit")
 
