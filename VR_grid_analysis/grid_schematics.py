@@ -172,7 +172,7 @@ def plot_allo_ego_grid_cell(output_path):
     rates_smoothened = ratees_flattened_smoothened.reshape((len(rates), len(rates[0])))
 
     fig, ax = plt.subplots(1,1, figsize=(6, 6))
-    ax.pcolormesh(X, Y, rates_smoothened, cmap=cmap, shading="auto", vmin=np.min(rates), vmax=np.max(rates))
+    c = ax.pcolormesh(X, Y, rates_smoothened, cmap=cmap, shading="auto", vmin=np.min(rates), vmax=np.max(rates))
     plt.ylabel('Trial number', fontsize=30, labelpad = 10)
     plt.xlabel("Location (cm)", fontsize=30, labelpad = 10)
     ax.spines['top'].set_visible(False)
@@ -180,6 +180,15 @@ def plot_allo_ego_grid_cell(output_path):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     ax.set_xticks([0,100,200])
+
+    cbar = fig.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    cbar.outline.set_linewidth(0)
+    cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    cbar.set_ticks([0,np.max(rates_smoothened)])
+    cbar.set_ticklabels(["0", "Max"])
+    cbar.ax.tick_params(size=0)
+    cbar.ax.tick_params(labelsize=20)
+
     plt.tight_layout()
     plt.subplots_adjust(wspace=0, hspace=0)
     plot_path = output_path + '/allo_and_egocentric_grid_cell_rates.png'
@@ -258,7 +267,7 @@ def plot_allo_ego_grid_cell(output_path):
     Y, X = np.meshgrid(centre_trials, frequency)
     #powers = np.flip(powers, axis=0)
     cmap = plt.cm.get_cmap("inferno")
-    ax.pcolormesh(X, Y, powers.T, cmap=cmap, shading="flat")
+    c = ax.pcolormesh(X, Y, powers.T, cmap=cmap, shading="flat")
     for f in range(1,5):
         ax.axvline(x=f, color="white", linewidth=2,linestyle="dotted")
 
@@ -282,6 +291,15 @@ def plot_allo_ego_grid_cell(output_path):
     ax.set_yticks(y_tick_locs.tolist())
     ax.set_xlim([0.1,5])
     ax.set_ylim([min(centre_trials), max(centre_trials)])
+
+    cbar = fig.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    cbar.outline.set_linewidth(0)
+    cbar.set_label('Periodic Power', rotation=270, fontsize=20)
+    cbar.set_ticks([np.min(powers), np.max(powers)])
+    cbar.set_ticklabels(["0   ", "1   "])
+    cbar.ax.tick_params(size=0)
+    cbar.ax.tick_params(labelsize=20)
+
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)

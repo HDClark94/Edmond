@@ -359,39 +359,44 @@ def main():
     print("============================================")
     print("============================================")
 
+
+
+
     # =================== for concatenation ====================================== #
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")
+
     vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/concatenated_dataframes/combined_Cohort7.pkl")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/concatenated_dataframes/combined_Cohort7.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/combined_Cohort2.pkl")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/combined_Cohort2.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/combined_Cohort3.pkl")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/combined_Cohort3.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/combined_Cohort4.pkl")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/OpenFeild", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/combined_Cohort4.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/combined_Cohort5.pkl")
-
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", suffix="vr", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/OpenField", suffix="of", save_path="/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/combined_Cohort5.pkl")
     # ============= for loading from concatenated dataframe ====================== #
 
     #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")

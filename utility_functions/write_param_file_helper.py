@@ -142,55 +142,71 @@ def write_recording_list_file(primary_paths, save_path):
         file.write(path_to_add+"\n")
     file.close()
 
+def print_track_lengths_from_param(vr_paths):
+
+    for path in sorted(vr_paths):
+        if os.path.exists(path+"/parameters.txt"):
+            a_file = open(path+"/parameters.txt")
+
+            lines = a_file.readlines()
+            for line in lines:
+                print(line)
+    return
+
 
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    vr_paths = get_recording_paths([], "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality")
-    of_paths = get_recording_paths([], "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField")
-    parameter_helper = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/parameter_helper.csv")
-    dead_channel_helper = pd.read_csv("/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/dead_channel_helper.csv")
+    # junjis mice
+    base_path = "/mnt/datastore/Harry/Cohort9_Junji"
+    vr_paths = get_recording_paths([], base_path+"/vr")
+    of_paths = get_recording_paths([], base_path+"/of")
+    #print_track_lengths_from_param(vr_paths)
+    parameter_helper = pd.read_csv(base_path+"/parameter_helper.csv")
+    dead_channel_helper = pd.read_csv(base_path+"/dead_channel_helper.csv")
     write_param_file(vr_paths, of_paths, recording_type="vr", parameter_helper=parameter_helper)
     write_param_file(of_paths, vr_paths, recording_type="openfield", parameter_helper=parameter_helper)
     write_dead_channel_file(vr_paths, dead_channel_helper=dead_channel_helper)
     write_dead_channel_file(of_paths,dead_channel_helper=dead_channel_helper)
-    write_recording_list_file(vr_paths, save_path="/mnt/datastore/Harry/Mouse_data_for_sarah_paper/_cohort2/full_list.txt")
-    print("stop")
+    write_recording_list_file(vr_paths, save_path=base_path+"/vr/full_list.txt")
 
-    '''
+
+    base_path = "/mnt/datastore/Harry/Cohort6_july2020"
+    vr_paths = get_recording_paths([], base_path+"/vr")
+    of_paths = get_recording_paths([], base_path+"/of")
+    parameter_helper = pd.read_csv(base_path+"/parameter_helper.csv")
+    dead_channel_helper = pd.read_csv(base_path+"/dead_channel_helper.csv")
+    write_param_file(vr_paths, of_paths, recording_type="vr", parameter_helper=parameter_helper)
+    write_param_file(of_paths, vr_paths, recording_type="openfield", parameter_helper=parameter_helper)
+    write_dead_channel_file(vr_paths, dead_channel_helper=dead_channel_helper)
+    write_dead_channel_file(of_paths,dead_channel_helper=dead_channel_helper)
+    write_recording_list_file(vr_paths, save_path=base_path+"/vr/full_list.txt")
+
     # october2020 experiment
-    vr_paths = get_recording_paths([], "/mnt/datastore/Harry/Cohort7_october2020/vr")
-    of_paths = get_recording_paths([], "/mnt/datastore/Harry/Cohort7_october2020/of")
-    parameter_helper = pd.read_csv("/mnt/datastore/Harry/Cohort7_october2020/parameter_helper.csv")
-    dead_channel_helper = pd.read_csv("/mnt/datastore/Harry/Cohort7_october2020/dead_channel_helper.csv")
+    base_path = "/mnt/datastore/Harry/Cohort7_october2020"
+    vr_paths = get_recording_paths([], base_path+"/vr")
+    of_paths = get_recording_paths([], base_path+"/of")
+    parameter_helper = pd.read_csv(base_path+"/parameter_helper.csv")
+    dead_channel_helper = pd.read_csv(base_path+"/dead_channel_helper.csv")
     write_param_file(vr_paths, of_paths, recording_type="vr", parameter_helper=parameter_helper)
     write_param_file(of_paths, vr_paths, recording_type="openfield", parameter_helper=parameter_helper)
     write_dead_channel_file(vr_paths, dead_channel_helper=dead_channel_helper)
     write_dead_channel_file(of_paths,dead_channel_helper=dead_channel_helper)
-
-    write_recording_list_tmp_file(vr_paths, save_path_full="/mnt/datastore/Harry/Cohort7_october2020/vr/full_list.txt",
-                                  save_path_tmp="/mnt/datastore/Harry/Cohort7_october2020/vr/tmp.txt")
-    write_recording_list_file(vr_paths, save_path="/mnt/datastore/Harry/Cohort7_october2020/vr/full_list.txt")
-    write_recording_list_file(of_paths, save_path="/mnt/datastore/Harry/Cohort7_october2020/of/full_list.txt")
+    write_recording_list_file(vr_paths, save_path=base_path+"/vr/full_list.txt")
 
     # may2021 experiment
-    vr_paths = get_recording_paths([], "/mnt/datastore/Harry/Cohort8_may2021/vr")
-    of_paths = get_recording_paths([], "/mnt/datastore/Harry/Cohort8_may2021/of")
-    parameter_helper = pd.read_csv("/mnt/datastore/Harry/Cohort8_may2021/parameter_helper.csv")
-    dead_channel_helper = pd.read_csv("/mnt/datastore/Harry/Cohort8_may2021/dead_channel_helper.csv")
+    base_path = "/mnt/datastore/Harry/Cohort8_may2021"
+    vr_paths = get_recording_paths([], base_path+"/vr")
+    of_paths = get_recording_paths([], base_path+"/of")
+    parameter_helper = pd.read_csv(base_path+"/parameter_helper.csv")
+    dead_channel_helper = pd.read_csv(base_path+"/dead_channel_helper.csv")
     write_param_file(vr_paths, of_paths, recording_type="vr", parameter_helper=parameter_helper)
     write_param_file(of_paths, vr_paths, recording_type="openfield", parameter_helper=parameter_helper)
     write_dead_channel_file(vr_paths, dead_channel_helper=dead_channel_helper)
     write_dead_channel_file(of_paths,dead_channel_helper=dead_channel_helper)
+    write_recording_list_file(vr_paths, save_path=base_path+"/vr/full_list.txt")
 
-    write_recording_list_tmp_file(vr_paths, save_path_full="/mnt/datastore/Harry/Cohort8_may2021/vr/full_list.txt",
-                                  save_path_tmp="/mnt/datastore/Harry/Cohort8_may2021/vr/tmp.txt")
-    write_recording_list_tmp_file(of_paths, save_path_full="/mnt/datastore/Harry/Cohort8_may2021/of/full_list.txt",
-                                  save_path_tmp="/mnt/datastore/Harry/Cohort8_may2021/of/tmp.txt")
-    write_recording_list_file(vr_paths, save_path="/mnt/datastore/Harry/Cohort8_may2021/vr/full_list.txt")
-    write_recording_list_file(of_paths, save_path="/mnt/datastore/Harry/Cohort8_may2021/of/full_list.txt")
-    '''
 
 if __name__ == '__main__':
     main()

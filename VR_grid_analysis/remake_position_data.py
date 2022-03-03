@@ -447,22 +447,33 @@ def hotfix3(recording, log):
     print("I hOPE THAT WORKED LOLLLLLLLLLL")
 
 
-def process_recordings(vr_recording_path_list, log_files):
+def hotfix_junji(recording):
+    # all trials have been mislabeled as probe trials so the first channel pin will be set to 0,
+    # this should make all probe trials now non beaconed trials
+    if os.path.exists(recording):
+        file_path = recording + '/' + settings.first_trial_channel
+        ch = OpenEphys.loadContinuous(file_path)
+        ch['data'] = np.repeat(0, len(ch['data']))
+        OpenEphys.writeContinuousFile(file_path, ch['header'], ch['timestamps'], ch['data'], ch['recordingNumber'])
+    print("I hOPE THAT WORKED LOLLLLLLLLLL")
 
-    for recording, log in zip(vr_recording_path_list, log_files):
+
+def process_recordings(vr_recording_path_list):
+
+    for recording in vr_recording_path_list:
         print("processing ", recording)
         try:
             output_path = recording+'/'+settings.sorterName
             track_length = get_track_length(recording)
-            processed_position_data= pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            #processed_position_data= pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
+            hotfix_junji(recording)
             #hotfix2(recording, log)
-            hotfix3(recording, log)
+            #hotfix3(recording, log)
             #raw_position_data, position_data = syncronise_position_data(recording, track_length)
-
-            raw_position_data, processed_position_data, position_data = PostSorting.post_process_sorted_data_vr.process_position_data(recording, output_path, track_length, stop_threshold=4.7)
-            processed_position_data.to_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            position_data.to_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
+            #raw_position_data, processed_position_data, position_data = PostSorting.post_process_sorted_data_vr.process_position_data(recording, output_path, track_length, stop_threshold=4.7)
+            #processed_position_data.to_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            #position_data.to_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -480,14 +491,14 @@ def main():
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
     #vr_path_list = ["/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26_fixed"]
 
-    vr_path_list = ["/mnt/datastore/Harry/cohort6_july2020/vr/M1_D2_2020-08-04_14-36-46", "/mnt/datastore/Harry/cohort6_july2020/vr/M1_D3_2020-08-05_14-42-27", "/mnt/datastore/Harry/cohort6_july2020/vr/M1_D4_2020-08-06_14-42-00",
-                    "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D2_2020-08-04_15-13-39", "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D3_2020-08-05_15-18-24", "/mnt/datastore/Harry/cohort6_july2020/vr/M2_D4_2020-08-06_15-16-09"]
-    log_files = ["/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200804_1422.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200805_1411.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200806_1428.csv",
-                 "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200804_1456.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200805_1503.csv", "/mnt/datastore/Harry/cohort6_july2020/behaviour logs/August2020/Logs/Opto2_tracks_20200806_1503.csv"]
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort9_Junji/vr") if f.is_dir()]
+    #J1_list = [k for k in vr_path_list if 'J1' in k]
+    #J2_list = [k for k in vr_path_list if 'J2' in k]
+
     #vr_path_list = vr_path_list[7:]
     #log_files = log_files[7:]
-    process_recordings(vr_path_list, log_files)
-
+    #process_recordings(J1_list)
+    #process_recordings(J2_list)
 
 
     print("look now`")

@@ -105,8 +105,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
 
                 if len(spatial_firing) > 0:
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
-                    #collumn_names_to_keep.append("firing_times")
-                    #collumn_names_to_keep.append("random_snippets")
+                    collumn_names_to_keep.append("firing_times")
+                    collumn_names_to_keep.append("random_snippets")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
                     if "n_pi_trials_by_hmt" in list(spatial_firing):
@@ -142,8 +142,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
-                    #spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
-                    #spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')

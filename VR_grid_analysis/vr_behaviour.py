@@ -649,7 +649,7 @@ def plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(processed_positio
     for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
         t_processed = hmt_processed[hmt_processed["trial_type"] == tt]
 
-        speed_histogram = plt.figure(figsize=(6,6))
+        speed_histogram = plt.figure(figsize=(12,5))
         ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
             mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
@@ -661,20 +661,21 @@ def plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(processed_positio
             ax.plot(locations, trajectories_avg, label=mouse_id)
 
         ax.tick_params(axis='both', which='major', labelsize=20)
-        ax.legend(title='Mouse')
-        plt.ylabel('Speed (cm/s)', fontsize=25, labelpad = 10)
-        plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+        #ax.legend(title='Mouse')
+        plt.ylabel('Speed (cm/s)', fontsize=30, labelpad = 10)
+        plt.xlabel('Location (cm)', fontsize=30, labelpad = 10)
         if tt == 0:
             style_track_plot(ax, 200)
         else:
             style_track_plot_no_RZ(ax, 200)
         tick_spacing = 100
         ax.set_yticks([0, 50, 100])
-        plt.xticks(fontsize=25)
-        plt.yticks(fontsize=25)
+        plt.xticks(fontsize=30)
+        plt.yticks(fontsize=30)
         ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
         Edmond.plot_utility2.style_vr_plot(ax, x_max=115)
-        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.subplots_adjust(bottom = 0.2)
+        #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
         ax.set_ylim(bottom=0)
         ax.set_xlim(left=0, right=200)
         plt.savefig(save_path + '/average_speed_trajectory_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
@@ -793,6 +794,244 @@ def cluster_speed_profiles(processed_position_data, save_path):
     plt.savefig(save_path+"/DBSCAN_clusters.png", dpi=300)
     return
 
+def plot_n_trial_per_session_by_mouse(processed_position_data, hmt, save_path):
+    hmt_processed = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
+
+    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
+        t_processed = hmt_processed[hmt_processed["trial_type"] == tt]
+
+        max_n = 0
+        speed_histogram = plt.figure(figsize=(6,6))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+
+            n_trials = []
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                n_trials.append(len(session_processed))
+
+            ax.scatter(np.unique(mouse_processed["session_number"]), n_trials, marker="o", label=mouse_id, zorder=10, clip_on=False)
+
+            if max(n_trials)>max_n:
+                max_n = max(n_trials)
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.legend(title='Mouse')
+        plt.ylabel('Number of trials', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+
+        tick_spacing = 50
+        ax.set_yticks([0, 50, 100])
+        ax.set_xticks([1, 25, 50])
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=max_n)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=0, right=50)
+        plt.savefig(save_path + '/n_trials_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
+        plt.close()
+
+    return
+
+
+def plot_percentage_trial_per_session_by_mouse_short_plot(processed_position_data, hmt, save_path):
+
+    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
+        t_processed = processed_position_data[processed_position_data["trial_type"] == tt]
+
+        speed_histogram = plt.figure(figsize=(8,1.5))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+
+            percent_trials = []
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                percent_trials.append(100*(len(session_processed[session_processed["hit_miss_try"]=="hit"])/len(session_processed)))
+
+            #ax.scatter(np.unique(mouse_processed["session_number"]), percent_trials, marker="o", label=mouse_id, zorder=10, clip_on=False)
+            ax.plot(np.unique(mouse_processed["session_number"]), percent_trials, label=mouse_id, zorder=10, clip_on=False)
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.legend(title='Mouse')
+        plt.ylabel('% trials', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+
+        tick_spacing = 50
+        ax.set_yticks([0, 50, 100])
+        ax.set_xticks([1, 15, 30])
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=100)
+        plt.subplots_adjust(bottom = 0.3, left = 0.2)
+        #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=0, right=30)
+        plt.savefig(save_path + '/percentage_trials_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'_shortplot.png', dpi=300)
+        plt.close()
+
+    return
+
+def plot_percentage_trial_per_session_by_mouse(processed_position_data, hmt, save_path):
+
+    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
+        t_processed = processed_position_data[processed_position_data["trial_type"] == tt]
+
+        speed_histogram = plt.figure(figsize=(8,3.3))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+        for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+
+            percent_trials = []
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                percent_trials.append(100*(len(session_processed[session_processed["hit_miss_try"]=="hit"])/len(session_processed)))
+
+            #ax.scatter(np.unique(mouse_processed["session_number"]), percent_trials, marker="o", label=mouse_id, zorder=10, clip_on=False)
+            ax.plot(np.unique(mouse_processed["session_number"]), percent_trials, label=mouse_id, zorder=10, clip_on=False)
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.legend(title='Mouse')
+        plt.ylabel('% trials', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+
+        tick_spacing = 50
+        ax.set_yticks([0, 50, 100])
+        ax.set_xticks([1, 15, 30])
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=100)
+        plt.subplots_adjust(bottom = 0.3, left = 0.2)
+        #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=0, right=30)
+        plt.savefig(save_path + '/percentage_trials_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
+        plt.close()
+
+    return
+
+
+def plot_percentage_trial_per_session_all_mice(processed_position_data, hmt, save_path):
+
+    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
+
+        t_processed = processed_position_data[processed_position_data["trial_type"] == tt]
+        speed_histogram = plt.figure(figsize=(8,3.3))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+        percentages_array = np.zeros((len(np.unique(processed_position_data["mouse_id"])), max(processed_position_data["session_number"])))*np.nan
+        for mouse_i, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                percentages_array[mouse_i, session_number-1] = 100*(len(session_processed[session_processed["hit_miss_try"]=="hit"])/len(session_processed))
+
+        ax.fill_between(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0)-stats.sem(percentages_array, axis=0, nan_policy='omit'), np.nanmean(percentages_array, axis=0)+stats.sem(percentages_array, axis=0, nan_policy='omit'), zorder=10, clip_on=False, alpha=0.3, color=get_hmt_color(hmt))
+        ax.plot(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0), zorder=10, clip_on=False, color=get_hmt_color(hmt))
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.legend(title='Mouse')
+        plt.ylabel('% trials', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+
+        tick_spacing = 50
+        ax.set_yticks([0, 50, 100])
+        ax.set_xticks([1, 15, 30])
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=100)
+        plt.subplots_adjust(bottom = 0.3, left = 0.2)
+        #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=0, right=30)
+        plt.savefig(save_path + '/percentage_trials_all_mice_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
+        plt.close()
+
+    return
+
+
+def plot_percentage_trial_per_session_all_mice_b_vs_nb(processed_position_data, hmt, save_path):
+    speed_histogram = plt.figure(figsize=(8,3.3))
+    ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+    for tt, tt_string, c in zip([0,1], ["b", "nb"], ["black", "blue"]):
+        t_processed = processed_position_data[processed_position_data["trial_type"] == tt]
+        percentages_array = np.zeros((len(np.unique(processed_position_data["mouse_id"])), max(processed_position_data["session_number"])))*np.nan
+        for mouse_i, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
+            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                percentages_array[mouse_i, session_number-1] = 100*(len(session_processed[session_processed["hit_miss_try"]=="hit"])/len(session_processed))
+
+        ax.fill_between(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0)-stats.sem(percentages_array, axis=0, nan_policy='omit'), np.nanmean(percentages_array, axis=0)+stats.sem(percentages_array, axis=0, nan_policy='omit'), zorder=10, clip_on=False, alpha=0.3, color=c)
+        ax.plot(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0), zorder=10, clip_on=False, color=c)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    #ax.legend(title='Mouse')
+    plt.ylabel('% trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    tick_spacing = 50
+    ax.set_yticks([0, 50, 100])
+    ax.set_xticks([1, 15, 30])
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    Edmond.plot_utility2.style_vr_plot(ax, x_max=100)
+    plt.subplots_adjust(bottom = 0.3, left = 0.2)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0, right=30)
+    plt.savefig(save_path + '/percentage_trials_all_mice_hmt_'+hmt+'_tt_b_vs_nb.png', dpi=300)
+    plt.close()
+
+    return
+
+
+def plot_percentage_trial_per_session_all_mice_h_vs_t_vs_m(processed_position_data, tt, save_path):
+    processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
+    speed_histogram = plt.figure(figsize=(8,3.3))
+    ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+    for hmt, c in zip(["hit", "try", "miss", "rejected"], ["green", "orange", "red", "black"]):
+        percentages_array = np.zeros((len(np.unique(processed_position_data["mouse_id"])), max(processed_position_data["session_number"])))*np.nan
+        for mouse_i, mouse_id in enumerate(np.unique(processed_position_data["mouse_id"])):
+            mouse_processed = processed_position_data[processed_position_data["mouse_id"] == mouse_id]
+
+            for session_number in np.unique(mouse_processed["session_number"]):
+                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
+                percentages_array[mouse_i, session_number-1] = 100*(len(session_processed[session_processed["hit_miss_try"]==hmt])/len(session_processed))
+
+        ax.fill_between(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0)-stats.sem(percentages_array, axis=0, nan_policy='omit'), np.nanmean(percentages_array, axis=0)+stats.sem(percentages_array, axis=0, nan_policy='omit'), zorder=10, clip_on=False, alpha=0.3, color=c)
+        ax.plot(np.arange(1, len(percentages_array[0])+1), np.nanmean(percentages_array, axis=0), zorder=10, clip_on=False, color=c)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    #ax.legend(title='Mouse')
+    plt.ylabel('% trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    tick_spacing = 50
+    ax.set_yticks([0, 50, 100])
+    ax.set_xticks([1, 15, 30])
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    Edmond.plot_utility2.style_vr_plot(ax, x_max=100)
+    plt.subplots_adjust(bottom = 0.3, left = 0.2)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0, right=30)
+    plt.savefig(save_path + '/percentage_trials_all_mice_tt_'+str(tt)+'_h_vs_t_vs_m.png', dpi=300)
+    plt.close()
+
+    return
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     print(" ")
     all_behaviour = pd.DataFrame()
@@ -826,6 +1065,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
     return all_behaviour
 
+
 def main():
     print('-------------------------------------------------------------')
 
@@ -844,6 +1084,12 @@ def main():
     #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_percentage_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_percentage_trial_per_session_by_mouse_short_plot(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_percentage_trial_per_session_all_mice_b_vs_nb(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_percentage_trial_per_session_all_mice_h_vs_t_vs_m(all_behaviour200cm_tracks, tt=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_percentage_trial_per_session_all_mice(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_hit_avg_speeds_by_block(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #all_behaviour200cm_tracks = add_hit_miss_try2(all_behaviour200cm_tracks, track_length=200)
 

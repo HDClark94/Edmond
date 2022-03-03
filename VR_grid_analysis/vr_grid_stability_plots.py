@@ -325,7 +325,7 @@ def plot_speed_histogram_with_error(processed_position_data, output_path, track_
         save_path = output_path + '/Figures/behaviour'
         if os.path.exists(save_path) is False:
             os.makedirs(save_path)
-        speed_histogram = plt.figure(figsize=(6,6))
+        speed_histogram = plt.figure(figsize=(6,4))
         ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
         bin_centres = np.array(processed_position_data["position_bin_centres"].iloc[0])
 
@@ -350,13 +350,14 @@ def plot_speed_histogram_with_error(processed_position_data, output_path, track_
         else:
             style_track_plot_no_RZ(ax, track_length)
         tick_spacing = 100
-        plt.xticks(fontsize=25)
-        plt.yticks(fontsize=25)
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
         ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
         x_max = max(trial_speeds_avg+trial_speeds_sem)
         x_max = 115
         Edmond.plot_utility2.style_vr_plot(ax, x_max)
-        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.subplots_adjust(bottom = 0.2, left=0.2)
+        #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
         plt.savefig(output_path + '/Figures/behaviour/trial_speeds_tt_'+str(tt)+"_"+suffix+'.png', dpi=300)
         plt.close()
 
@@ -2807,6 +2808,10 @@ def plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data, proc
                         reconstructed_signal_corr = get_avg_correlation(reconstructed_signal)
 
                         Edmond.plot_utility2.style_vr_plot(ax, len(hmt_processed_position_data))
+                    else:
+                        avg_correlation = np.nan
+                        reconstructed_signal_corr = np.nan
+
                     ax.tick_params(axis='both', which='both', labelsize=20)
                     ax.set_yticks([len(hmt_processed_position_data)-1])
                     ax.set_yticklabels([len(hmt_processed_position_data)])
@@ -4125,12 +4130,310 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
     return
 
 
+def plot_allo_minus_ego_component4(concantenated_dataframe,  save_path):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix="")
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+
+    p_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    d_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+
+    for grids, name, in zip([p_grids, d_grids], ["P_cells", "D_cells"]):
+
+        fig, ax = plt.subplots(1,1, figsize=(6,6))
+        allo_minus_ego_hit_proportions_b = np.asarray(grids["allo_minus_ego_hit_proportions_b"])
+        allo_minus_ego_hit_proportions_nb = np.asarray(grids["allo_minus_ego_hit_proportions_nb"])
+
+        bad_bnb = ~np.logical_or(np.isnan(allo_minus_ego_hit_proportions_b), np.isnan(allo_minus_ego_hit_proportions_nb))
+        bnb_p = stats.wilcoxon(np.compress(bad_bnb, allo_minus_ego_hit_proportions_b), np.compress(bad_bnb, allo_minus_ego_hit_proportions_nb))[1]
+
+        allo_minus_ego_hit_proportions_b = allo_minus_ego_hit_proportions_b[~np.isnan(allo_minus_ego_hit_proportions_b)]
+        allo_minus_ego_hit_proportions_nb = allo_minus_ego_hit_proportions_nb[~np.isnan(allo_minus_ego_hit_proportions_nb)]
+
+
+
+
+        data = [allo_minus_ego_hit_proportions_b, allo_minus_ego_hit_proportions_nb]
+
+        pts = np.linspace(0, np.pi * 2, 24)
+        circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+        vert = np.r_[circ, circ[::-1] * .7]
+        open_circle = mpl.path.Path(vert)
+
+        x4 = 3 * np.ones(len(allo_minus_ego_hit_proportions_b))
+        x5 = 4 * np.ones(len(allo_minus_ego_hit_proportions_nb))
+        x = np.concatenate((x4, x5), axis=0)
+        y = np.concatenate((allo_minus_ego_hit_proportions_b, allo_minus_ego_hit_proportions_nb), axis=0)
+        sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0, clip_on=False)
+
+        ax.bar(0, np.nanmedian(allo_minus_ego_hit_proportions_b), edgecolor="black", color="None", facecolor="None", linewidth=3, width=0.5)
+        ax.bar(1, np.nanmedian(allo_minus_ego_hit_proportions_nb), edgecolor="blue", color="None", facecolor="None", linewidth=3, width=0.5)
+
+        significance_bar(start=0, end=1, height=0.8, displaystring=get_p_text(bnb_p))
+
+        ax.axhline(y=0, linestyle="dashed", color="black")
+        ax.set_xticks([0,1, 2 ])
+        ax.set_yticks([-1, 0, 1])
+        ax.set_ylim([-1, 1])
+        ax.set_xticklabels(["Cued", "PI", " "])
+        ax.set_ylabel("% Allocentric - % Egocentric\nduring_hmt_trials", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+
+        ax.tick_params(axis='both', which='both', labelsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/allo_minus_ego_coding_tt_'+name+'.png', dpi=300)
+        plt.close()
+
+    return
+
+def plot_allo_minus_ego_component3(concantenated_dataframe,  save_path):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix="")
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+
+    p_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    d_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+
+    for grids, name, in zip([p_grids, d_grids], ["P_cells", "D_cells"]):
+
+        fig, ax = plt.subplots(1,1, figsize=(6,6))
+        allo_minus_ego_hit_proportions_nb = np.asarray(grids["allo_minus_ego_hit_proportions_nb"])
+        allo_minus_ego_try_proportions_nb = np.asarray(grids["allo_minus_ego_try_proportions_nb"])
+        allo_minus_ego_miss_proportions_nb = np.asarray(grids["allo_minus_ego_miss_proportions_nb"])
+
+        bad_ht = ~np.logical_or(np.isnan(allo_minus_ego_hit_proportions_nb), np.isnan(allo_minus_ego_try_proportions_nb))
+        bad_hm = ~np.logical_or(np.isnan(allo_minus_ego_hit_proportions_nb), np.isnan(allo_minus_ego_miss_proportions_nb))
+        hit_try_p = stats.wilcoxon(np.compress(bad_ht, allo_minus_ego_hit_proportions_nb), np.compress(bad_ht, allo_minus_ego_try_proportions_nb))[1]
+        hit_miss_p = stats.wilcoxon(np.compress(bad_hm, allo_minus_ego_hit_proportions_nb), np.compress(bad_hm, allo_minus_ego_miss_proportions_nb))[1]
+
+        allo_minus_ego_hit_proportions_nb = allo_minus_ego_hit_proportions_nb[~np.isnan(allo_minus_ego_hit_proportions_nb)]
+        allo_minus_ego_try_proportions_nb = allo_minus_ego_try_proportions_nb[~np.isnan(allo_minus_ego_try_proportions_nb)]
+        allo_minus_ego_miss_proportions_nb = allo_minus_ego_miss_proportions_nb[~np.isnan(allo_minus_ego_miss_proportions_nb)]
+
+        data = [allo_minus_ego_hit_proportions_nb, allo_minus_ego_try_proportions_nb, allo_minus_ego_miss_proportions_nb]
+
+        pts = np.linspace(0, np.pi * 2, 24)
+        circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+        vert = np.r_[circ, circ[::-1] * .7]
+        open_circle = mpl.path.Path(vert)
+
+        x4 = 3 * np.ones(len(allo_minus_ego_hit_proportions_nb))
+        x5 = 4 * np.ones(len(allo_minus_ego_try_proportions_nb))
+        x6 = 5 * np.ones(len(allo_minus_ego_miss_proportions_nb))
+        x = np.concatenate((x4, x5, x6), axis=0)
+        y = np.concatenate((allo_minus_ego_hit_proportions_nb, allo_minus_ego_try_proportions_nb, allo_minus_ego_miss_proportions_nb), axis=0)
+        sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0, clip_on=False)
+
+        colors=["green", "orange", "red", "green", "orange", "red"]
+        boxprops = dict(linewidth=3, color='k')
+        medianprops = dict(linewidth=3, color='k')
+        capprops = dict(linewidth=3, color='k')
+        whiskerprops = dict(linewidth=3, color='k')
+        #box = ax.boxplot(data, positions=[0,1,2,3,4,5], boxprops=boxprops, medianprops=medianprops,
+        #                 whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+        #for patch, color in zip(box['boxes'], colors):
+        #    patch.set_facecolor(color)
+
+        ax.bar(0, np.nanmedian(allo_minus_ego_hit_proportions_nb), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+        ax.bar(1, np.nanmedian(allo_minus_ego_try_proportions_nb), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+        ax.bar(2, np.nanmedian(allo_minus_ego_miss_proportions_nb), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+
+        #ax.bar(3, np.nanmean(allo_minus_ego_hit_proportions_nb), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(4, np.nanmean(allo_minus_ego_try_proportions_nb), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(5, np.nanmean(allo_minus_ego_miss_proportions_nb), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+
+        #vp = ax.violinplot(data, [0, 1,2], widths=0.5,
+        #                   showmeans=False, showmedians=True, showextrema=False)
+        #for i, pc in enumerate(vp['bodies']):
+        #    pc.set_facecolor(colors[i])
+        #    pc.set_edgecolor('black')
+        #    pc.set_alpha(1)
+
+        significance_bar(start=0, end=1, height=0.8, displaystring=get_p_text(hit_try_p))
+        significance_bar(start=0, end=2, height=1, displaystring=get_p_text(hit_miss_p))
+
+
+        ax.axhline(y=0, linestyle="dashed", color="black")
+        ax.set_xticks([0,1,2])
+        ax.set_yticks([-1, 0, 1])
+        ax.set_ylim([-1, 1])
+        ax.set_xticklabels(["Hit", "Try", "Miss"])
+        ax.set_ylabel("% Allocentric - % Egocentric\nduring_hmt_trials", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+
+        ax.tick_params(axis='both', which='both', labelsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/allo_minus_ego_coding_'+name+'.png', dpi=300)
+        plt.close()
+
+    return
+
+def plot_allo_minus_ego_component2(concantenated_dataframe,  save_path):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix="")
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+
+    p_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    d_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+
+    for grids, name, in zip([grid_cells, p_grids, d_grids], ["all_cells", "P_cells", "D_cells"]):
+
+        fig, ax = plt.subplots(1,1, figsize=(6,6))
+        allo_minus_ego_hit_proportions_b = np.asarray(grids["allo_minus_ego_hit_proportions_b"])
+        allo_minus_ego_hit_proportions_nb = np.asarray(grids["allo_minus_ego_hit_proportions_nb"])
+        allo_minus_ego_try_proportions_b = np.asarray(grids["allo_minus_ego_try_proportions_b"])
+        allo_minus_ego_try_proportions_nb = np.asarray(grids["allo_minus_ego_try_proportions_nb"])
+        allo_minus_ego_miss_proportions_b = np.asarray(grids["allo_minus_ego_miss_proportions_b"])
+        allo_minus_ego_miss_proportions_nb = np.asarray(grids["allo_minus_ego_miss_proportions_nb"])
+
+
+        allo_minus_ego_hit_proportions_b = allo_minus_ego_hit_proportions_b[~np.isnan(allo_minus_ego_hit_proportions_b)]
+        allo_minus_ego_hit_proportions_nb = allo_minus_ego_hit_proportions_nb[~np.isnan(allo_minus_ego_hit_proportions_nb)]
+        allo_minus_ego_try_proportions_b = allo_minus_ego_try_proportions_b[~np.isnan(allo_minus_ego_try_proportions_b)]
+        allo_minus_ego_try_proportions_nb = allo_minus_ego_try_proportions_nb[~np.isnan(allo_minus_ego_try_proportions_nb)]
+        allo_minus_ego_miss_proportions_b = allo_minus_ego_miss_proportions_b[~np.isnan(allo_minus_ego_miss_proportions_b)]
+        allo_minus_ego_miss_proportions_nb = allo_minus_ego_miss_proportions_nb[~np.isnan(allo_minus_ego_miss_proportions_nb)]
+
+        data = [allo_minus_ego_hit_proportions_b, allo_minus_ego_try_proportions_b, allo_minus_ego_miss_proportions_b,
+                allo_minus_ego_hit_proportions_nb, allo_minus_ego_try_proportions_nb, allo_minus_ego_miss_proportions_nb]
+
+        pts = np.linspace(0, np.pi * 2, 24)
+        circ = np.c_[np.sin(pts) / 2, -np.cos(pts) / 2]
+        vert = np.r_[circ, circ[::-1] * .7]
+        open_circle = mpl.path.Path(vert)
+
+        x1 = 0 * np.ones(len(allo_minus_ego_hit_proportions_b))
+        x2 = 1 * np.ones(len(allo_minus_ego_try_proportions_b))
+        x3 = 2 * np.ones(len(allo_minus_ego_miss_proportions_b))
+        x4 = 3 * np.ones(len(allo_minus_ego_hit_proportions_nb))
+        x5 = 4 * np.ones(len(allo_minus_ego_try_proportions_nb))
+        x6 = 5 * np.ones(len(allo_minus_ego_miss_proportions_nb))
+        x = np.concatenate((x1, x2, x3, x4, x5, x6), axis=0)
+        y = np.concatenate((allo_minus_ego_hit_proportions_b, allo_minus_ego_try_proportions_b, allo_minus_ego_miss_proportions_b,
+                            allo_minus_ego_hit_proportions_nb, allo_minus_ego_try_proportions_nb, allo_minus_ego_miss_proportions_nb), axis=0)
+        sns.stripplot(x, y, ax=ax, color="black", marker=open_circle, linewidth=.001, zorder=0, clip_on=False)
+
+        colors=["green", "orange", "red", "green", "orange", "red"]
+        boxprops = dict(linewidth=3, color='k')
+        medianprops = dict(linewidth=3, color='k')
+        capprops = dict(linewidth=3, color='k')
+        whiskerprops = dict(linewidth=3, color='k')
+        #box = ax.boxplot(data, positions=[0,1,2,3,4,5], boxprops=boxprops, medianprops=medianprops,
+        #                 whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+        #for patch, color in zip(box['boxes'], colors):
+        #    patch.set_facecolor(color)
+
+        #ax.bar(0, np.nanmean(allo_minus_ego_hit_proportions_b), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(1, np.nanmean(allo_minus_ego_try_proportions_b), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(2, np.nanmean(allo_minus_ego_miss_proportions_b), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+
+        #ax.bar(3, np.nanmean(allo_minus_ego_hit_proportions_nb), edgecolor="green", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(4, np.nanmean(allo_minus_ego_try_proportions_nb), edgecolor="orange", color="None", facecolor="None", linewidth=3, width=0.5)
+        #ax.bar(5, np.nanmean(allo_minus_ego_miss_proportions_nb), edgecolor="red", color="None", facecolor="None", linewidth=3, width=0.5)
+
+        vp = ax.violinplot(data, [0, 1,2,3,4,5], widths=0.5,
+                           showmeans=False, showmedians=True, showextrema=False)
+        #for i, pc in enumerate(vp['bodies']):
+        #    pc.set_facecolor(colors[i])
+        #    pc.set_edgecolor('black')
+        #    pc.set_alpha(1)
+
+        p = stats.mannwhitneyu(allo_minus_ego_hit_proportions_b, allo_minus_ego_hit_proportions_nb)[1]
+        significance_bar(start=0, end=3, height=1, displaystring=get_p_text(p))
+        p = stats.mannwhitneyu(allo_minus_ego_hit_proportions_nb, allo_minus_ego_try_proportions_nb)[1]
+        significance_bar(start=3, end=4, height=0.8, displaystring=get_p_text(p))
+        p = stats.mannwhitneyu(allo_minus_ego_hit_proportions_nb, allo_minus_ego_miss_proportions_nb)[1]
+        significance_bar(start=3, end=5, height=0.9, displaystring=get_p_text(p))
+
+
+        ax.axhline(y=0, linestyle="dashed", color="black")
+        ax.set_xticks([1,5])
+        ax.set_yticks([-1, 0, 1])
+        ax.set_ylim([-1, 1])
+        ax.set_xticklabels(["Cued", "PI"])
+        ax.set_ylabel("% Allocentric - % Egocentric\nduring_hmt_trials", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='major', labelsize=25)
+
+        ax.tick_params(axis='both', which='both', labelsize=20)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/allo_minus_ego_coding_'+name+'.png', dpi=300)
+        plt.close()
+
+    return
+
+def plot_allo_minus_ego_component(concantenated_dataframe,  save_path):
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    grid_cells = add_lomb_classifier(grid_cells, suffix="")
+    grid_cells = add_session_number(grid_cells)
+    grid_cells = extract_hit_success(grid_cells)
+
+    p_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    d_grids = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+
+    for grids, name, in zip([grid_cells, p_grids, d_grids], ["all_cells", "P_cells", "D_cells"]):
+
+        for hmt in ["hit", "miss", "try"]:
+            fig, ax = plt.subplots(1,1, figsize=(6,6))
+
+            allo_minus_ego_hmt_proportions_b = np.asarray(grids["allo_minus_ego_"+hmt+"_proportions_b"])
+            allo_minus_ego_hmt_proportions_nb = np.asarray(grids["allo_minus_ego_"+hmt+"_proportions_nb"])
+
+            allo_minus_ego_hmt_proportions_b = allo_minus_ego_hmt_proportions_b[~np.isnan(allo_minus_ego_hmt_proportions_b)]
+            allo_minus_ego_hmt_proportions_nb = allo_minus_ego_hmt_proportions_nb[~np.isnan(allo_minus_ego_hmt_proportions_nb)]
+
+            data = [allo_minus_ego_hmt_proportions_b, allo_minus_ego_hmt_proportions_nb]
+            p = stats.mannwhitneyu(allo_minus_ego_hmt_proportions_b, allo_minus_ego_hmt_proportions_nb)[1]
+            vp = ax.violinplot(data, [0, 1], widths=0.5,
+                               showmeans=False, showmedians=True, showextrema=False)
+
+            x1 = 0 * np.ones(len(allo_minus_ego_hmt_proportions_b))
+            x2 = 1 * np.ones(len(allo_minus_ego_hmt_proportions_nb))
+            #Combine the sampled data together
+            x = np.concatenate((x1, x2), axis=0)
+            y = np.concatenate((allo_minus_ego_hmt_proportions_b, allo_minus_ego_hmt_proportions_nb), axis=0)
+            sns.stripplot(x, y, ax=ax, color="black", jitter=0.2)
+            significance_bar(start=0, end=1, height=1, displaystring=get_p_text(p))
+
+            ax.axhline(y=0, linestyle="dashed", color="black")
+            ax.set_xticks([0,1])
+            ax.set_yticks([-1, 0, 1])
+            ax.set_ylim([-1, 1])
+            ax.set_xticklabels(["Cued", "PI"])
+            ax.set_ylabel("% Allocentric - % Egocentric\nduring "+hmt+" trials", fontsize=20, labelpad=10)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.xaxis.set_tick_params(length=0)
+            ax.tick_params(axis='both', which='major', labelsize=25)
+
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+            plt.savefig(save_path + '/allo_minus_ego_coding_'+name+'_'+hmt+'.png', dpi=300)
+            plt.close()
+
+    return
 
 def plot_code_components_against_behaviour(concantenated_dataframe,  save_path):
     grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
     grid_cells = add_lomb_classifier(grid_cells, suffix="")
     grid_cells = add_session_number(grid_cells)
     grid_cells = extract_hit_success(grid_cells)
+
 
     fig, ax = plt.subplots(1,1, figsize=(6,6))
     ax.scatter(grid_cells["percentage_b_hits"], grid_cells["percentage_allocentric"], c="black")
@@ -4169,12 +4472,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
             spike_data = add_lomb_classifier(spike_data)
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
-
-            #if get_track_length(recording)>200:
-            #    processed_position_data = calculate_rewarded_stops(processed_position_data, track_length=get_track_length(recording))
-            #    processed_position_data = calculate_rewarded_trials(processed_position_data)
-            #    processed_position_data.to_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            #shuffle_data = pd.read_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             if len(spike_data)>0:
                 #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
@@ -4183,8 +4481,6 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
 
                 #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording))
-                if len(spike_data.fr_binned_in_space.iloc[0][0])<200:
-                    print("stop here")
                 #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
 
                 #spike_data = plot_firing_rate_maps(spike_data=spike_data, processed_position_data=processed_position_data, raw_position_data=raw_position_data, output_path=output_path, track_length=get_track_length(recording))
@@ -4192,19 +4488,21 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
                 # ANALYSIS BY HMT OF NON BEACONED TRIALS
                 #spike_data = add_mean_firing_rate_hmt(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
-                plot_firing_rate_maps_per_trial_by_hmt(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
-                plot_firing_rate_maps_per_trial_by_hmt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                #plot_firing_rate_maps_per_trial_by_hmt(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                #plot_firing_rate_maps_per_trial_by_hmt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
                 #plot_realignment_matrix(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
 
                 # ANALYSIS BY TT OF HIT TRIALS
-                spike_data = plot_firing_rate_maps_hits_between_trial_types(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
-                plot_firing_rate_maps_per_trial_by_tt(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), hmts=["hit"])
-                plot_firing_rate_maps_per_trial_by_tt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), hmts=["hit"])
+                #spike_data = plot_firing_rate_maps_hits_between_trial_types(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+                #plot_firing_rate_maps_per_trial_by_tt(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), hmts=["hit"])
+                #plot_firing_rate_maps_per_trial_by_tt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), hmts=["hit"])
 
-                #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), tt=0, suffix="hit")
-                #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), tt=1, suffix="hit")
-                #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "miss"], output_path, track_length=get_track_length(recording), tt=1, suffix="miss")
-                #plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "try"], output_path, track_length=get_track_length(recording), tt=1, suffix="try")
+                # BEHAVIOUR PLOTS
+                plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), tt=0, suffix="hit")
+                plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "hit"], output_path, track_length=get_track_length(recording), tt=1, suffix="hit")
+                plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "miss"], output_path, track_length=get_track_length(recording), tt=1, suffix="miss")
+                plot_speed_histogram_with_error(processed_position_data[processed_position_data["hit_miss_try"] == "try"], output_path, track_length=get_track_length(recording), tt=1, suffix="try")
+
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, suffix="")
                 #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
@@ -4212,9 +4510,9 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_snr(spike_data, processed_position_data, output_path, track_length =get_track_length(recording))
                 #plot_snr_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                #plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
+                #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_rolling_lomb_codes_across_cells2(spike_data, paired_recording, output_path)
                 #plot_rolling_lomb_codes_across_cells(spike_data, paired_recording, processed_position_data, output_path, track_length = get_track_length(recording))
                 #spike_data = plot_power_by_hmt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
@@ -4278,7 +4576,7 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
-    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02']
     #vr_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
@@ -4287,6 +4585,7 @@ def main():
     process_recordings(vr_path_list, of_path_list)
 
     combined_shuffle_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
+    #combined_df = combined_df[combined_df["track_length"] == 200]
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df = add_lomb_classifier(combined_df,suffix="")
     #read_df(combined_df)
@@ -4299,28 +4598,30 @@ def main():
     #plot_trial_type_hmt_difference(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/trial_type_differences")
     #plot_trial_type_hmt_difference_hist(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/trial_type_differences")
     #plot_proportion_significant_to_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt")
-    plot_mean_firing_rates_vr_vs_of(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_mean_firing_rates_vr_vs_of(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_max_freq_histogram(combined_df, combined_shuffle_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_overview_ordered(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_spatial_info_vs_pearson(combined_df, output_path="/mnt/datastore/Harry/Vr_grid_cells/")
-    plot_lomb_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
-    for suffix in ["", "_all_beaconed", "_all_nonbeaconed", "_all_probe", "_nonbeaconed_hits", "_all_tries", "_all_misses"]:
-        combined_df = add_lomb_classifier(combined_df,suffix=suffix)
-    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_proportions(combined_df, suffix="_nonbeaconed_hits", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #for suffix in ["", "_all_beaconed", "_all_nonbeaconed", "_all_probe", "_nonbeaconed_hits", "_all_tries", "_all_misses"]:
+    #    combined_df = add_lomb_classifier(combined_df,suffix=suffix)
+    #plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions(combined_df, suffix="_nonbeaconed_hits", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     #plot_lomb_classifiers_by_trial_type(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_classifiers_by_trial_outcome(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     #plot_lomb_classifiers_proportions_by_mouse(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_proportions_by_hit_success(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_proportions_by_hit_success2(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions_by_hit_success(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_lomb_classifiers_proportions_by_hit_success2(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
 
     # Behaviour ego and allo
-    plot_code_components_against_behaviour(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-
+    #plot_code_components_against_behaviour(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    #plot_allo_minus_ego_component(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_allo_minus_ego_component3(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_allo_minus_ego_component4(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
 
     #plot_grid_scores_by_classifier(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")

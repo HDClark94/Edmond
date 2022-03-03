@@ -364,6 +364,7 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                 grid_pairs_vs_shuffle = []
                 grid_non_grid_pairs_vs_shuffle = []
                 non_grid_non_grid_pairs_vs_shuffle = []
+                tetrode_level = []
                 for i in range(len(cross_correlations[0])):
                     for j in range(len(cross_correlations[0][0])):
                         cluster_j_classifier = spike_data[spike_data["cluster_id"] == ids[j]]["grid_cell"].iloc[0]
@@ -373,8 +374,10 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
 
                         if tetrode_i == tetrode_j:
                             marker="x"
+                            tetrode_level.append("same")
                         else:
                             marker="o"
+                            tetrode_level.append("different")
 
                         if ((cluster_j_classifier == True) and (cluster_i_classifier == True)):
                             ax.scatter(cross_correlations[0, i, j], np.nanmean(cross_correlations[1:], axis=0)[i, j], marker=marker, color="red", zorder=10)
@@ -397,6 +400,7 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                 plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'joint_alignment_correlations_shuffle_vs_real_'+hmt+'_'+str(tt)+'png', dpi=300)
                 plt.close()
 
+                tetrode_level = np.array(tetrode_level)
                 grid_pairs_vs_shuffle = np.array(grid_pairs_vs_shuffle); gg_p = stats.wilcoxon(grid_pairs_vs_shuffle)[1]; gg_p= get_p_text(gg_p, ns=False)
                 grid_non_grid_pairs_vs_shuffle = np.array(grid_non_grid_pairs_vs_shuffle); gng_p = stats.wilcoxon(grid_non_grid_pairs_vs_shuffle)[1]; gng_p= get_p_text(gng_p, ns=False)
                 non_grid_non_grid_pairs_vs_shuffle = np.array(non_grid_non_grid_pairs_vs_shuffle); ngng_p = stats.wilcoxon(non_grid_non_grid_pairs_vs_shuffle)[1]; ngng_p= get_p_text(ngng_p, ns=False)
@@ -428,6 +432,7 @@ def plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position
                 session_df["session_id"] = [spike_data.session_id.iloc[0]]
                 session_df["trial_type"] = [tt]
                 session_df["hit_miss_try"] = [hmt]
+                session_df["tetrode_level"] = [tetrode_level]
                 session_df["grid_pairs_vs_shuffle"] = [grid_pairs_vs_shuffle]
                 session_df["grid_non_grid_pairs_vs_shuffle"] = [grid_non_grid_pairs_vs_shuffle]
                 session_df["non_grid_non_grid_pairs_vs_shuffle"] = [non_grid_non_grid_pairs_vs_shuffle]
@@ -938,7 +943,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
@@ -948,8 +953,8 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
             if paired_recording is not None:
                 of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-                #spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
-                #plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
+                spike_data = plot_joint_cell_correlations(spike_data, of_spike_data, processed_position_data, position_data, raw_position_data, output_path, get_track_length(recording))
+                plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
                 matched_recording_df = plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording), matched_recording_df)
                 matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
                 #plot_joint_cell_cross_correlations(spike_data, output_path)
@@ -994,9 +999,20 @@ def main():
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
                     '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24']
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D35_2021-06-25_12-02-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D37_2021-06-29_11-50-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D38_2021-06-30_11-54-56',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D41_2021-07-05_12-05-02',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D6_2021-05-17_10-26-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
+                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
-    #process_recordings(vr_path_list, of_path_list)
+    process_recordings(vr_path_list, of_path_list)
 
     combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
     combined_df = add_lomb_classifier(combined_df,suffix="")

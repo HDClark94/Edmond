@@ -16,6 +16,7 @@ from scipy.interpolate import interp1d
 from astropy.convolution import convolve, Gaussian1DKernel, Gaussian2DKernel
 import os
 import traceback
+from astropy.nddata import block_reduce
 import warnings
 import matplotlib.ticker as ticker
 import sys
@@ -683,8 +684,6 @@ def plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, positio
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_autocorrelogram_Cluster_' + str(cluster_id) + suffix + '.png', dpi=200)
             plt.close()
 
-    return spike_data
-
 
 def plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length, suffix=""):
     print('plotting spike spatial autocorrelogram...')
@@ -738,8 +737,6 @@ def plot_spatial_autocorrelogram(spike_data, processed_position_data, output_pat
             plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_autocorrelogram_Cluster_' + str(cluster_id) + suffix + '.png', dpi=200)
             plt.close()
-
-    return spike_data
 
 
 def moving_sum(array, window):
@@ -821,7 +818,7 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, po
 
             powers = []
             centre_distances = []
-            indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::2]
+            indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
             for m in indices_to_test:
                 ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
                 power = ls.power(frequency)
@@ -921,7 +918,7 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, po
                 # run moving window lomb on the shuffled firing
                 shuffle_powers = []
                 shuffle_centre_distances = []
-                indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::2]
+                indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
                 for m in indices_to_test:
                     ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
                     shuffle_power = ls.power(frequency)
@@ -1968,6 +1965,17 @@ def plot_spikes_on_track(spike_data, processed_position_data, output_path, track
                 plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_track_firing_Cluster_' + str(cluster_id) + '.png', dpi=200)
             plt.close()
 
+def get_vmin_vmax(cluster_firing_maps, bin_cm=8):
+    cluster_firing_maps_reduced = []
+    for i in range(len(cluster_firing_maps)):
+        cluster_firing_maps_reduced.append(block_reduce(cluster_firing_maps[i], bin_cm, func=np.mean))
+    cluster_firing_maps_reduced = np.array(cluster_firing_maps_reduced)
+    vmin= 0
+    vmax= np.max(cluster_firing_maps_reduced)
+    if vmax==0:
+        print("stop here")
+    return vmin, vmax
+
 def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_path, track_length):
     print('plotting trial firing rate maps...')
     save_path = output_path + '/Figures/firing_rate_maps_trials'
@@ -1977,45 +1985,44 @@ def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
         if len(firing_times_cluster)>1:
+            cluster_firing_maps2 = np.array(spike_data["fr_binned_in_space"].iloc[cluster_index])
+            where_are_NaNs2 = np.isnan(cluster_firing_maps2)
+            cluster_firing_maps2[where_are_NaNs2] = 0
+            cluster_firing_maps = min_max_normalize(cluster_firing_maps2)
+            vmin, vmax = get_vmin_vmax(cluster_firing_maps)
+
 
             x_max = len(processed_position_data)
             spikes_on_track = plt.figure()
             spikes_on_track.set_size_inches(5, 5, forward=True)
             ax = spikes_on_track.add_subplot(1, 1, 1)
-
-            cluster_firing_maps = np.array(spike_data["firing_rate_maps"].iloc[cluster_index])
-            where_are_NaNs = np.isnan(cluster_firing_maps)
-            cluster_firing_maps[where_are_NaNs] = 0
-
-            if len(cluster_firing_maps) == 0:
-                print("stop here")
-
-            cluster_firing_maps = min_max_normalize(cluster_firing_maps)
-
+            locations = np.arange(0, len(cluster_firing_maps[0]))
+            ordered = np.arange(0, len(processed_position_data), 1)
+            X, Y = np.meshgrid(locations, ordered)
             cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
-            cmap.set_bad(color='white')
-            bin_size = settings.vr_grid_analysis_bin_size
-
-            tmp = []
-            for i in range(len(cluster_firing_maps[0])):
-                for j in range(int(settings.vr_grid_analysis_bin_size)):
-                    tmp.append(cluster_firing_maps[:, i].tolist())
-            cluster_firing_maps = np.array(tmp).T
-            c = ax.imshow(cluster_firing_maps, interpolation='none', cmap=cmap, vmin=0, vmax=np.max(cluster_firing_maps), origin='lower', aspect="auto")
-
+            ax.pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
             plt.ylabel('Trial Number', fontsize=20, labelpad = 20)
             plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
             plt.xlim(0, track_length)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            plt.xlabel('Location (cm)', fontsize=25, labelpad = 20)
+            ax.set_xlim([0, track_length])
+            ax.set_ylim([0, len(processed_position_data)-1])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
             tick_spacing = 100
+            plt.locator_params(axis='y', nbins=3)
             ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
             ax.yaxis.set_ticks_position('left')
             ax.xaxis.set_ticks_position('bottom')
-            Edmond.plot_utility2.style_track_plot(ax, track_length)
-            Edmond.plot_utility2.style_vr_plot(ax, x_max)
-            plt.locator_params(axis = 'y', nbins  = 4)
-            plt.xticks(fontsize=20)
-            plt.yticks(fontsize=20)
-            plt.tight_layout()
+            spikes_on_track.tight_layout(pad=2.0)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+
+            #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+            #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+            #cbar.set_ticks([0,np.max(cluster_firing_maps)])
+            #cbar.set_ticklabels(["0", "Max"])
+            #cbar.ax.tick_params(labelsize=20)
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_map_trials_' + str(cluster_id) + '.png', dpi=300)
             plt.close()
 
@@ -2523,7 +2530,24 @@ def add_percentage_hits(spike_data, processed_position_data):
     return spike_data
 
 
-def add_rolling_lomb_classifier_percentages(spike_data):
+def get_lomb_classifier_per_trial(rolling_points, rolling_classifier, processed_position_data):
+    lomb_class_per_trial = []
+    for tn in processed_position_data["trial_number"]:
+        rolling_classifier_trial = rolling_classifier[rolling_points == tn]
+        if len(rolling_classifier_trial) == 0:
+            lomb_class_per_trial.append(np.nan)
+        else:
+            lomb_class_per_trial.append(stats.mode(rolling_classifier_trial)[0][0])
+    return np.array(lomb_class_per_trial)
+
+def add_rolling_lomb_classifier_percentages(spike_data, proceseed_position_data):
+
+    allo_minus_ego_hit_proportions_b = []
+    allo_minus_ego_try_proportions_b = []
+    allo_minus_ego_miss_proportions_b = []
+    allo_minus_ego_hit_proportions_nb = []
+    allo_minus_ego_try_proportions_nb = []
+    allo_minus_ego_miss_proportions_nb = []
 
     percentage_ego = []
     percentage_allo = []
@@ -2534,23 +2558,80 @@ def add_rolling_lomb_classifier_percentages(spike_data):
             powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
             centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
             centre_trials = np.round(centre_trials).astype(np.int64)
-            rolling_lomb_classifier, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers)
+            rolling_lomb_classifier, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial_not_numeric(centre_trials, powers)
+            lomb_classifier_per_trial = get_lomb_classifier_per_trial(rolling_points, rolling_lomb_classifier, proceseed_position_data)
 
-            allo = (len(rolling_lomb_classifier[rolling_lomb_classifier==0.5])/len(centre_trials))*100
-            ego = (len(rolling_lomb_classifier[rolling_lomb_classifier==1.5])/len(centre_trials))*100
+            allo = (len(rolling_lomb_classifier[rolling_lomb_classifier=="Position"])/len(centre_trials))*100
+            ego = (len(rolling_lomb_classifier[rolling_lomb_classifier=="Distance"])/len(centre_trials))*100
+
+            classifiers_during_b_hits = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==0) & (proceseed_position_data["hit_miss_try"]=="hit")]["trial_number"]-1]
+            classifiers_during_b_tries = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==0) & (proceseed_position_data["hit_miss_try"]=="try")]["trial_number"]-1]
+            classifiers_during_b_misses = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==0) & (proceseed_position_data["hit_miss_try"]=="miss")]["trial_number"]-1]
+            classifiers_during_nb_hits = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==1) & (proceseed_position_data["hit_miss_try"]=="hit")]["trial_number"]-1]
+            classifiers_during_nb_tries = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==1) & (proceseed_position_data["hit_miss_try"]=="try")]["trial_number"]-1]
+            classifiers_during_nb_misses = lomb_classifier_per_trial[proceseed_position_data[(proceseed_position_data["trial_type"]==1) & (proceseed_position_data["hit_miss_try"]=="miss")]["trial_number"]-1]
+
+            if len(classifiers_during_b_hits)>0:
+                allo_minus_ego_hit_proportion_b = (len(classifiers_during_b_hits[classifiers_during_b_hits=="Position"])/len(classifiers_during_b_hits))-(len(classifiers_during_b_hits[classifiers_during_b_hits=="Distance"])/len(classifiers_during_b_hits))
+            else:
+                allo_minus_ego_hit_proportion_b = np.nan
+
+            if len(classifiers_during_b_tries)>0:
+                allo_minus_ego_try_proportion_b = (len(classifiers_during_b_tries[classifiers_during_b_tries=="Position"])/len(classifiers_during_b_tries))-(len(classifiers_during_b_tries[classifiers_during_b_tries=="Distance"])/len(classifiers_during_b_tries))
+            else:
+                allo_minus_ego_try_proportion_b = np.nan
+
+            if len(classifiers_during_b_misses)>0:
+                allo_minus_ego_miss_proportion_b = (len(classifiers_during_b_misses[classifiers_during_b_misses=="Position"])/len(classifiers_during_b_misses))-(len(classifiers_during_b_misses[classifiers_during_b_misses=="Distance"])/len(classifiers_during_b_misses))
+            else:
+                allo_minus_ego_miss_proportion_b = np.nan
+
+            if len(classifiers_during_nb_hits)>0:
+                allo_minus_ego_hit_proportion_nb = (len(classifiers_during_nb_hits[classifiers_during_nb_hits=="Position"])/len(classifiers_during_nb_hits))-(len(classifiers_during_nb_hits[classifiers_during_nb_hits=="Distance"])/len(classifiers_during_nb_hits))
+            else:
+                allo_minus_ego_hit_proportion_nb = np.nan
+
+            if len(classifiers_during_nb_tries):
+                allo_minus_ego_try_proportion_nb = (len(classifiers_during_nb_tries[classifiers_during_nb_tries=="Position"])/len(classifiers_during_nb_tries))-(len(classifiers_during_nb_tries[classifiers_during_nb_tries=="Distance"])/len(classifiers_during_nb_tries))
+            else:
+                allo_minus_ego_try_proportion_nb = np.nan
+
+            if len(classifiers_during_nb_misses)>0:
+                allo_minus_ego_miss_proportion_nb = (len(classifiers_during_nb_misses[classifiers_during_nb_misses=="Position"])/len(classifiers_during_nb_misses))-(len(classifiers_during_nb_misses[classifiers_during_nb_misses=="Distance"])/len(classifiers_during_nb_misses))
+            else:
+                allo_minus_ego_miss_proportion_nb = np.nan
+
         else:
             allo = np.nan
             ego = np.nan
+            allo_minus_ego_hit_proportion_b = np.nan
+            allo_minus_ego_try_proportion_b = np.nan
+            allo_minus_ego_miss_proportion_b = np.nan
+            allo_minus_ego_hit_proportion_nb = np.nan
+            allo_minus_ego_try_proportion_nb = np.nan
+            allo_minus_ego_miss_proportion_nb = np.nan
 
         percentage_allo.append(allo)
         percentage_ego.append(ego)
+        allo_minus_ego_hit_proportions_b.append(allo_minus_ego_hit_proportion_b)
+        allo_minus_ego_try_proportions_b.append(allo_minus_ego_try_proportion_b)
+        allo_minus_ego_miss_proportions_b.append(allo_minus_ego_miss_proportion_b)
+        allo_minus_ego_hit_proportions_nb.append(allo_minus_ego_hit_proportion_nb)
+        allo_minus_ego_try_proportions_nb.append(allo_minus_ego_try_proportion_nb)
+        allo_minus_ego_miss_proportions_nb.append(allo_minus_ego_miss_proportion_nb)
 
     spike_data["percentage_allocentric"] = percentage_allo
     spike_data["percentage_egocentric"] = percentage_ego
+    spike_data["allo_minus_ego_hit_proportions_b"] = allo_minus_ego_hit_proportions_b
+    spike_data["allo_minus_ego_try_proportions_b"] = allo_minus_ego_try_proportions_b
+    spike_data["allo_minus_ego_miss_proportions_b"] = allo_minus_ego_miss_proportions_b
+    spike_data["allo_minus_ego_hit_proportions_nb"] = allo_minus_ego_hit_proportions_nb
+    spike_data["allo_minus_ego_try_proportions_nb"] = allo_minus_ego_try_proportions_nb
+    spike_data["allo_minus_ego_miss_proportions_nb"] = allo_minus_ego_miss_proportions_nb
     return spike_data
 
 
-def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
+def get_rolling_lomb_classifier_for_centre_trial_not_numeric(centre_trials, powers, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
     frequency = Settings.frequency
 
     trial_points = []
@@ -2574,13 +2655,13 @@ def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, n_window
         peak_frequencies.append(max_SNR_freq)
         trial_points.append(centre_trial)
         if lomb_classifier == "Position":
-            rolling_lomb_classifier.append(0.5)
+            rolling_lomb_classifier.append("Position")
             rolling_lomb_classifier_colors.append(Settings.allocentric_color)
         elif lomb_classifier == "Distance":
-            rolling_lomb_classifier.append(1.5)
+            rolling_lomb_classifier.append("Distance")
             rolling_lomb_classifier_colors.append(Settings.egocentric_color)
         elif lomb_classifier == "Null":
-            rolling_lomb_classifier.append(2.5)
+            rolling_lomb_classifier.append("Null")
             rolling_lomb_classifier_colors.append(Settings.null_color)
         else:
             rolling_lomb_classifier.append(3.5)
@@ -2596,7 +2677,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
 
             position_data = add_time_elapsed_collumn(position_data)
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
@@ -2604,32 +2685,32 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
 
             # BEHAVIOURAL
-            #processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            #processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
-            #spike_data = add_percentage_hits(spike_data, processed_position_data)
+            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+            spike_data = add_percentage_hits(spike_data, processed_position_data)
 
             # MOVING LOMB PERIODOGRAMS
-            #spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
-            spike_data = add_rolling_lomb_classifier_percentages(spike_data)
-            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
-            #spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
-            #shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
+            spike_data, shuffle_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording))
+            spike_data = add_rolling_lomb_classifier_percentages(spike_data, processed_position_data)
+            spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+            spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
+            shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
 
             # SPATIAL AUTO CORRELOGRAMS
-            #spike_data = plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
-            #spike_data = plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            #plot_spatial_autocorrelogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), suffix="")
+            plot_spatial_autocorrelogram_fr(spike_data, processed_position_data, position_data, raw_position_data, output_path, track_length=get_track_length(recording), suffix="")
 
             # FIRING AND BEHAVIOURAL PLOTTING
-            #plot_firing_rate_maps(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_firing_rate_maps_per_trial(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
-            #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
-            #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_speed_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
+            plot_firing_rate_maps(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            plot_firing_rate_maps_per_trial(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+            plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
+            plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+            plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
+            plot_speed_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
+            plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
 
             spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            #shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
+            shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -2645,39 +2726,39 @@ def main():
 
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D23_2021-06-09_10-44-25',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D25_2021-06-11_10-55-17', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D27_2021-06-15_10-33-47', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D30_2021-06-18_10-46-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D33_2021-06-23_11-08-03',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D35_2021-06-25_12-02-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D37_2021-06-29_11-50-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D38_2021-06-30_11-54-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D41_2021-07-05_12-05-02',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D5_2021-05-14_09-38-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D7_2021-05-18_09-51-25', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D11_2021-05-24_10-35-27',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D14_2021-05-27_09-55-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D4_2021-05-13_10-30-16', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D6_2021-05-17_10-26-15',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D25_2021-06-11_12-03-07',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D28_2021-06-16_11-45-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D5_2021-05-14_10-53-55', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D19_2021-06-03_12-45-13', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D29_2021-06-17_12-30-32',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D4_2021-05-13_09-20-38', '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
-                    '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D18_2021-06-02_12-27-22',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D1_2021-05-10_10-34-08',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D23_2021-06-09_10-44-25',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D25_2021-06-11_10-55-17', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D27_2021-06-15_10-33-47', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D30_2021-06-18_10-46-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D33_2021-06-23_11-08-03',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D35_2021-06-25_12-02-52', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D37_2021-06-29_11-50-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D38_2021-06-30_11-54-56', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D41_2021-07-05_12-05-02',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D5_2021-05-14_09-38-08', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D7_2021-05-18_09-51-25', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D11_2021-05-24_10-35-27',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D14_2021-05-27_09-55-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D4_2021-05-13_10-30-16', '/mnt/datastore/Harry/cohort8_may2021/vr/M12_D6_2021-05-17_10-26-15',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D25_2021-06-11_12-03-07',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D28_2021-06-16_11-45-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D5_2021-05-14_10-53-55', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D19_2021-06-03_12-45-13', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D29_2021-06-17_12-30-32',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D4_2021-05-13_09-20-38', '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D33_2021-06-23_12-22-49', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D37_2021-06-29_12-33-24', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D39_2021-07-01_12-28-46', '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D42_2021-07-06_12-38-31',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M14_D5_2021-05-14_11-31-59', '/mnt/datastore/Harry/cohort8_may2021/vr/M15_D6_2021-05-17_12-47-59']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D29_2021-06-17_10-35-48']
 
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()]
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
     #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()]
-    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
-    #of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()]
+    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
+    of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()]
     process_recordings(vr_path_list, of_path_list)
 
     print("look now")
