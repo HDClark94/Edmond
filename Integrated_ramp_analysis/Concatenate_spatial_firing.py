@@ -167,7 +167,6 @@ def remove_cluster_without_firing_events(spike_data):
 
     return spike_data_filtered
 
-
 def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, track_length=200):
 
     """
@@ -219,6 +218,7 @@ def process_dir(recordings_path, concatenated_spike_data=None, save_path=None, t
                                            'probe_trial_number', 'beaconed_firing_rate_map', 'non_beaconed_firing_rate_map',
                                            'probe_firing_rate_map', 'beaconed_firing_rate_map_sem', 'non_beaconed_firing_rate_map_sem',
                                            'probe_firing_rate_map_sem']
+
                         for column in columns_to_drop:
                             if column in list(spike_data):
                                 del spike_data[column]
@@ -246,24 +246,23 @@ def main():
 
     #spike_data = process_dir(recordings_path= "/mnt/datastore/Harry/Cohort7_october2020/vr", concatenated_spike_data=None,
     #                         save_path=None, track_length=200)
-    #spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort7.pkl")
+    #spike_data.to_pickle("/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Data/vr_dataframes/cohort7_concatenated_spike_data.pkl")
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", concatenated_spike_data=None,
-                             save_path=None, track_length=200)
-    spike_data = spike_data[spike_data["mouse_id"] != "1124"]
-    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort2.pkl")
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/VirtualReality", concatenated_spike_data=None,
+    #                         save_path=None, track_length=200)
+    #spike_data.to_pickle("/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Data/vr_dataframes/cohort2_concatenated_spike_data.pkl")
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", concatenated_spike_data=None,
-                             save_path=None, track_length=200)
-    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort3.pkl")
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/VirtualReality", concatenated_spike_data=None,
+    #                         save_path=None, track_length=200)
+    #spike_data.to_pickle("/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Data/vr_dataframes/cohort3_concatenated_spike_data.pkl")
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", concatenated_spike_data=None,
-                             save_path=None, track_length=200)
-    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort4.pkl")
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/VirtualReality", concatenated_spike_data=None,
+    #                         save_path=None, track_length=200)
+    #spike_data.to_pickle("/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Data/vr_dataframes/cohort4_concatenated_spike_data.pkl")
 
-    spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", concatenated_spike_data=None,
-                             save_path=None, track_length=200)
-    spike_data.to_pickle("/mnt/datastore/Harry/Ramp_cells_open_field_paper/concatenated_spike_data_cohort5.pkl")
+    #spike_data = process_dir(recordings_path= "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/VirtualReality", concatenated_spike_data=None,
+    #                         save_path=None, track_length=200)
+    #spike_data.to_pickle("/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Data/vr_dataframes/cohort5_concatenated_spike_data.pkl")
     print("were done for now ")
 
 if __name__ == '__main__':

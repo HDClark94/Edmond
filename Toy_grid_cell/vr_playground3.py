@@ -1069,9 +1069,9 @@ def main():
     for p_scalar in [1.0]:
         for n_trials in [500]:
             plot_linear_grid_cell_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cell_rates_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell_rates_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             plot_linear_grid_cells_spatial_autocorreologram_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
-            #plot_linear_grid_cell_lomb_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
+            plot_linear_grid_cell_lomb_anchored(n_trials=n_trials, save_path=save_path, p_scalar=p_scalar)
             print("")
 
     for p_scalar in [1.0]:

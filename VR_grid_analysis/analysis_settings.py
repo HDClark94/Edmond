@@ -16,4 +16,5 @@ window_length_in_laps = 3
 rolling_window_size_for_lomb_classifier = 1000
 measured_far = 0.023
 
-
+# Hit Miss Try
+track_speed_threshold = 20

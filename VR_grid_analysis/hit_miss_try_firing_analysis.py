@@ -1862,7 +1862,6 @@ def add_celltype_classifier(df_shuffle, spike_data):
         else:
             classifiers.append(np.nan)
             lomb_classifiers.append(np.nan)
-            print("stop here")
 
     df_shuffle["classifier"] = classifiers
     df_shuffle["Lomb_classifier_"] = lomb_classifiers
@@ -1892,16 +1891,57 @@ def plot_regression(ax, x, y, c, y_text_pos):
     ax.plot(x_test, Y_pred, color=c)
 
 
+def summarise_grid_cells(combined_df, save_path):
+    stats = pd.DataFrame()
 
+    n_cells_total = 0
+    n_sessions_total = 0
+    n_grids_total = 0
+    for mouse in np.unique(combined_df["mouse"]):
+        mouse_stats = pd.DataFrame()
+        mouse_df = combined_df[combined_df["mouse"] == mouse]
+        n_cells = len(mouse_df)
+        n_sessions = len(np.unique(mouse_df["session_id"]))
+        n_grids = len(mouse_df[mouse_df["classifier"] == "G"])
+        n_cells_total += n_cells
+        n_sessions_total += n_sessions
+        n_grids_total += n_grids
+
+        mouse_stats["mouse"] = [mouse]
+        mouse_stats["n_cells"] = [n_cells]
+        mouse_stats["n_sessions"] = [n_sessions]
+        mouse_stats["n_grids"] = [n_grids]
+        mouse_stats["percentage_grids"] = [(n_grids/n_cells)*100]
+        stats = pd.concat([stats, mouse_stats], ignore_index=True)
+
+    total_stats = pd.DataFrame()
+    total_stats["mouse"] = ["total"]
+    total_stats["n_cells"] = [n_cells_total]
+    total_stats["n_sessions"] = [n_sessions_total]
+    total_stats["n_grids"] = [n_grids_total]
+    total_stats["percentage_grids"] = [(n_grids_total/n_cells_total)*100]
+    stats = pd.concat([stats, total_stats], ignore_index=True)
+    stats.to_csv(save_path+"grid_stats.csv")
+
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    grid_cells = grid_cells[["session_id", "cluster_id", "mouse", "classifier", "Lomb_classifier_", "grid_score", "hd_score"]]
+    grid_cells.to_csv(save_path+"grid_cells.csv")
+    return
 
 def main():
     print('-------------------------------------------------------------')
-    combined_df = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
+    combined_df = pd.DataFrame()
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
     combined_df_shuffle = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
 
-    #combined_df = combined_df[combined_df["track_length"] == 200]
+    combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
+    combined_df = combined_df[combined_df["track_length"] == 200]
     combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
-    add_celltype_classifier(combined_df_shuffle, combined_df)
+    df_shuffle = add_celltype_classifier(combined_df_shuffle, combined_df)
+    summarise_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/")
 
     # periodic power of ego and allocentric peaks
     plot_coding_power_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Position/nonbeaconed/", CT="G", PDN="Position", tt="non_beaconed")

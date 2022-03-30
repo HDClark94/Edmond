@@ -115,6 +115,16 @@ def rename_files(path_list, sub_out, sub_in):
             if file_name_old != file_name_new:
                 os.rename(file_name_old, file_name_new)
 
+
+def delete_folder_by_name(folder_list, name):
+    for recording in folder_list:
+        inputpath = recording
+        for dirpath, dirnames, filenames in os.walk(inputpath):
+            if dirpath.endswith(name):
+                print("I want to delete this folder:, " +dirpath)
+                shutil.rmtree(dirpath)
+        print("I hope this worked")
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
@@ -179,7 +189,6 @@ def main():
     #        delete_files_with_extension(path_to_folder=path, extension="/shuffle.pkl")
 
 
-    print("hi")
-
 if __name__ == '__main__':
     main()
+
