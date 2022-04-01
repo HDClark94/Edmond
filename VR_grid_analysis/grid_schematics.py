@@ -165,11 +165,9 @@ def plot_allo_ego_grid_cell(output_path):
     X, Y = np.meshgrid(locations_, trial_numbers_)
     cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
 
-    ratees_flattened = np.ravel(rates)
-    ratees_flattened = convolve(ratees_flattened, gauss_kernel)
-    ratees_flattened_smoothened = moving_sum(ratees_flattened, window=2)/2
-    ratees_flattened_smoothened = np.append(ratees_flattened_smoothened, np.zeros(len(ratees_flattened)-len(ratees_flattened_smoothened)))
-    rates_smoothened = ratees_flattened_smoothened.reshape((len(rates), len(rates[0])))
+    rates_flattened = np.ravel(rates)
+    rates_flattened = convolve(rates_flattened, gauss_kernel)
+    rates_smoothened = rates_flattened.reshape((len(rates), len(rates[0])))
 
     fig, ax = plt.subplots(1,1, figsize=(6, 6))
     c = ax.pcolormesh(X, Y, rates_smoothened, cmap=cmap, shading="auto", vmin=np.min(rates), vmax=np.max(rates))
@@ -180,6 +178,7 @@ def plot_allo_ego_grid_cell(output_path):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     ax.set_xticks([0,100,200])
+    ax.set_yticks([1,50,100])
 
     cbar = fig.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
     cbar.outline.set_linewidth(0)
