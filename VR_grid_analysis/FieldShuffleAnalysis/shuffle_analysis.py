@@ -119,7 +119,10 @@ def find_neighbouring_minima(firing_rate_map, local_maximum_idx):
     return (local_min_left, local_min_right)
 
 
-def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kernel_std=2, extra_smooth_gauss_kernel_std=4, peak_min_distance=20):
+def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kernel_std=Settings.rate_map_gauss_kernel_std,
+                                           extra_smooth_gauss_kernel_std= Settings.rate_map_extra_smooth_gauss_kernel_std,
+                                           peak_min_distance=Settings.minimum_peak_distance):
+
     firing_rate_map_by_trial_flattened = firing_rate_map_by_trial.flatten()
     gauss_kernel_extra = Gaussian1DKernel(stddev=extra_smooth_gauss_kernel_std)
     gauss_kernel = Gaussian1DKernel(stddev=gauss_kernel_std)
@@ -131,7 +134,7 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kerne
     elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
     frequency = Settings.frequency
     sliding_window_size=track_length*Settings.window_length_in_laps
-    indices_to_test = np.arange(0, len(elapsed_distance)-sliding_window_size, 1, dtype=np.int64)[::10]
+    indices_to_test = np.arange(0, len(elapsed_distance)-sliding_window_size, 1, dtype=np.int64)[::Settings.power_estimate_step]
 
     # find peaks and trough indices
     peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=peak_min_distance)[0]
