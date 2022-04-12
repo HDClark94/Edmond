@@ -152,14 +152,15 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kerne
     avg_powers = np.nanmean(powers, axis=0)
     shuffle_peak_power = np.nanmax(avg_powers)
 
-    return shuffle_peak_power
+    return shuffle_peak_power, np.reshape(fr, (n_trials, track_length))
 
 
 def run_shuffle(cluster_spike_data):
     firing_rate_map = cluster_spike_data["fr_binned_in_space"].iloc[0]
-    shuffle_peak_power = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
+    shuffle_peak_power, shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
     cluster_spike_data["peak_power"] = [shuffle_peak_power]
-    single_shuffle = cluster_spike_data[["cluster_id", "peak_power"]]
+    cluster_spike_data["shuffled_rate_map"] = [shuffled_rate_map]
+    single_shuffle = cluster_spike_data[["cluster_id", "peak_power", "shuffled_rate_map"]]
     return single_shuffle
 
 
