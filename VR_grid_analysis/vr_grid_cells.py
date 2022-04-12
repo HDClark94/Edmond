@@ -337,7 +337,7 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, ou
             sliding_window_size=track_length*Settings.window_length_in_laps
             powers = []
             centre_distances = []
-            indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+            indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::Settings.power_estimate_step]
             for m in indices_to_test:
                 ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
                 power = ls.power(frequency)
