@@ -321,28 +321,19 @@ def add_avg_track_speed(processed_position_data, track_length):
 
 
 
-def get_reward_colors(rewarded, avg_track_speed, ejection=False):
-    colors = []
-
-    if ejection:
-        for i in range(len(rewarded)):
-            if (rewarded[i] == 1) and (avg_track_speed[i] > 20):
-                colors.append("green")
-            elif (rewarded[i] == 1) and (avg_track_speed[i] < 20):
-                colors.append("gray")
-            elif (rewarded[i] == 0) and (avg_track_speed[i] > 20):
-                colors.append("red")
-            elif (rewarded[i] == 0) and (avg_track_speed[i] < 20):
-                colors.append("gray")
-            else:
-                colors.append("red")
-
-    else:
-        for i in range(len(rewarded)):
-            if rewarded[i] == 1:
-                colors.append("green")
-            else:
-                colors.append("red")
+def get_reward_colors(hmt, avg_track_speed):
+    colors=[]
+    for i in range(len(hmt)):
+        if (hmt[i] == "hit"):
+            colors.append("green")
+        elif (hmt[i] == "try"):
+            colors.append("orange")
+        elif (hmt[i] == "miss"):
+            colors.append("red")
+        elif (hmt[i] == "rejected"):
+            colors.append("grey")
+        else:
+            colors.append("white")
     return colors
 
 def get_colors_hmt(hmt):
@@ -354,7 +345,7 @@ def get_colors_hmt(hmt):
             colors.append("red")
         elif (hmt[i] == "try"):
             colors.append("orange")
-        else:
+        elif (hmt[i] == "rejected"):
             colors.append("grey")
     return colors
 
@@ -408,11 +399,10 @@ def plot_trial_discriminant_histogram(processed_position_data, save_path):
 def plot_trial_speeds(processed_position_data, save_path):
     avg_RZ_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_in_RZ"])
     avg_track_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_on_track"])
-    rewarded = pandas_collumn_to_numpy_array(processed_position_data["rewarded"])
-    rewarded_colors = get_reward_colors(rewarded, avg_track_speed, ejection=False)
-    rewarded_colors_with_ejections = get_reward_colors(rewarded, avg_track_speed, ejection=True)
+    hmt = pandas_collumn_to_numpy_array(processed_position_data["hit_miss_try"])
+    rewarded_colors = get_reward_colors(hmt, avg_track_speed)
     fig, ax = plt.subplots(figsize=(6,6))
-    ax.scatter(avg_track_speed, avg_RZ_speed, color=rewarded_colors_with_ejections, edgecolor=rewarded_colors, marker="o", alpha=0.3)
+    ax.scatter(avg_track_speed, avg_RZ_speed, color=rewarded_colors, marker="x", alpha=0.3)
     ax.plot([0,100], [0,100], linestyle="dashed", color="black")
     ax.set_ylabel("Avg Trial Speed in RZ", fontsize=25, labelpad=10)
     ax.set_xlabel("Avg Trial Speed on track", fontsize=25, labelpad=10)
@@ -430,15 +420,14 @@ def plot_trial_speeds(processed_position_data, save_path):
 
 def plot_trial_speeds_hmt(processed_position_data, save_path):
     # remove low speed trials
-    processed_position_data = processed_position_data[(processed_position_data["avg_speed_on_track"] > 20)]
+    #processed_position_data = processed_position_data[(processed_position_data["avg_speed_on_track"] > 20)]
     avg_RZ_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_in_RZ"])
     avg_track_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_on_track"])
     hmt = pandas_collumn_to_numpy_array(processed_position_data["hit_miss_try"])
     rewarded_colors = get_colors_hmt(hmt)
-
     fig, ax = plt.subplots(figsize=(6,6))
     ax.scatter(avg_track_speed, avg_RZ_speed, color=rewarded_colors, edgecolor=rewarded_colors, marker="o", alpha=0.3)
-    ax.plot([0,100], [0,100], linestyle="dashed", color="black")
+    ax.plot([0,120], [0,120], linestyle="dashed", color="black")
     ax.set_ylabel("Avg Trial Speed in RZ", fontsize=25, labelpad=10)
     ax.set_xlabel("Avg Trial Speed on track", fontsize=25, labelpad=10)
     ax.tick_params(axis='both', which='major', labelsize=20)
@@ -447,8 +436,8 @@ def plot_trial_speeds_hmt(processed_position_data, save_path):
     fig.tight_layout()
     ax.set_xticks([0,20,40,60,80,100])
     ax.set_yticks([0,20,40,60,80,100])
-    ax.set_ylim(bottom=0, top=100)
-    ax.set_xlim(left=0, right=100)
+    ax.set_ylim(bottom=0, top=120)
+    ax.set_xlim(left=0, right=120)
     plt.subplots_adjust(right=0.95, top=0.95)
     plt.savefig(save_path + '/RZ_speed_vs_track_speed_hmt.png', dpi=300)
     plt.close()
@@ -1096,11 +1085,11 @@ def main():
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = []
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()])
-    #vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()])
-    #vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
-    #all_behaviour200cm_tracks = process_recordings(vr_path_list)
-    #all_behaviour200cm_tracks.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
+    all_behaviour200cm_tracks = process_recordings(vr_path_list)
+    all_behaviour200cm_tracks.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
 
     for i in range(len(all_behaviour200cm_tracks)):
@@ -1114,8 +1103,8 @@ def main():
             print(m_i + "_D"+str(s_i))
 
 
-    #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    #plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_percentage_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_percentage_trial_per_session_by_mouse_short_plot(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")

@@ -18,8 +18,8 @@ import settings
 
 prm = pt.Parameters()
 
-def recompute_scores(spike_data, synced_spatial_data, recompute_speed_score=True, recompute_hd_score=True,
-                     recompute_grid_score=True, recompute_spatial_score=True, recompute_border_score=True, recompute_stability_score=True):
+def recompute_scores(spike_data, synced_spatial_data, recompute_speed_score=False, recompute_hd_score=False,
+                     recompute_grid_score=False, recompute_spatial_score=False, recompute_border_score=False, recompute_stability_score=False):
     spike_data = PostSorting.open_field_spatial_firing.process_spatial_firing(spike_data, synced_spatial_data)
     position_heatmap, spike_data = PostSorting.open_field_firing_maps.make_firing_field_maps(synced_spatial_data, spike_data)
     if recompute_speed_score:

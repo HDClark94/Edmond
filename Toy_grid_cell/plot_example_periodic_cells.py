@@ -3,13 +3,24 @@ import numpy as np
 from scipy import signal
 from astropy.timeseries import LombScargle
 from astropy.convolution import convolve, Gaussian1DKernel
+from scipy.signal import find_peaks
 from scipy import stats
 import matplotlib.ticker as ticker
 import Edmond.VR_grid_analysis.analysis_settings as Settings
 import Edmond.plot_utility2
+import scipy.interpolate as interp
 plt.rc('axes', linewidth=3)
 import warnings
 warnings.filterwarnings('ignore')
+
+def make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm):
+    rates = []
+    for trial_number in np.arange(1, n_trials+1):
+        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
+        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
+        rates.append(trial_rates.tolist())
+    firing_rate_map_by_trial = np.array(rates)
+    return firing_rate_map_by_trial
 
 def getStableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
                                  p_scalar, track_length, field_spacing, step):
@@ -34,18 +45,7 @@ def getStableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
-
-    # smoothen
-    gauss_kernel = Gaussian1DKernel(stddev=2)
-    firing_rate_map_by_trial_flat = firing_rate_map_by_trial.flatten()
-    firing_rate_map_by_trial_flat = convolve(firing_rate_map_by_trial_flat, gauss_kernel)
-    firing_rate_map_by_trial = np.reshape(firing_rate_map_by_trial_flat, (n_trials, track_length))
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -78,12 +78,7 @@ def getUnstableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spe
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -103,12 +98,7 @@ def getStableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -137,12 +127,7 @@ def getUnstableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spee
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -167,12 +152,7 @@ def getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -196,12 +176,7 @@ def getRampCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, 
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -217,12 +192,7 @@ def getNoisyCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar,
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -243,12 +213,36 @@ def getNoisyFieldCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_sc
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    rates = []
-    for trial_number in np.arange(1, n_trials+1):
-        trial_spike_locations = spike_locations[spike_trial_numbers == trial_number]
-        trial_rates, bin_edges = np.histogram(trial_spike_locations, bins=int(track_length/bin_size_cm), range=(0, track_length))
-        rates.append(trial_rates.tolist())
-    firing_rate_map_by_trial = np.array(rates)
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
+
+    return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
+
+
+def getShuffledPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step):
+    _, _, firing_rate_map_by_trial = getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step)
+    _, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold=0.99, n_shuffles=1, gauss_kernel_std=2, peak_min_distance=20)
+    field_shuffled_rate_map_smoothed = field_shuffled_rate_map_smoothed[0]
+    field_shuffled_rate_map = field_shuffled_rate_map[0]
+
+    field_shuffled_rate_map_smoothed_flattened = field_shuffled_rate_map_smoothed.flatten()
+
+    # remake firing from shuffled place cell rate map
+    distance_covered = n_trials*track_length
+    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+
+    arr_interp = interp.interp1d(np.arange(field_shuffled_rate_map_smoothed_flattened.size),field_shuffled_rate_map_smoothed_flattened)
+    firing_p = arr_interp(np.linspace(0,field_shuffled_rate_map_smoothed_flattened.size-1,locations.size))
+
+    firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
+    firing_p = firing_p*p_scalar
+    spikes_at_locations = np.zeros(len(locations))
+    for i in range(len(locations)):
+        spikes_at_locations[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+    spike_locations = locations[spikes_at_locations==1]
+    spike_trial_numbers = (spike_locations//track_length)+1
+    spike_locations = spike_locations%track_length
+
+    firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial
 
@@ -305,13 +299,56 @@ def plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial):
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
-    cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
-    cbar.set_ticks([0,np.max(cluster_firing_maps)])
-    cbar.set_ticklabels(["0", "Max"])
-    cbar.ax.tick_params(labelsize=20)
+    #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    #cbar.set_ticks([0,np.max(cluster_firing_maps)])
+    #cbar.set_ticklabels(["0", "Max"])
+    #cbar.ax.tick_params(labelsize=20)
     plt.savefig(save_path + '/'+cell_type+'_rate_map.png', dpi=300)
     plt.close()
+
+def plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map, shuffled_save_path, plot_n_shuffles=10):
+    for i in np.arange(plot_n_shuffles):
+        n_trials = len(field_shuffled_rate_map[0])
+        track_length = len(field_shuffled_rate_map[0][0])
+
+        cluster_firing_maps = field_shuffled_rate_map[i]
+        where_are_NaNs = np.isnan(cluster_firing_maps)
+        cluster_firing_maps[where_are_NaNs] = 0
+        cluster_firing_maps = Edmond.plot_utility2.min_max_normalize(cluster_firing_maps)
+        percentile_99th = np.nanpercentile(cluster_firing_maps, 99); cluster_firing_maps = np.clip(cluster_firing_maps, a_min=0, a_max=percentile_99th)
+        vmin, vmax = Edmond.plot_utility2.get_vmin_vmax(cluster_firing_maps)
+
+        spikes_on_track = plt.figure()
+        spikes_on_track.set_size_inches(6, 6, forward=True)
+        ax = spikes_on_track.add_subplot(1, 1, 1)
+        locations = np.arange(0, len(cluster_firing_maps[0]))
+        ordered = np.arange(1, n_trials+1, 1)
+        X, Y = np.meshgrid(locations, ordered)
+        cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
+        c = ax.pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
+        plt.ylabel('Trial Number', fontsize=25, labelpad = 10)
+        plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+        plt.xlim(0, track_length)
+        ax.tick_params(axis='both', which='both', labelsize=20)
+        ax.set_xlim([0, track_length])
+        ax.set_ylim([0, n_trials-1])
+        ax.set_yticks([1, 50, 100])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+        #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+        #cbar.set_ticks([0,np.max(cluster_firing_maps)])
+        #cbar.set_ticklabels(["0", "Max"])
+        #cbar.ax.tick_params(labelsize=20)
+        plt.savefig(shuffled_save_path + '/field_shuffled_'+cell_type+'_rate_map_'+str(i+1)+'.png', dpi=300)
+        plt.close()
+
 
 def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial):
     fr=firing_rate_map_by_trial.flatten()
@@ -351,7 +388,7 @@ def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_t
     plt.savefig(save_path + '/' + cell_type + '_spatial_autocorrelogram.png', dpi=200)
     plt.close()
 
-def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial):
+def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial, far):
     fr=firing_rate_map_by_trial.flatten()
     track_length = len(firing_rate_map_by_trial[0])
     n_trials = len(firing_rate_map_by_trial)
@@ -378,6 +415,7 @@ def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_t
     sem_subset_powers = stats.sem(powers, axis=0, nan_policy="omit")
     ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3)
     ax.plot(frequency, avg_subset_powers, color="black", linestyle="solid", linewidth=3)
+    ax.axhline(y=far, color="red", linewidth=3, linestyle="dashed")
     plt.ylabel('Periodic Power', fontsize=25, labelpad = 10)
     plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
     plt.xlim(0,5.05)
@@ -433,16 +471,252 @@ def plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial
     ax.set_yticks(y_tick_locs.tolist())
     ax.set_xlim([0.1,5])
     ax.set_ylim([min(centre_trials), max(centre_trials)])
-    cbar = fig.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label('Power', rotation=270, fontsize=20)
-    cbar.set_ticks([0,np.max(powers)])
-    cbar.set_ticklabels(["0", "Max"])
-    cbar.ax.tick_params(labelsize=20)
+    #cbar = fig.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    #cbar.set_label('Power', rotation=270, fontsize=20)
+    #cbar.set_ticks([0,np.max(powers)])
+    #cbar.set_ticklabels(["0", "Max"])
+    #cbar.ax.tick_params(labelsize=20)
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/'+cell_type+'_spatial_periodogram.png', dpi=300)
     plt.close()
+
+def smoothen_rate_map(firing_rate_map_by_trial, n_trials, track_length, gauss_kernel_std):
+    # smoothen and reshape
+    gauss_kernel = Gaussian1DKernel(stddev=gauss_kernel_std)
+    firing_rate_map_by_trial_flat = firing_rate_map_by_trial.flatten()
+    firing_rate_map_by_trial_flat_smoothened = convolve(firing_rate_map_by_trial_flat, gauss_kernel)
+    firing_rate_map_by_trial_smoothened = np.reshape(firing_rate_map_by_trial_flat_smoothened, (n_trials, track_length))
+    return firing_rate_map_by_trial_smoothened
+
+
+def find_neighbouring_minima(firing_rate_map, local_maximum_idx):
+    # walk right
+    local_min_right = local_maximum_idx
+    local_min_right_found = False
+    for i in np.arange(local_maximum_idx, len(firing_rate_map)): #local max to end
+        if local_min_right_found == False:
+            if np.isnan(firing_rate_map[i]):
+                continue
+            elif firing_rate_map[i] < firing_rate_map[local_min_right]:
+                local_min_right = i
+            elif firing_rate_map[i] > firing_rate_map[local_min_right]:
+                local_min_right_found = True
+
+    # walk left
+    local_min_left = local_maximum_idx
+    local_min_left_found = False
+    for i in np.arange(0, local_maximum_idx)[::-1]: # local max to start
+        if local_min_left_found == False:
+            if np.isnan(firing_rate_map[i]):
+                continue
+            elif firing_rate_map[i] < firing_rate_map[local_min_left]:
+                local_min_left = i
+            elif firing_rate_map[i] > firing_rate_map[local_min_left]:
+                local_min_left_found = True
+
+    return (local_min_left, local_min_right)
+
+def get_peak_indices(firing_rate_map, peaks_i):
+    peak_indices =[]
+    for j in range(len(peaks_i)):
+        peak_index_tuple = find_neighbouring_minima(firing_rate_map, peaks_i[j])
+        peak_indices.append(peak_index_tuple)
+    return peak_indices
+
+
+def fill_rate_map2(firing_rate_map_by_trial, segmentation_array, fill_order):
+    firing_rate_map_by_trial = firing_rate_map_by_trial.flatten()
+
+    # make empty rate map with nan placemarkers
+    fr = np.zeros(len(firing_rate_map_by_trial)); fr[:] = np.nan
+
+    # fill fr array based on random segmentation order
+    i = 0
+    for segment_to_fill in fill_order:
+        firing_rate_map_segment = firing_rate_map_by_trial[segmentation_array == segment_to_fill]
+        fr[i: i+len(firing_rate_map_segment)] = firing_rate_map_segment
+        i+=len(firing_rate_map_segment)
+
+    return fr
+
+def fill_rate_map(firing_rate_map_by_trial, peaks, field_array, peak_fill_order):
+    fr_original = firing_rate_map_by_trial.flatten()
+
+    # replace nans in rate map if there is any
+    fr_original[np.isnan(fr_original)] = 0
+
+    # make empty rate map with nan placemarkers
+    fr = np.zeros(len(fr_original)); fr[:] = np.nan
+
+    # fill the rate map as in the style of a field shuffle
+    bin_indices_used_in_fr = []
+    bin_indices_used_in_fr_original = []
+    for field_index in peak_fill_order:
+        peak_i = peaks[field_index-1]
+        field_left_i  = np.where((field_array==field_index)==True)[0][0]; field_size_left = peak_i-field_left_i
+        field_right_i = np.where((field_array==field_index)==True)[0][-1]; field_size_right = field_right_i-peak_i
+
+        # randomly place peak bin
+        peak_bin_not_filled = True
+        while peak_bin_not_filled:
+            random_peak_bin_index = np.random.randint(low=0, high=len(fr))
+            if np.isnan(fr[random_peak_bin_index]):
+                fr[random_peak_bin_index] = fr_original[peak_i]
+                bin_indices_used_in_fr.append(random_peak_bin_index)
+                bin_indices_used_in_fr_original.append(peak_i)
+                peak_bin_not_filled = False
+
+        #walk left and assign field bins
+        for field_j, j in enumerate(np.flip(np.arange(random_peak_bin_index-field_size_left, random_peak_bin_index))):
+            field_bin_not_filled = True
+            while field_bin_not_filled:
+                if j < 0:
+                    j += len(fr)
+                if np.isnan(fr[j]):
+                    fr[j] = fr_original[peak_i-field_j-1]
+                    bin_indices_used_in_fr.append(j)
+                    bin_indices_used_in_fr_original.append(peak_i-field_j-1)
+                    field_bin_not_filled = False
+                else:
+                    j-=1
+
+        # walk right and assign field bins
+        for field_j, j in enumerate(np.arange(random_peak_bin_index+1, random_peak_bin_index+field_size_right+1)):
+            field_bin_not_filled = True
+            while field_bin_not_filled:
+                if j >= len(fr):
+                    j -= len(fr)
+                if np.isnan(fr[j]):
+                    fr[j] = fr_original[peak_i+field_j+1]
+                    if j <0:
+                        print("stop here")
+                    bin_indices_used_in_fr.append(j)
+                    bin_indices_used_in_fr_original.append(peak_i+field_j+1)
+                    field_bin_not_filled = False
+                else:
+                    j+=1
+
+    # assign the bins randomly not attributed to a field
+    indices_not_assigned_fr = np.array(list((set(bin_indices_used_in_fr) | set(np.arange(0,len(fr)))) - (set(bin_indices_used_in_fr) & set(np.arange(0,len(fr))))))
+    indices_not_assigned_fr_original = np.array(list((set(bin_indices_used_in_fr_original) | set(np.arange(0,len(fr)))) - (set(bin_indices_used_in_fr_original) & set(np.arange(0,len(fr))))))
+    np.random.shuffle(indices_not_assigned_fr_original)
+    for i, fr_i in enumerate(indices_not_assigned_fr):
+        fr[fr_i] = fr_original[indices_not_assigned_fr_original[i]]
+
+    return fr
+
+
+
+def make_field_array(firing_rate_map_by_trial, peaks_indices):
+    field_array = np.zeros(len(firing_rate_map_by_trial))
+    for i in range(len(peaks_indices)):
+        field_array[peaks_indices[i][0]:peaks_indices[i][1]] = i+1
+    return field_array.astype(np.int64)
+
+def make_segmentation_array(field_array):
+    segmentation_array = np.zeros(len(field_array))
+    segment_index = 0
+    last_val = 1e7 # arbitrary different value
+    for i in range(len(field_array)):
+        if field_array[i] != last_val:
+            segment_index+=1
+        segmentation_array[i] = segment_index
+        last_val = field_array[i]
+    return segmentation_array.astype(np.int64)
+
+def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold, n_shuffles=1000, gauss_kernel_std=2, extra_smooth_gauss_kernel_std=4, peak_min_distance=20):
+    firing_rate_map_by_trial_flattened = firing_rate_map_by_trial.flatten()
+    gauss_kernel_extra = Gaussian1DKernel(stddev=extra_smooth_gauss_kernel_std)
+    gauss_kernel = Gaussian1DKernel(stddev=gauss_kernel_std)
+    firing_rate_map_by_trial_flattened_extra_smooth = convolve(firing_rate_map_by_trial_flattened, gauss_kernel_extra)
+
+    track_length = len(firing_rate_map_by_trial[0])
+    n_trials = len(firing_rate_map_by_trial)
+    elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
+    elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
+    frequency = Settings.frequency
+    sliding_window_size=track_length*Settings.window_length_in_laps
+    indices_to_test = np.arange(0, len(elapsed_distance)-sliding_window_size, 1, dtype=np.int64)[::10]
+
+    # find peaks and trough indices
+    peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=peak_min_distance)[0]
+    peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
+    field_array = make_field_array(firing_rate_map_by_trial_flattened, peaks_indices)
+
+    shuffle_peaks = []
+    shuffle_rate_maps = []
+    shuffle_rate_maps_smoothed = []
+    for i in np.arange(n_shuffles):
+        peak_fill_order = np.arange(1, len(peaks_i)+1)
+        np.random.shuffle(peak_fill_order) # randomise fill order
+
+        fr = fill_rate_map(firing_rate_map_by_trial, peaks_i, field_array, peak_fill_order)
+        fr_smoothed = convolve(fr, gauss_kernel)
+
+        powers = []
+        for m in indices_to_test:
+            ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
+            power = ls.power(frequency)
+            powers.append(power.tolist())
+        powers = np.array(powers)
+
+        avg_powers = np.nanmean(powers, axis=0)
+        shuffle_peak = np.nanmax(avg_powers)
+        shuffle_peaks.append(shuffle_peak)
+        shuffle_rate_maps.append(np.reshape(fr, (n_trials, track_length)))
+        shuffle_rate_maps_smoothed.append(np.reshape(fr_smoothed, (n_trials, track_length)))
+
+    shuffle_peaks = np.array(shuffle_peaks)
+    return np.nanpercentile(shuffle_peaks, p_threshold*100), shuffle_rate_maps_smoothed, shuffle_rate_maps
+
+
+def field_shuffle_and_get_false_alarm_rate2(firing_rate_map_by_trial, p_threshold, n_shuffles=1000, gauss_kernel_std=2, extra_smooth_gauss_kernel_std=4, peak_min_distance=20):
+    firing_rate_map_by_trial_flattened = firing_rate_map_by_trial.flatten()
+    gauss_kernel_extra = Gaussian1DKernel(stddev=extra_smooth_gauss_kernel_std)
+    gauss_kernel = Gaussian1DKernel(stddev=gauss_kernel_std)
+    firing_rate_map_by_trial_flattened_extra_smooth = convolve(firing_rate_map_by_trial_flattened, gauss_kernel_extra)
+
+    track_length = len(firing_rate_map_by_trial[0])
+    n_trials = len(firing_rate_map_by_trial)
+    elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
+    elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
+    frequency = Settings.frequency
+    sliding_window_size=track_length*Settings.window_length_in_laps
+    indices_to_test = np.arange(0, len(elapsed_distance)-sliding_window_size, 1, dtype=np.int64)[::10]
+
+    # find peaks and trough indices
+    peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=peak_min_distance)[0]
+    peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
+    field_array = make_field_array(firing_rate_map_by_trial_flattened, peaks_indices)
+    segmentation_array = make_segmentation_array(field_array)
+
+    shuffle_peaks = []
+    shuffle_rate_maps = []
+    shuffle_rate_maps_smoothed = []
+    for i in np.arange(n_shuffles):
+        fill_order = np.unique(segmentation_array)
+        np.random.shuffle(fill_order) # randomise fill order
+
+        fr = fill_rate_map2(firing_rate_map_by_trial, segmentation_array, fill_order)
+        fr_smoothed = convolve(fr, gauss_kernel)
+
+        powers = []
+        for m in indices_to_test:
+            ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
+            power = ls.power(frequency)
+            powers.append(power.tolist())
+        powers = np.array(powers)
+
+        avg_powers = np.nanmean(powers, axis=0)
+        shuffle_peak = np.nanmax(avg_powers)
+        shuffle_peaks.append(shuffle_peak)
+        shuffle_rate_maps.append(np.reshape(fr, (n_trials, track_length)))
+        shuffle_rate_maps_smoothed.append(np.reshape(fr_smoothed, (n_trials, track_length)))
+
+    shuffle_peaks = np.array(shuffle_peaks)
+    return np.nanpercentile(shuffle_peaks, p_threshold*100), shuffle_rate_maps_smoothed, shuffle_rate_maps
 
 
 def get_cluster_firing(cell_type_str, n_trials=100, bin_size_cm=1, sampling_rate=100, avg_speed_cmps=10,
@@ -456,40 +730,65 @@ def get_cluster_firing(cell_type_str, n_trials=100, bin_size_cm=1, sampling_rate
         spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getStableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step)
     elif cell_type_str == "unstable_egocentric_grid_cell":
         spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getUnstableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step)
+    elif cell_type_str == "noisy_field_cell":
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getNoisyFieldCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step)
+    elif cell_type_str == "shuffled_place_cell":
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getShuffledPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step)
     elif cell_type_str == "place_cell":
         spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step)
     elif cell_type_str == "ramp_cell":
         spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getRampCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step)
     elif cell_type_str == "noisy_cell":
         spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getNoisyCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step)
-    elif cell_type_str == "noisy_field_cell":
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = getNoisyFieldCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step)
 
-    return spikes_locations, spike_trial_numbers, firing_rate_map_by_trial
+    firing_rate_map_by_trial_smoothed = smoothen_rate_map(firing_rate_map_by_trial, n_trials, track_length, gauss_kernel_std)
+
+    return spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed
 
 
-def plot_cell(cell_type, save_path, n_trials=100, track_length=200):
-    spikes_locations, spike_trial_numbers, firing_rate_map_by_trial = get_cluster_firing(cell_type_str=cell_type, n_trials=n_trials, track_length=track_length)
-    plot_cell_spikes(cell_type, save_path, spikes_locations, spike_trial_numbers, firing_rate_map_by_trial)
-    plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial)
-    plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial)
-    plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial)
-    plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial)
+def plot_cell(cell_type, save_path, shuffled_save_path, n_trials=100, track_length=200):
+    spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str=cell_type, n_trials=n_trials, track_length=track_length, gauss_kernel_std=2)
 
+    # default plots
+    plot_cell_spikes(cell_type, save_path, spikes_locations, spike_trial_numbers, firing_rate_map_by_trial_smoothed)
+    plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial_smoothed)
+    plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial_smoothed)
+    plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed)
+
+    # plots require a field shuffle
+    far, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold=0.99, n_shuffles=1000, gauss_kernel_std=2, peak_min_distance=20)
+    plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, far)
+    plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map_smoothed, shuffled_save_path, plot_n_shuffles=10)
+    print("plotted ", cell_type)
+
+    '''
+    # testing
+    far, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(field_shuffled_rate_map[0], p_threshold=0.99, n_shuffles=5, gauss_kernel_std=2, peak_min_distance=20)
+    plot_cell_avg_spatial_periodogram(cell_type, save_path, field_shuffled_rate_map_smoothed[0], far)
+    plot_cell_rates(cell_type, save_path, field_shuffled_rate_map_smoothed[0])
+    plot_cell_spatial_autocorrelogram(cell_type, save_path, field_shuffled_rate_map_smoothed[0])
+    plot_cell_spatial_periodogram(cell_type, save_path, field_shuffled_rate_map_smoothed[0])
+    plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map_smoothed, shuffled_save_path, plot_n_shuffles=5)
+    print("plotted ", cell_type)
+    '''
 
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
-    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data"
+    np.random.seed(0)
 
-    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path)
-    plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path)
-    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path)
-    plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path)
-    plot_cell(cell_type="place_cell", save_path=save_path)
-    plot_cell(cell_type="ramp_cell", save_path=save_path)
-    plot_cell(cell_type="noisy_cell", save_path=save_path)
-    plot_cell(cell_type="noisy_field_cell", save_path=save_path)
+    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data"
+    shuffled_save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/shuffled"
+
+    plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
 
     print("look now")
 

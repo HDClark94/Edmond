@@ -161,6 +161,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_vr')})
+                    spatial_firing["session_id_vr"] = spatial_firing["session_id"]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -220,6 +221,7 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
                     spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_of')})
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_of')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_of')})
+                    spatial_firing["session_id_of"] = spatial_firing["session_id"]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')

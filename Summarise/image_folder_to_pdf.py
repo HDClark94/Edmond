@@ -113,13 +113,13 @@ def main():
     image_list = [f.path for f in os.scandir(path) if f.is_file()]
     #image_list2pdf(image_list, save_path="/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures", label=True)
 
-    path = "/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures/instant_firing_rates"
-    image_list = [f.path for f in os.scandir(path) if f.is_file()]
+    #path = "/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures/instant_firing_rates"
+    #image_list = [f.path for f in os.scandir(path) if f.is_file()]
     #image_list2pdf(image_list, save_path="/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures/instant_rates", label=True)
 
 
     # for looking at P cells
-    df = pd.read_csv('/mnt/datastore/Harry/test_recording/AllMice_LinearModelResults.txt', sep="\t")
+    df = pd.read_csv('/mnt/datastore/Harry/test_recording/all_results_coefficients.csv', sep="\t")
     path = "/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures/instant_firing_rates"
     image_list = [f.path for f in os.scandir(path) if f.is_file()]
     image_list2pdf_position_cells(image_list, df, save_path="/mnt/datastore/Harry/CurrentBiology_2022/Ramp_Plots/Figures/instant_rates", label=True)
