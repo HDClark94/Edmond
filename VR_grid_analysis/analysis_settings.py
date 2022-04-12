@@ -15,6 +15,11 @@ frequency = np.arange(0.1, 5+frequency_step, frequency_step)
 window_length_in_laps = 3
 rolling_window_size_for_lomb_classifier = 1000
 measured_far = 0.023
+power_estimate_step = 10
+minimum_peak_distance = 20
+rate_map_extra_smooth_gauss_kernel_std = 4
+rate_map_gauss_kernel_std = 2
+
 
 # Hit Miss Try
 track_speed_threshold = 20
