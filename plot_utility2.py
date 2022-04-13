@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 import settings
+from astropy.nddata import block_reduce
 
 '''
 colour functions are from https://gist.github.com/adewes/5884820
@@ -213,12 +214,34 @@ def style_vr_plot(ax, x_max=None):
         left=True,
         labelleft=True,
         labelbottom=True)  # labels along the bottom edge are off
-
-    #ax.set_aspect('equal')
-
-    ax.axvline(0, linewidth=2.5, color='black') # bold line on the y axis
-    ax.axhline(0, linewidth=2.5, color='black') # bold line on the x axis
     if x_max is not None:
         plt.ylim(0, x_max)
-
     return ax
+
+
+def get_vmin_vmax(cluster_firing_maps, bin_cm=8):
+    cluster_firing_maps_reduced = []
+    for i in range(len(cluster_firing_maps)):
+        cluster_firing_maps_reduced.append(block_reduce(cluster_firing_maps[i], bin_cm, func=np.mean))
+    cluster_firing_maps_reduced = np.array(cluster_firing_maps_reduced)
+    vmin= 0
+    vmax= np.max(cluster_firing_maps_reduced)
+    if vmax==0:
+        print("stop here")
+    return vmin, vmax
+
+def min_max_normalize(x):
+    """
+        argument
+            - x: input image data in numpy array [32, 32, 3]
+        return
+            - normalized x
+    """
+    min_val = np.min(x)
+    max_val = np.max(x)
+    x = (x-min_val) / (max_val-min_val)
+    return x
+
+def min_max_normlise(array, min_val, max_val):
+    normalised_array = ((max_val-min_val)*((array-min(array))/(max(array)-min(array))))+min_val
+    return normalised_array

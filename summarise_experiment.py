@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import os
+import PostSorting.lfp
+import matplotlib as plt
 from Edmond.Concatenate_from_server import *
 
 def get_tidy_title(collumn):
@@ -358,12 +360,43 @@ def main():
     print("============================================")
     print("============================================")
 
+    '''
+    # plot the lfp summaries for each mouse
+    vr_recording_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort2/VirtualReality") if f.is_dir()]
+    lfp_summary_df = PostSorting.lfp.batch_summary_lfp(vr_recording_path_list)
+    vr_recording_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort7_october2020/vr") if f.is_dir()]
+    lfp_summary_df = PostSorting.lfp.batch_summary_lfp(vr_recording_path_list)
+    vr_recording_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort5/VirtualReality") if f.is_dir()]
+    lfp_summary_df = PostSorting.lfp.batch_summary_lfp(vr_recording_path_list)
+    vr_recording_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort4/VirtualReality") if f.is_dir()]
+    lfp_summary_df = PostSorting.lfp.batch_summary_lfp(vr_recording_path_list)
+    vr_recording_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort3/VirtualReality") if f.is_dir()]
+    lfp_summary_df = PostSorting.lfp.batch_summary_lfp(vr_recording_path_list)
+    '''
     # =================== for concatenation ====================================== #
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
+    # VR grid cell project
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
+
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
+
+    # Ramp cell project
     vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
@@ -389,10 +422,8 @@ def main():
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/combined_Cohort5.pkl")
 
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
-    # ============= for loading from concatenated dataframe ====================== #
 
+    # ============= for loading from concatenated dataframe ====================== #
     #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_vr.pkl")
     #of_data = pd.read_pickle("/mnt/datastore/Harry/Cohort7_october2020/summary/All_mice_of.pkl")
     #vr_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/summary/All_mice_vr.pkl")
@@ -402,11 +433,9 @@ def main():
     #linear_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/linear_model_classifations.csv")
     #mixed_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/mixed_model_classifations.csv")
     #mixed_model_classifications = pd.read_csv("/mnt/datastore/Harry/Ramp_cells_open_field_paper/mixed_model_classifations_best_score.csv")
-
     #combined_df = combine_of_vr_dataframes(vr_data, of_data)
     #combined_df = add_model_classifications(combined_df, linear_model_classifications, mixed_model_classifications)
     #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
-
     #vr_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_vr.pkl")
     #of_data2 = pd.read_pickle("/mnt/datastore/Harry/Cohort6_july2020/summary/All_mice_of.pkl")
     #plot_summary_per_mouse(of_data2, save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")

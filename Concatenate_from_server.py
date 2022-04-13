@@ -8,10 +8,38 @@ import PostSorting.parameters
 import PostSorting.open_field_grid_cells
 import PostSorting.open_field_firing_maps
 import PostSorting.theta_modulation
+import control_sorting_analysis
 
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
 prm.set_pixel_ratio(440)
+
+def remove_outlier_waveforms(all_waveforms, max_deviations=2):
+    # remove snippets that have data points > 3 standard dev away from mean
+    mean = all_waveforms.mean(axis=1)
+    sd = all_waveforms.std(axis=1)
+    distance_from_mean = all_waveforms.T - mean
+    outliers = np.sum(distance_from_mean > max_deviations * sd, axis=1) > 0
+    return all_waveforms[:, ~outliers]
+
+def add_peaks_to_troughs(df):
+    peak_to_troughs = []
+    for index, row in df.iterrows():
+        row = row.to_frame().T.reset_index(drop=True)
+        primary_channel = row["primary_channel"].iloc[0]
+        random_snippets = row["random_snippets"].iloc[0][primary_channel-1]
+        random_snippets = remove_outlier_waveforms(random_snippets)
+        troughs = np.min(random_snippets, axis=1)
+        peaks = np.max(random_snippets, axis=1)
+        peak_to_trough = max(peaks-troughs)
+        peak_to_troughs.append(peak_to_trough)
+    df["snippet_peak_to_trough"] = peak_to_troughs
+    return df
+
+def get_track_length(recording_path):
+    parameter_file_path = control_sorting_analysis.get_tags_parameter_file(recording_path)
+    stop_threshold, track_length, cue_conditioned_goal = PostSorting.post_process_sorted_data_vr.process_running_parameter_tag(parameter_file_path)
+    return track_length
 
 def get_proportion_reward(processed_position, trial_type="all"):
     if trial_type == "beaconed":
@@ -90,19 +118,50 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                 print('I found a spatial data frame, processing ' + data_frame_path)
                 spatial_firing = pd.read_pickle(data_frame_path)
                 processed_position = pd.read_pickle(processed_position_path)
-
-                if "Curated" in list(spatial_firing):
-                    spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
                 spatial_firing = add_full_session_id(spatial_firing, path)
+                spatial_firing = add_peaks_to_troughs(spatial_firing)
+                spatial_firing["track_length"] = get_track_length(path)
 
                 if len(spatial_firing) > 0:
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
                     collumn_names_to_keep.append("firing_times")
                     collumn_names_to_keep.append("random_snippets")
-                    spatial_firing=spatial_firing[collumn_names_to_keep]
+                    if "MOVING_LOMB_avg_power" in list(spatial_firing):
+                        collumn_names_to_keep.append("MOVING_LOMB_avg_power")
+                    if "n_pi_trials_by_hmt" in list(spatial_firing):
+                        collumn_names_to_keep.append("n_pi_trials_by_hmt")
+                    if "fields_per_trial_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type")
+                    if "fields_per_trial_hmt_by_trial_type_pre_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_pre_rz")
+                    if "fields_per_trial_hmt_by_trial_type_post_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_post_rz")
+                    if "fields_sizes_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type")
+                    if "fields_sizes_hmt_by_trial_type_pre_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type_pre_rz")
+                    if "fields_sizes_hmt_by_trial_type_post_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type_post_rz")
+                    if "fields_jitter_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type")
+                    if "fields_jitter_hmt_by_trial_type_pre_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type_pre_rz")
+                    if "fields_jitter_hmt_by_trial_type_post_rz" in list(spatial_firing):
+                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type_post_rz")
+                    if "avg_correlations_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("avg_correlations_hmt_by_trial_type")
+                    if "field_realignments_hmt_by_trial_type" in list(spatial_firing):
+                        collumn_names_to_keep.append("field_realignments_hmt_by_trial_type")
+                    if "percentage_hits" in list(spatial_firing):
+                        collumn_names_to_keep.append("percentage_hits")
 
+                    spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_vr')})
+                    spatial_firing["session_id_vr"] = spatial_firing["session_id"]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -159,6 +218,10 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_of')})
+                    spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_of')})
+                    spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_of')})
+                    spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_of')})
+                    spatial_firing["session_id_of"] = spatial_firing["session_id"]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')

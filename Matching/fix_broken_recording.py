@@ -24,12 +24,15 @@ def clip_recording(broken_recording, clip_end_sampling_points=None, clip_start_s
 
             OpenEphys.writeContinuousFile(broken_recording+"/"+continuous_files[i], ch['header'], ch['timestamps'], ch['data'], ch['recordingNumber'])
 
+
+
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
     broken_recording = "/mnt/datastore/Harry/Cohort8_may2021/of/M11_D44_2021-07-08_11-24-55"
-    clip_recording(broken_recording, clip_end_sampling_points=54032384, clip_start_sampling_points=None)
+    #clip_recording(broken_recording, clip_end_sampling_points=54032384, clip_start_sampling_points=None)
 
 
 

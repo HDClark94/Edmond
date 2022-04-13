@@ -122,8 +122,189 @@ def plot_combined_vr_of(vr_paths, of_paths, save_path, condition, condition_abov
                         plt.close()
 
 
+def plot_snrs_by_tt(vr_paths, save_path, condition, combined_df):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition=="G":
+        combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    n_columns = 8
+    n_rows = (len(combined_df)//n_columns)+1
+    fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns*6, n_rows*6))
+    fig = plt.figure(figsize=(n_columns*6, n_rows*6))
+
+    i=0
+    for index, cell in combined_df.iterrows():
+        i += 1
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        vr_path = [s for s in vr_paths if session_id in s][0]
+        figure_vr_path = vr_path+"/MountainSort/Figures/moving_lomb_power_by_hmt/"+"hit_tt_powers_"+str(int(cluster_id))+".png"
+        im = mpimg.imread(figure_vr_path)
+        fig.add_subplot(n_rows, n_columns, i)
+        plt.title(session_id+"_"+str(int(cluster_id)))
+        plt.imshow(im)
+
+    plot_path = save_path + '/'+condition+'_all_power_by_tt.png'
+    fig.savefig(plot_path, dpi=150)
+    plt.close()
+
+def plot_snrs_tests_by_hmt(vr_paths, save_path, condition, combined_df):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition=="G":
+        combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    n_columns = 8
+    n_rows = (len(combined_df)//n_columns)+1
+    fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns*6, n_rows*6))
+    fig = plt.figure(figsize=(n_columns*6, n_rows*6))
+
+    i=0
+    for index, cell in combined_df.iterrows():
+        i += 1
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        vr_path = [s for s in vr_paths if session_id in s][0]
+        figure_vr_path = vr_path+"/MountainSort/Figures/moving_lomb_power_by_hmt/hmt_powers_test_"+str(int(cluster_id))+".png"
+        if os.path.exists(figure_vr_path):
+            im = mpimg.imread(figure_vr_path)
+            fig.add_subplot(n_rows, n_columns, i)
+            plt.title(session_id+"_"+str(int(cluster_id)))
+            plt.imshow(im)
+
+    plot_path = save_path + '/'+condition+'_all_snr_tests_by_hmt.png'
+    fig.savefig(plot_path, dpi=150)
+    plt.close()
+
+def plot_hit_firing_rate_maps_by_tt(vr_paths, save_path, condition, combined_df):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition=="G":
+        combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    n_columns = 8
+    n_rows = (len(combined_df)//n_columns)+1
+    fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns*6, n_rows*6))
+    fig = plt.figure(figsize=(n_columns*6, n_rows*6))
+
+    i=0
+    for index, cell in combined_df.iterrows():
+        i += 1
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        vr_path = [s for s in vr_paths if session_id in s][0]
+        figure_vr_path = vr_path+"/MountainSort/Figures/firing_rate_maps/"+session_id+"_firing_rate_map_hits_by_trial_type_"+str(int(cluster_id))+".png"
+        if os.path.exists(figure_vr_path):
+            im = mpimg.imread(figure_vr_path)
+            fig.add_subplot(n_rows, n_columns, i)
+            plt.title(session_id+"_"+str(int(cluster_id)))
+            plt.imshow(im)
+
+    plot_path = save_path + '/'+condition+'_all_hit_firing_rate_maps_by_tt.png'
+    fig.savefig(plot_path, dpi=150)
+    plt.close()
 
 
+def plot_firing_rate_maps_by_hmt(vr_paths, save_path, condition, combined_df):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition=="G":
+        combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    n_columns = 8
+    n_rows = (len(combined_df)//n_columns)+1
+    fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns*6, n_rows*6))
+    fig = plt.figure(figsize=(n_columns*6, n_rows*6))
+
+    i=0
+    for index, cell in combined_df.iterrows():
+        i += 1
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        vr_path = [s for s in vr_paths if session_id in s][0]
+        figure_vr_path = vr_path+"/MountainSort/Figures/firing_rate_maps/"+session_id+"_firing_rate_map_by_trial_outcome_"+str(int(cluster_id))+".png"
+        if os.path.exists(figure_vr_path):
+            im = mpimg.imread(figure_vr_path)
+            fig.add_subplot(n_rows, n_columns, i)
+            plt.title(session_id+"_"+str(int(cluster_id)))
+            plt.imshow(im)
+
+    plot_path = save_path + '/'+condition+'_all_firing_rate_maps_by_hmt.png'
+    fig.savefig(plot_path, dpi=150)
+    plt.close()
+
+def plot_snrs_by_hmt(vr_paths, save_path, condition, combined_df):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition=="G":
+        combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    n_columns = 8
+    n_rows = (len(combined_df)//n_columns)+1
+    fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns*6, n_rows*6))
+    fig = plt.figure(figsize=(n_columns*6, n_rows*6))
+
+    i=0
+    for index, cell in combined_df.iterrows():
+        i += 1
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        vr_path = [s for s in vr_paths if session_id in s][0]
+        figure_vr_path = vr_path+"/MountainSort/Figures/moving_lomb_power_by_hmt/"+"hmt_powers_"+str(int(cluster_id))+".png"
+        im = mpimg.imread(figure_vr_path)
+        fig.add_subplot(n_rows, n_columns, i)
+        plt.title(session_id+"_"+str(int(cluster_id)))
+        plt.imshow(im)
+
+    plot_path = save_path + '/'+condition+'_all_power_by_hmt.png'
+    fig.savefig(plot_path, dpi=150)
+    plt.close()
 
 
 
@@ -133,6 +314,12 @@ def main():
 
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort8_may2021/vr") if f.is_dir()]
     of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort8_may2021/of") if f.is_dir()]
+    combined_df = pd.read_pickle("/mnt/datastore/Harry/VR_grid_cells/combined_cohort8.pkl")
+    #plot_snrs_by_hmt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
+    #plot_snrs_by_tt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
+    #plot_firing_rate_maps_by_hmt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
+    plot_hit_firing_rate_maps_by_tt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
+    plot_snrs_tests_by_hmt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
     #plot_combined_vr_of(vr_path_list, of_path_list,  save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures", condition="grid_score", condition_above=0.2, condition_below=None)
 
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort7_october2020/vr") if f.is_dir()]

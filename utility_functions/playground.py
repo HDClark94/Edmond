@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import shutil
 
 def print_folder_paths(foldeer_path):
     folder_list = [f.path for f in os.scandir(foldeer_path) if f.is_dir()]
@@ -44,6 +45,16 @@ def remove_all_snippets_collumn(recordings_path):
     print("done")
 
 
+def delete_folders_by_name(path_to_folder, name):
+    # eg. delete_files_with_extension(path_to_folder = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/", name = "MountainSort")
+    inputpath = path_to_folder
+    for dirpath, dirnames, filenames in os.walk(inputpath):
+        if dirpath.endswith(name):
+            print("I want to delete this folder:, " +dirpath)
+            shutil.rmtree(dirpath)
+    print("I hope this worked")
+
+
 def delete_files_with_extension(path_to_folder, extension):
     # eg. delete_files_with_extension(path_to_folder = "/mnt/datastore/Harry/Mouse_data_for_sarah_paper/", extension = ".spikes")
     inputpath = path_to_folder
@@ -53,7 +64,7 @@ def delete_files_with_extension(path_to_folder, extension):
             if os.path.join(dirpath, name).endswith(extension):
                 print("I want to delete this file:, " +os.path.join(dirpath, name))
                 os.remove(os.path.join(dirpath, name))
-    print("I hope this worked")
+    #print("I hope this worked")
     # this function actually works
 
 def rename_channel_paths(path):
@@ -92,14 +103,92 @@ def print_paired_spatial_firing_clusters(vr_recording_path_list, of_recording_pa
                 print(spike_data_of["cluster_id"].tolist())
     return
 
+def rename_files(path_list, sub_out, sub_in):
+
+    for path in path_list:
+
+        file_list = [f.path for f in os.scandir(path) if f.is_file()]
+        for file in file_list:
+            file_name_old = file
+            file_name_new = file_name_old.replace(sub_out, sub_in)
+
+            if file_name_old != file_name_new:
+                os.rename(file_name_old, file_name_new)
+
+
+def delete_folder_by_name(folder_list, name):
+    for recording in folder_list:
+        inputpath = recording
+        for dirpath, dirnames, filenames in os.walk(inputpath):
+            if dirpath.endswith(name):
+                print("I want to delete this folder:, " +dirpath)
+                shutil.rmtree(dirpath)
+        print("I hope this worked")
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
-    path_to_folder = ""
-    #delete_files_with_extension(path_to_folder, extension=".spikes")
 
-    a = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/of/M13_D5_2021-05-14_11-34-47/MountainSort/DataFrames/spatial_firing.pkl")
-    print("hi")
+
+    #delete_files_with_extension(path_to_folder="", extension="_shuffle.pkl")
+
+    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort9_Junji/vr") if f.is_dir()]
+    J1_list = [k for k in vr_path_list if 'J1' in k]
+    J2_list = [k for k in vr_path_list if 'J2' in k]
+    J3_list = [k for k in vr_path_list if 'J3' in k]
+    J4_list = [k for k in vr_path_list if 'J4' in k]
+    J5_list = [k for k in vr_path_list if 'J5' in k]
+    vr_path_list = []
+    #vr_path_list.extend(J1_list)
+    #vr_path_list.extend(J2_list)
+    #vr_path_list.extend(J3_list)
+    #vr_path_list.extend(J4_list)
+    #vr_path_list.extend(J5_list)
+
+    #for path in vr_path_list:
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC1.continuous') # of sync pulse
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC2.continuous') # vr movement
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC3.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC4.continuous') # vr trial pin1
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC5.continuous') # vr trial pin2
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC6.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC7.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_ADC8.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_AUX1.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_AUX2.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_AUX3.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH1.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH2.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH3.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH4.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH5.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH6.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH7.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH8.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH9.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH10.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH11.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH12.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH13.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH14.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH15.continuous')
+        #delete_files_with_extension(path_to_folder=path, extension='100_CH16.continuous')
+
+    #rename_files(vr_path_list, sub_out="101", sub_in="100")
+
+
+    #for folder in ["/mnt/datastore/Harry/Cohort7_october2020/of",
+    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/OpenField",
+    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/OpenFeild",
+    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/OpenFeild",
+    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField"]:
+
+    #    of_path_list = [f.path for f in os.scandir(folder) if f.is_dir()]
+
+    #    for path in of_path_list:
+    #        delete_files_with_extension(path_to_folder=path, extension="/shuffle.pkl")
+
 
 if __name__ == '__main__':
     main()
+

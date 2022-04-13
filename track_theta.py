@@ -1,20 +1,8 @@
-import numpy as np
-from scipy import signal
-from scipy.ndimage import gaussian_filter1d
-import matplotlib.pylab as plt
-import math
-import os
-import pandas as pd
-import PostSorting.parameters
-import pickle
-from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
-import traceback
-import warnings
 import sys
 from PostSorting.theta_modulation import *
 from Edmond.ramp_cells_of import *
 import scipy
-from Edmond.loc_ramp_analysis import remove_mouse
+from Elrond.Integrated_ramp_analysis.loc_ramp_analysis import remove_mouse
 warnings.filterwarnings('ignore')
 
 test_params = PostSorting.parameters.Parameters()
