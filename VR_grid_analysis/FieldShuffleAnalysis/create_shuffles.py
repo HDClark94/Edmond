@@ -9,7 +9,7 @@ recording_folder_to_process = sys.argv[1] # something like /mnt/datastore/Harry/
 N_SHUFFLES = 1000
 local_scratch_path = '/exports/eddie/scratch/s1228823/recordings'
 ELEANOR_HOST = 'ubuntu@172.16.49.217'
-RUN_SHUFFLE_PATH = '/home/s1228823/in_vivo_ephys_openephys/Edmond/VR_grid_analysis/FieldShuffleAnalysis/run_shuffle.sh'
+RUN_SHUFFLE_PATH = '/home/s1228823/Edmond/VR_grid_analysis/FieldShuffleAnalysis/run_shuffle.sh'
 ELEANOR_RECORDINGS_PATH = Path(recording_folder_to_process)
 LOCAL_SCRATCH_PATH = Path(local_scratch_path)
 

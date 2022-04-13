@@ -14,7 +14,7 @@ module load anaconda
 source activate myenv
 
 # append the python path
-export PYTHONPATH="/home/s1228823/in_vivo_ephys_openephys"
+export PYTHONPATH="/home/s1228823/Edmond"
 
 # Run the program
-python /home/s1228823/in_vivo_ephys_openephys/Edmond/VR_grid_analysis/FieldShuffleAnalysis/shuffle_analysis.py
+python /home/s1228823/Edmond/VR_grid_analysis/FieldShuffleAnalysis/shuffle_analysis.py
