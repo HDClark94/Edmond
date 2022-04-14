@@ -158,7 +158,7 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kerne
 
 
 def run_shuffle(cluster_spike_data):
-    firing_rate_map = cluster_spike_data["fr_binned_in_space"].iloc[0]
+    firing_rate_map = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
     shuffle_peak_power, shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
     cluster_spike_data["peak_power"] = [shuffle_peak_power]
     cluster_spike_data["shuffled_rate_map"] = [shuffled_rate_map]
