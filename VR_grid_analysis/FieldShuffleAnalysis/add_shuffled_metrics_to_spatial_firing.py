@@ -3,26 +3,8 @@ import numpy as np
 import os
 import sys
 import traceback
-#import warnings
-#warnings.filterwarnings("ignore")
-
-def nan2val(scores, collumn):
-    scores_without_nans = []
-    for i in range(len(scores)):
-        if np.isnan(scores[i]):
-            if collumn == "speed_score":
-                scores[i] = 0
-            elif collumn == "hd_score":
-                scores[i] = 0
-            elif collumn == "rayleigh_score":
-                scores[i] = 1
-            elif collumn == "spatial_information_score":
-                scores[i] = 0
-            elif collumn == "grid_score":
-                scores[i] = 0
-            elif collumn == "border_score":
-                scores[i] = 0
-    return scores
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def add_shuffled_cutoffs(recordings_folder_to_process):
@@ -36,12 +18,9 @@ def add_shuffled_cutoffs(recordings_folder_to_process):
         if os.path.isdir(recording_path+r"/MountainSort/DataFrames/shuffles"):
             shuffle_list = [f.path for f in os.scandir(recording_path+r"/MountainSort/DataFrames/shuffles") if f.is_file()]
 
-            # remove shuffle.pkl if one is found, this is a deprecated pkl.
-            if os.path.isfile(recording_path+r"/MountainSort/DataFrames/shuffles/shuffle.pkl"):
-                shuffle_list.remove(recording_path+r"/MountainSort/DataFrames/shuffles/shuffle.pkl")
-
             for i in range(len(shuffle_list)):
                 cluster_shuffle = pd.read_pickle(shuffle_list[i])
+                cluster_shuffle = cluster_shuffle[["cluster_id", "peak_power"]]
                 shuffle = pd.concat([shuffle, cluster_shuffle], ignore_index=False)
             print("I have found a shuffled dataframe")
 
@@ -119,10 +98,10 @@ def main():
           'change that.')
 
     folders = []
-    folders.append("/mnt/datastore/Harry/Cohort9_Junji/of")
-    folders.append("/mnt/datastore/Harry/Cohort7_october2020/of")
-    folders.append("/mnt/datastore/Harry/Cohort6_july2020/of")
-    folders.append("/mnt/datastore/Harry/Cohort8_may2021/of")
+    #folders.append("/mnt/datastore/Harry/Cohort9_Junji/vr")
+    folders.append("/mnt/datastore/Harry/Cohort7_october2020/vr")
+    folders.append("/mnt/datastore/Harry/Cohort6_july2020/vr")
+    folders.append("/mnt/datastore/Harry/Cohort8_may2021/vr")
 
     for folder in folders:
         add_shuffled_cutoffs(folder)
