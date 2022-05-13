@@ -109,6 +109,7 @@ def main():
 
     grid_cells = pd.read_csv("/mnt/datastore/Harry/Vr_grid_cells/grid_cells.csv")
     of_recording_path_list = np.unique(grid_cells["full_session_id_of"]).tolist()
+    of_recording_path_list = ["/mnt/datastore/Harry/cohort8_may2021/of/M11_D36_2021-06-28_11-19-21"]
     process_recordings(of_recording_path_list)
 
     print("were done for now ")

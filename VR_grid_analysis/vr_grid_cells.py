@@ -8,7 +8,7 @@ import PostSorting.vr_cued
 import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
-from PostSorting.vr_spatial_firing import bin_fr_in_space, bin_fr_in_time, add_position_x
+from PostSorting.vr_spatial_firing import bin_fr_in_space, bin_fr_in_time, add_position_x, add_trial_number, add_trial_type
 from scipy import stats
 import Edmond.VR_grid_analysis.analysis_settings as Settings
 from scipy import signal
@@ -23,6 +23,7 @@ import sys
 import Edmond.plot_utility2
 import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
 import settings
+from scipy import stats
 import matplotlib.pylab as plt
 import matplotlib as mpl
 import control_sorting_analysis
@@ -255,11 +256,12 @@ def plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length, suffi
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
-        firing_rates = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
+        firing_rates = np.array(cluster_spike_data['fr_binned_in_space_smoothed'].iloc[0])
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
 
         if len(firing_times_cluster)>1:
             fr = firing_rates.flatten()
+            fr[np.isnan(fr)] = 0; fr[np.isinf(fr)] = 0
             autocorr_window_size = track_length*4
             lags = np.arange(0, autocorr_window_size, 1) # were looking at 10 timesteps back and 10 forward
             autocorrelogram = []
@@ -310,11 +312,8 @@ def reduce_digits(numeric_float, n_digits=6):
     scientific_notation = "{:.1e}".format(numeric_float)
     return scientific_notation
 
-def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, output_path, track_length):
-    print('plotting moving lomb_scargle periodogram...')
-    save_path = output_path + '/Figures/moving_lomb_scargle_periodograms'
-    if os.path.exists(save_path) is False:
-        os.makedirs(save_path)
+def calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, output_path, track_length):
+    print('calculating moving lomb_scargle periodogram...')
 
     n_trials = len(processed_position_data)
     elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
@@ -327,11 +326,12 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, ou
     all_centre_trials=[]
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
-        firing_rates = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
+        firing_rates = np.array(cluster_spike_data["fr_binned_in_space_smoothed"].iloc[0])
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
 
         if len(firing_times_cluster)>1:
             fr = firing_rates.flatten()
+
             # construct the lomb-scargle periodogram
             frequency = Settings.frequency
             sliding_window_size=track_length*Settings.window_length_in_laps
@@ -345,39 +345,8 @@ def plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, ou
                 centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
             powers = np.array(powers)
             centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
-
             avg_power = np.nanmean(powers, axis=0)
             max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
-            fig = plt.figure(figsize=(6,6))
-            ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-            for f in range(1,6):
-                ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
-            subset_trial_numbers = processed_position_data["trial_number"]
-            subset_trial_numbers = np.asarray(subset_trial_numbers)
-            subset_mask = np.isin(centre_trials, subset_trial_numbers)
-            subset_mask = np.vstack([subset_mask]*len(powers[0])).T
-            subset_powers = powers.copy()
-            subset_powers[subset_mask == False] = np.nan
-            avg_subset_powers = np.nanmean(subset_powers, axis=0)
-            sem_subset_powers = stats.sem(subset_powers, axis=0, nan_policy="omit")
-            ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3)
-            ax.plot(frequency, avg_subset_powers, color="black", linestyle="solid", linewidth=3)
-            plt.ylabel('Periodic Power', fontsize=20, labelpad = 10)
-            plt.xlabel("Track Frequency", fontsize=20, labelpad = 10)
-            plt.xlim(0,5.05)
-            ax.set_xticks([0,5])
-            ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
-            ax.set_ylim(bottom=0)
-            ax.yaxis.set_ticks_position('left')
-            ax.xaxis.set_ticks_position('bottom')
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            plt.xticks(fontsize=20)
-            plt.yticks(fontsize=20)
-            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
-            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_moving_lomb_scargle_avg_periodogram_Cluster_' + str(cluster_id) + '.png', dpi=300)
-            plt.close()
-
 
             freqs.append(max_SNR_freq)
             SNRs.append(max_SNR)
@@ -460,13 +429,8 @@ def analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data):
             avg_powers = np.nanmean(powers, axis=0)
             centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
             centre_trials = np.round(centre_trials).astype(np.int64)
-
-            if code == "_allo":
-                _, _, code_i = get_allocentric_peak(frequency, avg_powers, tolerance=0.05)
-            elif code == "_ego":
-                _, _, code_i = get_egocentric_peak(frequency, avg_powers, tolerance=0.05)
-
             firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
             for tt in ["all", 0, 1, 2]:
                 for hmt in ["all", "hit", "miss", "try"]:
                     subset_processed_position_data = processed_position_data.copy()
@@ -478,6 +442,11 @@ def analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data):
 
                     if len(firing_times_cluster)>1:
                         if len(subset_trial_numbers)>0:
+                            if code == "_allo":
+                                _, _, code_i = get_allocentric_peak(frequency, avg_powers, tolerance=0.05)
+                            elif code == "_ego":
+                                _, _, code_i = get_egocentric_peak(frequency, avg_powers, tolerance=0.05)
+
                             subset_mask = np.isin(centre_trials, subset_trial_numbers)
                             subset_mask = np.vstack([subset_mask]*len(powers[0])).T
                             subset_powers = powers.copy()
@@ -787,14 +756,10 @@ def add_lomb_classifier(spatial_firing, suffix=""):
     """
     lomb_classifiers = []
     for index, row in spatial_firing.iterrows():
-        if "ML_SNRs"+suffix in list(spatial_firing):
-            lomb_SNR = row["ML_SNRs"+suffix]
-            lomb_freq = row["ML_Freqs"+suffix]
-
-            lomb_classifier = get_lomb_classifier(lomb_SNR, lomb_freq, 0.023, 0.05, numeric=False)
-        else:
-            lomb_classifier = "Unclassifed"
-
+        lomb_SNR_threshold = row["power_threshold"]
+        lomb_SNR = row["ML_SNRs"+suffix]
+        lomb_freq = row["ML_Freqs"+suffix]
+        lomb_classifier = get_lomb_classifier(lomb_SNR, lomb_freq, lomb_SNR_threshold, 0.05, numeric=False)
         lomb_classifiers.append(lomb_classifier)
 
     spatial_firing["Lomb_classifier_"+suffix] = lomb_classifiers
@@ -1155,9 +1120,9 @@ def get_trial_color(trial_type):
     if trial_type == 0:
         return "black"
     elif trial_type == 1:
-        return "red"
-    elif trial_type == 2:
         return "blue"
+    elif trial_type == 2:
+        return "deepskyblue"
     else:
         print("invalid trial-type passed to get_trial_color()")
 
@@ -1467,6 +1432,59 @@ def add_rolling_lomb_classifier_percentages(spike_data, proceseed_position_data)
     return spike_data
 
 
+def get_avg_correlation(firing_rate_map):
+    corrs=[]
+    for i in range(len(firing_rate_map)):
+        for j in range(len(firing_rate_map)):
+            if i!=j:
+                corr = stats.pearsonr(firing_rate_map[i], firing_rate_map[j])[0]
+                corrs.append(corr)
+    return np.nanmean(corrs)
+
+def add_realignement_shifts(spike_data, processed_position_data, track_length):
+    realignments = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[spike_data["cluster_id"]==cluster_id]
+        firing_times_cluster = spike_data.firing_times.iloc[0]
+        # determine the max shift based on the spatial frequency
+        try:
+            putative_field_frequency = int(np.round(cluster_df["ML_Freqs"].iloc[0]))
+            max_shift = int(track_length/putative_field_frequency)
+        except:
+            max_shift = track_length
+
+        if len(firing_times_cluster)>1:
+            cluster_firing_maps = np.array(spike_data['fr_binned_in_space_smoothed'].iloc[cluster_index])
+            cluster_firing_maps[np.isnan(cluster_firing_maps)] = 0
+            cluster_firing_maps[np.isinf(cluster_firing_maps)] = 0
+            cluster_firing_maps = min_max_normalize(cluster_firing_maps)
+
+            shifts=[]
+            mean_cluster_firing_map = np.nanmean(cluster_firing_maps, axis=0)
+
+            # best align to mean firing rate map
+            for ti, tn in enumerate(processed_position_data["trial_number"]):
+                A = mean_cluster_firing_map
+                B = cluster_firing_maps[ti].flatten()
+                A -= A.mean(); A /= A.std() # z score
+                B -= B.mean(); B /= B.std() # z score
+                xcorr = signal.correlate(A, B, mode="same")
+                lags = signal.correlation_lags(A.size, B.size, mode="same")
+                xcorr /= np.max(xcorr)
+
+                xcorr = xcorr[np.abs(lags).argsort()][0:max_shift]
+                lags = lags[np.abs(lags).argsort()][0:max_shift]
+                recovered_shift = lags[xcorr.argmax()]
+                shifts.append(recovered_shift)
+
+            realignments.append(np.array(shifts))
+        else:
+            realignments.append(np.nan)
+
+    spike_data["map_realignments"] = realignments
+    return spike_data
+
+
 def get_rolling_lomb_classifier_for_centre_trial_not_numeric(centre_trials, powers, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
     frequency = Settings.frequency
 
@@ -1504,6 +1522,34 @@ def get_rolling_lomb_classifier_for_centre_trial_not_numeric(centre_trials, powe
             rolling_lomb_classifier_colors.append("black")
     return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
 
+def add_n_PI_trial(spike_data, processed_position_data):
+    processed_position_data = processed_position_data[(processed_position_data["trial_type"] == 1) | (processed_position_data["trial_type"] == 2)]
+    n_hits = len(processed_position_data[processed_position_data["hit_miss_try"] == "hit"])
+    n_tries = len(processed_position_data[processed_position_data["hit_miss_try"] == "try"])
+    n_misses = len(processed_position_data[processed_position_data["hit_miss_try"] == "miss"])
+    new_column = [[n_hits, n_misses, n_tries]]
+
+    new = pd.DataFrame()
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        cluster_spike_data["n_pi_trials_by_hmt"] = new_column
+        new = pd.concat([new, cluster_spike_data], ignore_index=True)
+    return new
+
+def add_displayed_peak_firing(spike_data):
+    peak_firing = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+        if len(firing_times_cluster)>1:
+            fr_binned_in_space = np.asarray(cluster_spike_data["fr_binned_in_space_smoothed"].iloc[0])
+            fr_binned_in_space[np.isnan(fr_binned_in_space)] = 0
+            fr_binned_in_space[np.isinf(fr_binned_in_space)] = 0
+            peak_firing.append(np.nanpercentile(fr_binned_in_space.flatten(), 99))
+        else:
+            peak_firing.append(np.nan)
+    spike_data["vr_peak_firing"] = peak_firing
+    return spike_data
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
@@ -1514,33 +1560,37 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         try:
             output_path = recording+'/'+settings.sorterName
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 
-            raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
-            spike_data = add_position_x(spike_data, raw_position_data)
-            spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording))
-            position_data = add_time_elapsed_collumn(position_data)
+            # remake the spike locations and firing rate maps
+            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+            #spike_data = add_position_x(spike_data, raw_position_data)
+            #spike_data = add_trial_number(spike_data, raw_position_data)
+            #spike_data = add_trial_type(spike_data, raw_position_data)
+            #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording), smoothen=True)
+            #spike_data = add_displayed_peak_firing(spike_data)
 
             # BEHAVIOURAL
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
-            spike_data = add_percentage_hits(spike_data, processed_position_data)
+            #processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+            #processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+            #spike_data = add_percentage_hits(spike_data, processed_position_data)
+            #spike_data = add_n_PI_trial(spike_data, processed_position_data)
 
             # MOVING LOMB PERIODOGRAMS
-            spike_data = plot_moving_lomb_scargle_periodogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
-            spike_data = add_rolling_lomb_classifier_percentages(spike_data, processed_position_data)
-            spike_data = analyse_lomb_powers(spike_data, processed_position_data)
-            spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
-            #shuffle_data = analyse_lomb_powers(shuffle_data, processed_position_data)
+            #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, output_path, track_length=get_track_length(recording))
+            #spike_data = add_rolling_lomb_classifier_percentages(spike_data, processed_position_data)
+            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+            #spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
+
+            # Joint activity analysis
+            spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
 
             # FIRING AND BEHAVIOURAL PLOTTING
-            plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
-            plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
-            plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
+            #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+            #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
 
             spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            #shuffle_data.to_pickle(recording+"/MountainSort/DataFrames/lomb_shuffle_powers.pkl")
 
             print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
@@ -1553,17 +1603,23 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
 def main():
     print('-------------------------------------------------------------')
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     vr_path_list = []
     of_path_list = []
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()])
-    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
-    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()])
+    #vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
+
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
-    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
-    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/of") if f.is_dir()])
+    #of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/of") if f.is_dir()])
+
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26','/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41',
+    #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36']
     process_recordings(vr_path_list, of_path_list)
 
 

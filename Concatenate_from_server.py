@@ -29,8 +29,8 @@ def add_peaks_to_troughs(df):
         primary_channel = row["primary_channel"].iloc[0]
         random_snippets = row["random_snippets"].iloc[0][primary_channel-1]
         random_snippets = remove_outlier_waveforms(random_snippets)
-        troughs = np.min(random_snippets, axis=1)
-        peaks = np.max(random_snippets, axis=1)
+        troughs = np.min(random_snippets, axis=0)
+        peaks = np.max(random_snippets, axis=0)
         peak_to_trough = max(peaks-troughs)
         peak_to_troughs.append(peak_to_trough)
     df["snippet_peak_to_trough"] = peak_to_troughs

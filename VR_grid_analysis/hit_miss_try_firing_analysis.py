@@ -1106,8 +1106,14 @@ def get_avg_correlations(spike_data, hmt, tt):
     avg_correlations = []
     for index, cluster_data in spike_data.iterrows():
         cluster_data = cluster_data.to_frame().T.reset_index(drop=True)
-        avg_correlation = cluster_data["avg_correlations_hmt_by_trial_type"].iloc[0][i][j]
-        avg_correlations.append(avg_correlation)
+        if np.asarray(cluster_data["avg_correlations_hmt_by_trial_type"].iloc[0]).shape == (3,3):
+            avg_correlation = cluster_data["avg_correlations_hmt_by_trial_type"].iloc[0][i][j]
+            avg_correlations.append(avg_correlation)
+        else:
+            print("no avg correlations found")
+            print(cluster_data.session_id.iloc[0])
+            print(cluster_data.cluster_id.iloc[0])
+
     return np.array(avg_correlations)
 
 def get_avg_map_shifts(spike_data, hmt, tt):
@@ -1115,9 +1121,16 @@ def get_avg_map_shifts(spike_data, hmt, tt):
     avg_map_shifts = []
     for index, cluster_data in spike_data.iterrows():
         cluster_data = cluster_data.to_frame().T.reset_index(drop=True)
-        map_shifts = cluster_data["field_realignments_hmt_by_trial_type"].iloc[0][i][j]
-        avg_shift = np.nanmean(np.abs(map_shifts))
-        avg_map_shifts.append(avg_shift)
+        if np.asarray(cluster_data["field_realignments_hmt_by_trial_type"].iloc[0]).shape == (3,3):
+            map_shifts = cluster_data["field_realignments_hmt_by_trial_type"].iloc[0][i][j]
+            avg_shift = np.nanmean(np.abs(map_shifts))
+            avg_map_shifts.append(avg_shift)
+        else:
+            a=1
+            #print("no avg map_shifts found")
+            #print(cluster_data.session_id.iloc[0])
+            #print(cluster_data.cluster_id.iloc[0])
+
     return np.array(avg_map_shifts)
 
 def plot_avg_correlation_comparison_tt(combined_df, save_path, CT="", PDN="", hmt="", get_lomb_classifier=True):
@@ -1897,13 +1910,10 @@ def main():
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
-    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
-    combined_df_shuffle = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8_lomb_shuffle.pkl")
+    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
 
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
     combined_df = combined_df[combined_df["track_length"] == 200]
-    combined_df_shuffle = combined_df_shuffle[combined_df_shuffle["track_length"] == 200]
-    df_shuffle = add_celltype_classifier(combined_df_shuffle, combined_df)
 
     # periodic power of ego and allocentric peaks
     plot_coding_power_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Position/nonbeaconed/", CT="G", PDN="Position", tt="non_beaconed")
@@ -1927,7 +1937,7 @@ def main():
     plot_map_shifts_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/map_shifts/G/Position/hit/", CT="G", PDN="Position", hmt="hit")
     plot_map_shifts_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/map_shifts/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit")
 
-    plot_correlation_of_hit_miss_diff_with_map_shifts(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/map_shifts/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1)
+    #plot_correlation_of_hit_miss_diff_with_map_shifts(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/map_shifts/G/Position/nonbeaconed/", CT="G", PDN="Position", tt=1)
 
     # compare hit miss try according to lomb classifications using the pairwise trial correlations
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/", CT="G", PDN="", tt="all")
@@ -1943,10 +1953,10 @@ def main():
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Distance/nonbeaconed/", CT="G", PDN="Distance", tt="non_beaconed")
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Distance/probe/", CT="G", PDN="Distance", tt="probe")
 
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/", CT="G", PDN="Null", tt="all")
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/beaconed/", CT="G", PDN="Null", tt="beaconed")
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/nonbeaconed/", CT="G", PDN="Null", tt="non_beaconed")
-    plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/probe/", CT="G", PDN="Null", tt="probe")
+    #plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/", CT="G", PDN="Null", tt="all")
+    #plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/beaconed/", CT="G", PDN="Null", tt="beaconed")
+    #plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/nonbeaconed/", CT="G", PDN="Null", tt="non_beaconed")
+    #plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/G/Null/probe/", CT="G", PDN="Null", tt="probe")
 
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/Position/", CT="NG", PDN="Position", tt="all")
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/Position/beaconed/", CT="NG", PDN="Position", tt="beaconed")
@@ -1964,41 +1974,6 @@ def main():
     plot_SNR_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/snr/NG/Distance/probe/", CT="NG", PDN="Distance", tt="probe")
 
 
-    # compare hit miss try according to shuffle lomb classifications using the power
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/", CT="G", PDN="", tt="all")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/", CT="NG", PDN="", tt="all")
-
-
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/", CT="G", PDN="Position", get_lomb_classifier=False, tt="all")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/beaconed/", CT="G", PDN="Position", get_lomb_classifier=False, tt="beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/nonbeaconed/", CT="G", PDN="Position", get_lomb_classifier=False, tt="non_beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Position/probe/", CT="G", PDN="Position", get_lomb_classifier=False, tt="probe")
-
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Distance/", CT="G", PDN="Distance", get_lomb_classifier=False, tt="all")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Distance/beaconed/", CT="G", PDN="Distance", get_lomb_classifier=False, tt="beaconed")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Distance/nonbeaconed/", CT="G", PDN="Distance", get_lomb_classifier=False, tt="non_beaconed")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Distance/probe/", CT="G", PDN="Distance", get_lomb_classifier=False, tt="probe")
-
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Null/", CT="G", PDN="Null", get_lomb_classifier=False, tt="all")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Null/beaconed/", CT="G", PDN="Null", get_lomb_classifier=False, tt="beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Null/nonbeaconed/", CT="G", PDN="Null", get_lomb_classifier=False, tt="non_beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/G/Null/probe/", CT="G", PDN="Null", get_lomb_classifier=False, tt="probe")
-
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Position/", CT="NG", PDN="Position", get_lomb_classifier=False, tt="all")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Position/beaconed/", CT="NG", PDN="Position", get_lomb_classifier=False, tt="beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Position/nonbeaconed/", CT="NG", PDN="Position", get_lomb_classifier=False, tt="non_beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Position/probe/", CT="NG", PDN="Position", get_lomb_classifier=False, tt="probe")
-
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Null/", CT="NG", PDN="Null", get_lomb_classifier=False, tt="all")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Null/beaconed/", CT="NG", PDN="Null", get_lomb_classifier=False, tt="beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Null/nonbeaconed/", CT="NG", PDN="Null", get_lomb_classifier=False, tt="non_beaconed")
-    plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Null/probe/", CT="NG", PDN="Null", get_lomb_classifier=False, tt="probe")
-
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Distance/", CT="NG", PDN="Distance", get_lomb_classifier=False, tt="all")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Distance/beaconed/", CT="NG", PDN="Distance", get_lomb_classifier=False, tt="beaconed")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Distance/nonbeaconed/", CT="NG", PDN="Distance", get_lomb_classifier=False, tt="non_beaconed")
-    #plot_SNR_comparison(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/shuffles/snr/NG/Distance/probe/", CT="NG", PDN="Distance", get_lomb_classifier=False, tt="probe")
-
     # now by trial_type specificially
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/", CT="G", PDN="", hmt="hit")
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/NG/", CT="G", PDN="", hmt="hit")
@@ -2013,9 +1988,9 @@ def main():
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Distance/try/", CT="G", PDN="Distance", hmt="try")
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Distance/miss/", CT="G", PDN="Distance", hmt="miss")
 
-    plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/", CT="G", PDN="Null", hmt="all")
-    plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/hit/", CT="G", PDN="Null", hmt="hit")
-    plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/try/", CT="G", PDN="Null", hmt="try")
+    #plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/", CT="G", PDN="Null", hmt="all")
+    #plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/hit/", CT="G", PDN="Null", hmt="hit")
+    #plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/try/", CT="G", PDN="Null", hmt="try")
     #plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/G/Null/miss/", CT="G", PDN="Null", hmt="miss")
 
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/NG/Position/", CT="NG", PDN="Position", hmt="all")
@@ -2033,40 +2008,6 @@ def main():
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/NG/Distance/try/", CT="NG", PDN="Distance", hmt="try")
     plot_SNR_comparison_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/snr/NG/Distance/miss/", CT="NG", PDN="Distance", hmt="miss")
 
-
-    # compare hit miss try according to shuffle lomb classifications using the power
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/", CT="G", PDN="", hmt="hit")
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/", CT="NG", PDN="", hmt="hit")
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Position/", CT="G", PDN="Position", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Position/hit/", CT="G", PDN="Position", hmt="hit", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Position/try/", CT="G", PDN="Position", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Position/miss/", CT="G", PDN="Position", hmt="miss", get_lomb_classifier=False)
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Distance/", CT="G", PDN="Distance", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Distance/hit/", CT="G", PDN="Distance", hmt="hit", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Distance/try/", CT="G", PDN="Distance", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Distance/miss/", CT="G", PDN="Distance", hmt="miss", get_lomb_classifier=False)
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Null/", CT="G", PDN="Null", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Null/hit/", CT="G", PDN="Null", hmt="hit", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Null/try/", CT="G", PDN="Null", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/G/Null/miss/", CT="G", PDN="Null", hmt="miss", get_lomb_classifier=False)
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Position/", CT="NG", PDN="Position", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Position/hit/", CT="NG", PDN="Position", hmt="hit", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Position/try/", CT="NG", PDN="Position", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Position/miss/", CT="NG", PDN="Position", hmt="miss", get_lomb_classifier=False)
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Null/", CT="NG", PDN="Null", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Null/hit/", CT="NG", PDN="Null", hmt="hit",  get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Null/try/", CT="NG", PDN="Null", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Null/miss/", CT="NG", PDN="Null", hmt="miss", get_lomb_classifier=False)
-
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Distance/", CT="NG", PDN="Distance", hmt="all", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Distance/hit/", CT="NG", PDN="Distance", hmt="hit", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Distance/try/", CT="NG", PDN="Distance", hmt="try", get_lomb_classifier=False)
-    plot_SNR_comparison_tt(combined_df_shuffle, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/tt/shuffles/snr/NG/Distance/miss/", CT="NG", PDN="Distance", hmt="miss", get_lomb_classifier=False)
 
     print("look now")
 
