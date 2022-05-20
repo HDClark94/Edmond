@@ -65,7 +65,7 @@ def getUnstableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spe
         # add an offset for all even trials
         offset = 0
         if trial_number%2 == 0:
-            offset = np.random.randint(low=0, high=field_spacing/4)
+            offset = np.random.randint(low=-field_spacing/2, high=field_spacing/2)
 
         firing_p = np.sin((2*np.pi*(1/field_spacing)*trial_locations)+offset)
         firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)

@@ -270,13 +270,13 @@ def plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length, suffi
                 corr = stats.pearsonr(fr_lagged, fr[:len(fr_lagged)])[0]
                 autocorrelogram.append(corr)
             autocorrelogram= np.array(autocorrelogram)
-            fig = plt.figure(figsize=(6,6))
+            fig = plt.figure(figsize=(5,2.5))
             ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
             for f in range(1,6):
                 ax.axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
             ax.axhline(y=0, color="black", linewidth=2,linestyle="dashed")
             ax.plot(lags, autocorrelogram, color="black", linewidth=3)
-            plt.ylabel('Spatial Autocorrelation', fontsize=25, labelpad = 10)
+            plt.ylabel('Spatial Autocorr', fontsize=25, labelpad = 10)
             plt.xlabel('Lag (cm)', fontsize=25, labelpad = 10)
             plt.xlim(0,(track_length*2)+3)
             ax.yaxis.set_ticks_position('left')
@@ -293,7 +293,8 @@ def plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length, suffi
             ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
             plt.xticks(fontsize=20)
             plt.yticks(fontsize=20)
-            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+            fig.tight_layout(pad=2.0)
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_spatial_autocorrelogram_Cluster_' + str(cluster_id) + suffix + '.png', dpi=200)
             plt.close()
 
@@ -1551,6 +1552,117 @@ def add_displayed_peak_firing(spike_data):
     spike_data["vr_peak_firing"] = peak_firing
     return spike_data
 
+
+def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
+    frequency = Settings.frequency
+
+    trial_points = []
+    peak_frequencies = []
+    rolling_lomb_classifier = []
+    rolling_lomb_classifier_numeric = []
+    rolling_lomb_classifier_colors = []
+    for i in range(len(centre_trials)):
+        centre_trial = centre_trials[i]
+
+        if i<int(n_window_size/2):
+            power_window = powers[:i+int(n_window_size/2), :]
+        elif i+int(n_window_size/2)>len(centre_trials):
+            power_window = powers[i-int(n_window_size/2):, :]
+        else:
+            power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
+
+        avg_power = np.nanmean(power_window, axis=0)
+        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+
+        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, 0.05, numeric=False)
+        peak_frequencies.append(max_SNR_freq)
+        trial_points.append(centre_trial)
+        if lomb_classifier == "Position":
+            rolling_lomb_classifier.append("P")
+            rolling_lomb_classifier_numeric.append(0.5)
+            rolling_lomb_classifier_colors.append(Settings.allocentric_color)
+        elif lomb_classifier == "Distance":
+            rolling_lomb_classifier.append("D")
+            rolling_lomb_classifier_numeric.append(1.5)
+            rolling_lomb_classifier_colors.append(Settings.egocentric_color)
+        elif lomb_classifier == "Null":
+            rolling_lomb_classifier.append("N")
+            rolling_lomb_classifier_numeric.append(2.5)
+            rolling_lomb_classifier_colors.append(Settings.null_color)
+        else:
+            rolling_lomb_classifier.append("U")
+            rolling_lomb_classifier_numeric.append(3.5)
+            rolling_lomb_classifier_colors.append("black")
+
+
+    return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_numeric), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
+
+def get_modal_class_char(modal_class):
+    if modal_class == "Position":
+        classifier = "P"
+    elif modal_class == "Distance":
+        classifier = "D"
+    elif modal_class == "Null":
+        classifier = "N"
+    else:
+        classifier = "U"
+    return classifier
+
+def get_block_lengths(rolling_lomb_classifier, modal_class_char):
+    block_lengths = []
+    current_block_length = 0
+    for i in range(len(rolling_lomb_classifier)):
+        if rolling_lomb_classifier[i] == modal_class_char:
+            current_block_length+=1
+        else:
+            if current_block_length != 0:
+                block_lengths.append(current_block_length)
+            current_block_length=0
+    block_lengths = np.array(block_lengths)/len(rolling_lomb_classifier) # normalise by length of session
+    return block_lengths.tolist()
+
+
+
+def add_rolling_stats(spike_data):
+    block_lengths_for_encoder=[]
+    proportion_encoding_encoder=[]
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
+
+        if "rolling_threshold" in list(spike_data):
+            power_threshold =  cluster_spike_data["rolling_threshold"].iloc[0]
+        elif "power_threshold" in list(spike_data):
+            power_threshold = cluster_spike_data["power_threshold"].iloc[0]
+        else:
+            print("no threshold has been added for this cell")
+
+        modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
+        modal_class_char = get_modal_class_char(modal_class)
+
+        if len(firing_times_cluster)>1:
+
+            powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+            centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
+            centre_trials = np.round(centre_trials).astype(np.int64)
+
+            powers[np.isnan(powers)] = 0
+            rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold)
+
+            proportion_encoding = len(rolling_lomb_classifier[rolling_lomb_classifier==modal_class_char])/len(rolling_lomb_classifier)
+            block_lengths = get_block_lengths(rolling_lomb_classifier, modal_class_char)
+        else:
+            proportion_encoding = np.nan
+            block_lengths=[]
+
+        block_lengths_for_encoder.append(block_lengths)
+        proportion_encoding_encoder.append(proportion_encoding)
+
+    spike_data["rolling:block_lengths_for_encoder"] = block_lengths_for_encoder
+    spike_data["rolling:proportion_encoding_encoder"] = proportion_encoding_encoder
+    return spike_data
+
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
 
@@ -1582,8 +1694,11 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
             #spike_data = analyse_lomb_powers_ego_vs_allocentric(spike_data, processed_position_data)
 
+            # Rolling classifications
+            spike_data = add_rolling_stats(spike_data)
+
             # Joint activity analysis
-            spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
+            #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
 
             # FIRING AND BEHAVIOURAL PLOTTING
             #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])

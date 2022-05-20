@@ -710,11 +710,11 @@ def plot_lomb_classifiers_vs_shuffle(concantenated_dataframe, suffix="", save_pa
     position_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Position"]
     null_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Null"]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7,6), gridspec_kw={'width_ratios': [1, 0.3]})
-    ax1.set_ylabel("Peak power vs shuffle",color="black",fontsize=25, labelpad=10)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7,4), gridspec_kw={'width_ratios': [1, 0.3]})
+    ax1.set_ylabel("Peak power vs \n false alarm rate",color="black",fontsize=25, labelpad=10)
     ax1.set_xlabel("Track frequency", color="black", fontsize=25, labelpad=10)
     ax1.set_xticks(np.arange(0, 11, 1.0))
-    ax1.set_yticks([-0.1, 0, 0.1, 0.2, 0.3])
+    ax1.set_yticks([-0.1, 0, 0.1, 0.2, 0.3, 0.4])
     ax2.set_xticks([0, 0.5])
     ax2.set_xticklabels(["0", "0.5"])
     ax2.set_yticks([])
@@ -737,9 +737,9 @@ def plot_lomb_classifiers_vs_shuffle(concantenated_dataframe, suffix="", save_pa
     ax2.spines['top'].set_visible(False)
     ax2.spines['left'].set_visible(False)
     ax1.set_xlim([0,5.02])
-    ax1.set_ylim([-0.1,0.3])
+    ax1.set_ylim([-0.1,0.4])
     ax2.set_xlim([-0.05,0.55])
-    ax2.set_ylim([-0.1,0.3])
+    ax2.set_ylim([-0.1,0.4])
     ax2.set_xlabel(r'$\Delta$ from Int', color="black", fontsize=25, labelpad=10)
     ax2.scatter(x=distance_from_integer(null_cells["ML_Freqs"+suffix]), y=null_cells["ML_SNRs"+suffix]-null_cells["power_threshold"], color=Settings.null_color, marker="o", alpha=0.3)
     ax2.scatter(x=distance_from_integer(distance_cells["ML_Freqs"+suffix]), y=distance_cells["ML_SNRs"+suffix]-distance_cells["power_threshold"], color=Settings.egocentric_color, marker="o", alpha=0.3)
@@ -891,11 +891,49 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
     ax.set_xlabel("", fontsize=20)
     ax.set_ylabel("Peak power", fontsize=20)
     significance_bar(start=1, end=2, height=0.292, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
-    #significance_bar(start=5, end=6, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[4], data[5])[1]))
-    #significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
-    #significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
+    significance_bar(start=5, end=6, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[4], data[5])[1]))
+    significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
+    significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
     plt.savefig(save_path + '/lomb_classifier_powers_vs_groups.png', dpi=300)
     plt.close()
+
+
+    fig, ax = plt.subplots(figsize=(4,4))
+    data = [g_position_cells[~np.isnan(g_position_cells)],
+            g_distance_cells[~np.isnan(g_distance_cells)],
+            g_null_cells[~np.isnan(g_null_cells)],
+            ng_position_cells[~np.isnan(ng_position_cells)],
+            ng_distance_cells[~np.isnan(ng_distance_cells)],
+            ng_null_cells[~np.isnan(ng_null_cells)]]
+    colors=[Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    parts = ax.violinplot(data, positions=[1,2,3,5,6,7], showmeans=False, showmedians=False, showextrema=False)
+    for patch, color, data_x, pos_x in zip(parts['bodies'], colors, data, [1,2,3,5,6,7]):
+        patch.set_facecolor(color)
+        patch.set_alpha(1)
+        ax.scatter((np.ones(len(data_x))*pos_x)+np.random.uniform(low=-0.3, high=0.3, size=len(data_x)), data_x, color="black", marker="o", zorder=-1, alpha=0.3, s=10)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(bottom=0, top=0.3)
+    ax.set_xlim(left=0.5, right=7.5)
+    ax.set_xticks([2, 6])
+    ax.set_yticks([0, 0.1, 0.2, 0.3])
+    ax.set_xticklabels(["G", "NG"])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("", fontsize=20)
+    ax.set_ylabel("Peak power", fontsize=20)
+    significance_bar(start=1, end=2, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
+    significance_bar(start=5, end=6, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[4], data[5])[1]))
+    significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
+    significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
+    plt.savefig(save_path + '/lomb_classifier_powers_vs_groups_voliin.png', dpi=300)
+    plt.close()
+
     return
 
 
@@ -1095,6 +1133,24 @@ def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_p
     ax.tick_params(axis='both', which='major', labelsize=25)
     plt.savefig(save_path + '/lomb_classifiers_proportions_'+suffix+'.png', dpi=200)
     plt.close()
+
+    # plot by pie chart
+    groups = ["Position", "Distance", "Null"]
+    colors_lm = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color, "black"]
+    objects = ["G", "NG"]
+    for object, x in zip(objects, x_pos):
+        if object == "G":
+            df = grid_cells
+        elif object == "NG":
+            df = non_grid_cells
+        sizes = [len(df[(df["Lomb_classifier_"+suffix] == "Position")]),
+                 len(df[(df["Lomb_classifier_"+suffix] == "Distance")]),
+                 len(df[(df["Lomb_classifier_"+suffix] == "Null")])]
+        fig1, ax1 = plt.subplots(figsize=(4,4))
+        ax1.pie(sizes, labels=groups, autopct='%1.1f%%', startangle=90, colors=colors_lm, pctdistance=1.2, labeldistance=1.5)
+        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        plt.savefig(save_path + '/lomb_classifiers_proportions_'+suffix+'_pie_'+object+'.png', dpi=1000)
+        plt.close()
     return
 
 def plot_lomb_classifiers_proportions_hmt(concantenated_dataframe, save_path=""):
@@ -4700,6 +4756,7 @@ def main():
 
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
     combined_df = combined_df[combined_df["track_length"] == 200]
+    combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
     #read_df(combined_df)
 

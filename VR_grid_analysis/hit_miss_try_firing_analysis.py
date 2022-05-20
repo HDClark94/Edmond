@@ -1914,6 +1914,7 @@ def main():
 
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
     combined_df = combined_df[combined_df["track_length"] == 200]
+    combined_df = combined_df[combined_df["n_trials"] >= 10]
 
     # periodic power of ego and allocentric peaks
     plot_coding_power_comparison(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/hmt/coding_scheme/G/Position/nonbeaconed/", CT="G", PDN="Position", tt="non_beaconed")
