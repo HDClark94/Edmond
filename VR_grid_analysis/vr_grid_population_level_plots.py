@@ -4015,69 +4015,6 @@ def get_peak_powers_across_trials(powers, centre_trials):
         tn_powers.append(avg_peak)
     return np.array(tn_powers), np.unique(centre_trials)
 
-def plot_rolling_lomb_codes_across_cells2(spike_data, paired_recording, output_path):
-    print('plotting moving lomb_scargle periodogram...')
-    save_path = output_path + '/Figures/rolling_classifiers'
-    if os.path.exists(save_path) is False:
-        os.makedirs(save_path)
-
-    if paired_recording is not None:
-        of_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-    spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "classifier"]], on="cluster_id")
-    spike_data = spike_data[spike_data["classifier"] == "G"]
-    spike_data = spike_data.sort_values(by=["classifier"])
-
-    if len(spike_data)>0:
-        fig, ax = plt.subplots(1, 1, figsize=(3,6))
-        tab10 = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        x_pos = 0
-        x_step = 0.4
-        classifier_labels = []
-        for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
-            cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
-            powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
-            classifier = cluster_spike_data["classifier"].iloc[0]
-            modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
-            if modal_class == "Position":
-                classifier = "P"
-            elif modal_class == "Distance":
-                classifier = "D"
-            elif modal_class == "Null":
-                classifier = "N"
-            label = classifier+str(cluster_index+1)
-            centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
-            centre_trials = np.round(centre_trials).astype(np.int64)
-            legend_freq = np.linspace(x_pos, x_pos+0.2, 5)
-            rolling_lomb_classifier, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers)
-            rolling_lomb_classifier_tiled = np.tile(rolling_lomb_classifier,(len(legend_freq),1))
-            cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
-            boundaries = [0, 1, 2, 3, 4]
-            norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
-            Y, X = np.meshgrid(centre_trials, legend_freq)
-            ax.pcolormesh(X, Y, rolling_lomb_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
-            x_pos += x_step
-            classifier_labels.append(label)
-
-        ax.set_xticks(np.arange(0, x_step*len(spike_data), x_step)+0.1)
-        ax.set_xticklabels(classifier_labels)
-        for i in range(len(classifier_labels)):
-            ax.get_xticklabels()[i].set_color(tab10[i])
-        plt.tick_params(axis = "x", which = "both", bottom = False, top = False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.yaxis.set_visible(False)
-        ax.set_xlim([0, 2.2])
-        plt.xticks(fontsize=20)
-        plt.yticks(fontsize=20)
-        plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-        plt.subplots_adjust(bottom = 0.2)
-        plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'rolling_lomb_classifier.png', dpi=300)
-        plt.close()
-    return
-
-
 def plot_hits_of_cued_and_pi_trials(processed_position_data, output_path):
     print('I am plotting stop rasta...')
     save_path = output_path+'/Figures/behaviour'
@@ -4744,6 +4681,122 @@ def plot_allo_minus_ego_component(concantenated_dataframe,  save_path):
 
     return
 
+def plot_rolling_lomb_block_sizes(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+    Null_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Null"]
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.null_color)
+    ax.set_xlabel("Frac. session", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/fraction_encoding.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(Position_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Null_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.null_color)
+    ax.set_xlabel("Block length (frac. session)", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    _, _, patches0 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), histtype="step", cumulative=True, alpha=0.5, color="r")
+    _, _, patches1 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder_shuffled"]), density=True, bins=10, histtype="step", cumulative=True, range=(0,1), alpha=0.5, color="grey")
+    patches0[0].set_xy(patches0[0].get_xy()[:-1])
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    ax.set_xlabel("Block length (frac. session)", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding_vs_shuffled.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_position"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
+    ax.set_xlabel("frac. session", fontsize=20)
+    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding_position.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_distance"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
+    ax.set_xlabel("frac. session", fontsize=20)
+    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding_distance.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_null"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.null_color)
+    ax.set_xlabel("frac. session", fontsize=20)
+    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding_null.png', dpi=300)
+    plt.close()
+
+
+    return
+
+
 
 def main():
     print('-------------------------------------------------------------')
@@ -4766,7 +4819,10 @@ def main():
     plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
-    # Figure 3 plots
+    # Figure 3 plots remapping
+    plot_rolling_lomb_block_sizes(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+
+
     plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_proportions_by_probe_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 

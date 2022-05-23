@@ -146,23 +146,38 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kerne
     fr_smoothed = convolve(fr, gauss_kernel)
 
     powers = []
+    rolling_peak_powers = []
+    rolling_peak_sizes = []
     for m in indices_to_test:
         ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
         power = ls.power(frequency)
         powers.append(power.tolist())
+
+        # calculate rolling_peak powers and sizes
+        if len(powers) % 100 == 0:
+            rolling_powers = np.array(powers)
+            avg_rolling_powers = np.nanmean(rolling_powers, axis=0)
+            shuffle_peak_rolling_power = np.nanmax(avg_rolling_powers)
+            rolling_peak_powers.append(shuffle_peak_rolling_power)
+            rolling_peak_sizes.append(len(powers))
+    rolling_peak_powers = np.array(rolling_peak_powers)
+    rolling_peak_sizes = np.array(rolling_peak_sizes)
+
     powers = np.array(powers)
     avg_powers = np.nanmean(powers, axis=0)
     shuffle_peak_power = np.nanmax(avg_powers)
 
-    return shuffle_peak_power, np.reshape(fr, (n_trials, track_length))
+    return shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, np.reshape(fr, (n_trials, track_length))
 
 
 def run_shuffle(cluster_spike_data):
     firing_rate_map = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
-    shuffle_peak_power, shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
+    shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
     cluster_spike_data["peak_power"] = [shuffle_peak_power]
+    cluster_spike_data["rolling_peak_powers"] = [rolling_peak_powers]
+    cluster_spike_data["rolling_peak_sizes"] = [rolling_peak_sizes]
     cluster_spike_data["shuffled_rate_map"] = [shuffled_rate_map]
-    single_shuffle = cluster_spike_data[["cluster_id", "peak_power", "shuffled_rate_map"]]
+    single_shuffle = cluster_spike_data[["cluster_id", "peak_power", "rolling_peak_powers", "rolling_peak_sizes", "shuffled_rate_map"]]
     return single_shuffle
 
 
@@ -224,8 +239,6 @@ def main():
     recording_path = os.environ['RECORDING_PATH']
     n_shuffles = int(os.environ['SHUFFLE_NUMBER'])
     cluster_id = int(os.environ["CLUSTER_ID"])
-
-    one_job_shuffle_parallel(recording_path, cluster_id, n_shuffles)
     #=========================================================================================#
     #=========================================================================================#
 

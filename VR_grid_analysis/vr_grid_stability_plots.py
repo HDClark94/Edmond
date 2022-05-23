@@ -3733,45 +3733,6 @@ def get_hmt_for_centre_trial(centre_trials, processed_position_data, tt=1):
     centre_trials_hmt[miss_mask] = 0
     return centre_trials_hmt
 
-def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
-    frequency = Settings.frequency
-
-    trial_points = []
-    peak_frequencies = []
-    rolling_lomb_classifier = []
-    rolling_lomb_classifier_colors = []
-    for i in range(len(centre_trials)):
-        centre_trial = centre_trials[i]
-
-        if i<int(n_window_size/2):
-            power_window = powers[:i+int(n_window_size/2), :]
-        elif i+int(n_window_size/2)>len(centre_trials):
-            power_window = powers[i-int(n_window_size/2):, :]
-        else:
-            power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
-
-        avg_power = np.nanmean(power_window, axis=0)
-        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
-
-        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, 0.05, numeric=False)
-        peak_frequencies.append(max_SNR_freq)
-        trial_points.append(centre_trial)
-        if lomb_classifier == "Position":
-            rolling_lomb_classifier.append(0.5)
-            rolling_lomb_classifier_colors.append(Settings.allocentric_color)
-        elif lomb_classifier == "Distance":
-            rolling_lomb_classifier.append(1.5)
-            rolling_lomb_classifier_colors.append(Settings.egocentric_color)
-        elif lomb_classifier == "Null":
-            rolling_lomb_classifier.append(2.5)
-            rolling_lomb_classifier_colors.append(Settings.null_color)
-        else:
-            rolling_lomb_classifier.append(3.5)
-            rolling_lomb_classifier_colors.append("black")
-
-
-    return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
-
 def get_peak_powers_across_trials(powers, centre_trials):
     tn_powers=[]
     for tn in np.unique(centre_trials):
@@ -4036,6 +3997,7 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
+    power_step = Settings.power_estimate_step
     step = Settings.frequency_step
     frequency = Settings.frequency
 
@@ -4058,7 +4020,7 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
             modal_class = cluster_spike_data['Lomb_classifier_'].iloc[0]
             modal_class_color = get_modal_color(modal_class)
 
-            fig, axes = plt.subplots(2,1,figsize=(6,12), gridspec_kw={'height_ratios': [1, 1]})
+            fig, axes = plt.subplots(3,1,figsize=(6,15), gridspec_kw={'height_ratios': [1, 1, 0.5]})
 
             cluster_firing_maps2 = np.array(spike_data['fr_binned_in_space_smoothed'].iloc[cluster_index])
             where_are_NaNs2 = np.isnan(cluster_firing_maps2)
@@ -4098,8 +4060,8 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
                 axes[1].axvline(x=f, color="white", linewidth=2,linestyle="dotted")
             x_pos = 4.8
             legend_freq = np.linspace(x_pos, x_pos+0.2, 5)
-            rolling_lomb_classifier, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold)
-            rolling_lomb_classifier_tiled = np.tile(rolling_lomb_classifier,(len(legend_freq),1))
+            rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold, track_length, power_step)
+            rolling_lomb_classifier_tiled = np.tile(rolling_lomb_classifier_numeric,(len(legend_freq),1))
             cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
             boundaries = [0, 1, 2, 3, 4]
             norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
@@ -4115,9 +4077,6 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
             axes[1].yaxis.set_tick_params(labelsize=20)
             axes[1].xaxis.set_tick_params(labelsize=20)
 
-
-
-            """
             for f in range(1,6):
                 axes[2].axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
             #axes[1].axvline(x=modal_frequency, color=modal_class_color, linewidth=3,linestyle="solid")
@@ -4145,8 +4104,6 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
             axes[2].xaxis.set_tick_params(labelsize=20)
             axes[2].spines['top'].set_visible(False)
             axes[2].spines['right'].set_visible(False)
-            """
-
 
             plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
             plt.savefig(save_path + '/' + cluster_spike_data.session_id.iloc[0] + '_spatial_moving_lomb_scargle_periodogram_combined_Cluster_' + str(cluster_id) +'.png', dpi=300)
@@ -4233,7 +4190,7 @@ def main():
     of_recording_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
     of_recording_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/of") if f.is_dir()])
 
-    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53', '/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
+    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53', '/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08']
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02']
 
