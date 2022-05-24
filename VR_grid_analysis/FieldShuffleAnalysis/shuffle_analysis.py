@@ -239,6 +239,7 @@ def main():
     recording_path = os.environ['RECORDING_PATH']
     n_shuffles = int(os.environ['SHUFFLE_NUMBER'])
     cluster_id = int(os.environ["CLUSTER_ID"])
+    one_job_shuffle_parallel(recording_path, cluster_id, n_shuffles)
     #=========================================================================================#
     #=========================================================================================#
 
