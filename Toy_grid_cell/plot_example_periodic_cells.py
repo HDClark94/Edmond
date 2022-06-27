@@ -62,10 +62,11 @@ def getUnstableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spe
     for trial_number in np.unique(trial_numbers):
         trial_locations = (locations%track_length)[trial_numbers==trial_number]
 
-        # add an offset for all even trials
+        # add an offset for all trials
         offset = 0
-        if trial_number%2 == 0:
-            offset = np.random.randint(low=-field_spacing/2, high=field_spacing/2)
+        if trial_number%1 == 0:
+            offset = np.random.normal(0, 1)
+            #offset = np.random.randint(low=-field_spacing/4, high=field_spacing/4)
 
         firing_p = np.sin((2*np.pi*(1/field_spacing)*trial_locations)+offset)
         firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)
@@ -595,14 +596,14 @@ def main():
     save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data"
     shuffled_save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/shuffled"
 
-    plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
     plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    #plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
     #plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
 
     print("look now")

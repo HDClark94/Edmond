@@ -40,7 +40,8 @@ def summarise_grid_cells(combined_df, save_path, save=True):
         stats.to_csv(save_path+"grid_stats.csv")
 
     combined_df = combined_df[["session_id_vr", "session_id_of", "full_session_id_of", "full_session_id_vr", "cluster_id", "mouse", "classifier", "Lomb_classifier_", "ML_Freqs", "grid_score", "grid_spacing",
-                               "hd_score", "border_score", "ThetaIndex", "mean_firing_rate_of", "rate_map_correlation_first_vs_second_half", "spatial_information_score"]]
+                               "hd_score", "border_score", "ThetaIndex", "mean_firing_rate_of", "rate_map_correlation_first_vs_second_half", "spatial_information_score",
+                               "rolling:proportion_encoding_position", "rolling:proportion_encoding_distance",  "rolling:proportion_encoding_null"]]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     if save:

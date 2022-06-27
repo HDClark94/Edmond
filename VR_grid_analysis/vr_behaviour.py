@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import PostSorting.parameters
 import PostSorting.vr_stop_analysis
+from statsmodels.stats.anova import AnovaRM
 import PostSorting.vr_time_analysis
 import PostSorting.vr_make_plots
 import PostSorting.vr_cued
@@ -701,8 +702,8 @@ def plot_average_hmt_speed_trajectories_by_trial_type(processed_position_data, h
         tt_processed = hmt_processed[hmt_processed["trial_type"] == tt]
         trajectories = pandas_collumn_to_2d_numpy_array(tt_processed["speeds_binned_in_space"])
         trajectories_avg = np.nanmean(trajectories, axis=0)[start:end]
-        trajectories_sem = np.nanstd(trajectories, axis=0)[start:end]
-        #trajectories_sem = stats.sem(trajectories, axis=0, nan_policy="omit")[start:end]
+        #trajectories_sem = np.nanstd(trajectories, axis=0)[start:end]
+        trajectories_sem = stats.sem(trajectories, axis=0, nan_policy="omit")[start:end]
         locations = np.asarray(processed_position_data['position_bin_centres'].iloc[0])[start:end]
 
         speed_histogram = plt.figure(figsize=(6,4))
@@ -808,46 +809,83 @@ def cluster_speed_profiles(processed_position_data, save_path):
     plt.savefig(save_path+"/DBSCAN_clusters.png", dpi=300)
     return
 
-def plot_n_trial_per_session_by_mouse(processed_position_data, hmt, save_path):
-    hmt_processed = processed_position_data[processed_position_data["hit_miss_try"] == hmt]
+def plot_n_trial_per_session_by_mouse(processed_position_data, save_path):
+    max_session = 30
+    all_behaviour200cm_tracks = processed_position_data[processed_position_data["session_number"] <= max_session]
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+    mouse_array = np.zeros((len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
 
-    for tt, tt_string in zip([0,1,2], ["b", "nb", "p"]):
-        t_processed = hmt_processed[hmt_processed["trial_type"] == tt]
+    # plot figure
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    mouse_i = 0
+    for mouse_id, mouse_color in zip(mouse_ids, colors):
+        mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+        n_trials = []
+        session_numbers = []
+        for session_number in np.unique(mouse_df.session_number):
+            session_df = mouse_df[mouse_df["session_number"] == session_number]
+            n_trials.append(len(session_df))
+            session_numbers.append(session_number)
+            mouse_array[mouse_i, session_number-1] = len(session_df)
+        mouse_i +=1
+        # plot per mouse
+        ax.plot(session_numbers, n_trials, '-', label=mouse_id, color=mouse_color)
 
-        max_n = 0
-        speed_histogram = plt.figure(figsize=(6,6))
-        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-        for _, mouse_id in enumerate(np.unique(t_processed["mouse_id"])):
-            mouse_processed = t_processed[t_processed["mouse_id"] == mouse_id]
+    plt.ylabel('Number of trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    #plt.ylim(0, 100)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/n_trials_by_mouse.png', dpi=200)
+    plt.close()
 
-            n_trials = []
-            for session_number in np.unique(mouse_processed["session_number"]):
-                session_processed = mouse_processed[mouse_processed["session_number"] == session_number]
-                n_trials.append(len(session_processed))
+    # do stats test
+    df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(mouse_array[0])),
+                       'session_id': np.tile(np.arange(0,max_session),  len(mouse_array)),
+                       'n_trials': mouse_array.flatten()})
+    df = df.dropna()
+    df = reassign_session_numbers(df)
+    # Conduct the repeated measures ANOVA
+    df = df[df["mouse_id"]!=0]
+    df = df[df["mouse_id"]!=4]
+    df = df[df["mouse_id"]!=6]
+    df = df[df["mouse_id"]!=11]
+    df = df[df["session_id"]<25]
+    a = AnovaRM(data=df, depvar='n_trials', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+    print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
 
-            ax.scatter(np.unique(mouse_processed["session_number"]), n_trials, marker="o", label=mouse_id, zorder=10, clip_on=False)
 
-            if max(n_trials)>max_n:
-                max_n = max(n_trials)
-
-        ax.tick_params(axis='both', which='major', labelsize=20)
-        #ax.legend(title='Mouse')
-        plt.ylabel('Number of trials', fontsize=25, labelpad = 10)
-        plt.xlabel('Session number', fontsize=25, labelpad = 10)
-
-        tick_spacing = 50
-        ax.set_yticks([0, 50, 100])
-        ax.set_xticks([1, 25, 50])
-        plt.xticks(fontsize=25)
-        plt.yticks(fontsize=25)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-        Edmond.plot_utility2.style_vr_plot(ax, x_max=max_n)
-        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
-        ax.set_ylim(bottom=0)
-        ax.set_xlim(left=0, right=50)
-        plt.savefig(save_path + '/n_trials_by_mouse_hmt_'+hmt+"_tt_"+tt_string+'.png', dpi=300)
-        plt.close()
-
+    # plot average across mouse
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    nan_mask = ~np.isnan(np.nanmean(mouse_array, axis=0))
+    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(mouse_array, axis=0)+stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], color="black", alpha=0.3)
+    ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(mouse_array, axis=0)[nan_mask], color="black")
+    plt.ylabel('Number of trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    #plt.ylim(0, 100)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/n_trials_across_animals.png', dpi=200)
+    plt.close()
     return
 
 
@@ -1099,7 +1137,8 @@ def plot_all_speeds(mouse_df, save_path):
     stops_on_track = plt.figure(figsize=(6,30))
     ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
     mouse_df = mouse_df[mouse_df["session_number"]<=30]
-    mouse_df = mouse_df.sort_values(by=['session_number'])
+    mouse_df = mouse_df.sort_values(by=['session_number', 'trial_number'])
+
     track_length = mouse_df.track_length.iloc[0]
     fig = plt.figure(figsize=(6,30))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
@@ -1125,6 +1164,10 @@ def plot_all_speeds(mouse_df, save_path):
     plt.ylabel('Trial Number', fontsize=25, labelpad = 10)
     plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
     plt.xlim(0,track_length)
+    mouse_df["elapsed_trial_number"] = np.arange(1, len(mouse_df)+1, 1)
+    first_trials = mouse_df[mouse_df["trial_number"] == 1]
+    for i in range(len(first_trials)):
+        ax.axhline(y=first_trials["elapsed_trial_number"].iloc[i], color="black", linewidth=3, zorder=2)
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
@@ -1138,6 +1181,8 @@ def plot_all_stops(mouse_df, save_path, track_length=200):
     ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
     mouse_df = curate_stops(mouse_df, track_length)
     mouse_df = mouse_df[mouse_df["session_number"]<=30]
+    mouse_df = mouse_df.sort_values(by=['session_number', 'trial_number'])
+
     trial_number=1
     for session_number in np.unique(mouse_df["session_number"]):
         session_df = mouse_df[mouse_df["session_number"] == session_number]
@@ -1148,6 +1193,11 @@ def plot_all_stops(mouse_df, save_path, track_length=200):
             trial_stop_color = get_trial_color(trial_type)
             ax.plot(np.array(trial_row["stop_location_cm"].iloc[0]), trial_number*np.ones(len(trial_row["stop_location_cm"].iloc[0])), 'o', color=trial_stop_color, markersize=2, alpha=0.2)
             trial_number+=1
+
+    mouse_df["elapsed_trial_number"] = np.arange(1, len(mouse_df)+1, 1)
+    first_trials = mouse_df[mouse_df["trial_number"] == 1]
+    for i in range(len(first_trials)):
+        ax.axhline(y=first_trials["elapsed_trial_number"].iloc[i], color="red", linewidth=3, zorder=2)
 
     plt.ylabel('Stops on trials', fontsize=25, labelpad = 10)
     plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
@@ -1165,12 +1215,77 @@ def plot_all_stops(mouse_df, save_path, track_length=200):
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/all_stop_raster.png', dpi=200)
 
+def plot_n_trials(mouse_df, save_path, track_length=200):
+    max_session = 30
+    stops_on_track = plt.figure(figsize=(6,4))
+    ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    mouse_df = mouse_df[mouse_df["session_number"]<=30]
+    mouse_df = mouse_df.sort_values(by=['session_number'])
+
+    n_trials = []
+    session_numbers = []
+    for session_number in np.unique(mouse_df.session_number):
+        session_df = mouse_df[mouse_df["session_number"] == session_number]
+
+        n = len(session_df)
+        n_trials.append(n)
+        session_numbers.append(session_number)
+
+    ax.plot(session_numbers, n_trials, '-', color="black")
+
+    plt.ylabel('n trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number)', fontsize=25, labelpad = 10)
+    plt.xlim(0, max_session)
+    #plt.ylim(0,100)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+    #ax.yaxis.set_major_locator(ticker.MultipleLocator(1000))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/n_trials.png', dpi=200)
+
+def plot_percentage_hits(mouse_df, save_path, track_length=200):
+    stops_on_track = plt.figure(figsize=(6,4))
+    ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    mouse_df = mouse_df[mouse_df["session_number"]<=30]
+    mouse_df = mouse_df.sort_values(by=['session_number'])
+
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+        percent_hits = []
+        session_numbers = []
+        for session_number in np.unique(tt_session_df.session_number):
+            session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+
+            percent = (len(session_df[session_df["hit_miss_try"] == "hit"])/len(session_df))*100
+            percent_hits.append(percent)
+            session_numbers.append(session_number)
+
+        ax.plot(session_numbers, percent_hits, '-', color=tt_color)
+
+    plt.ylabel('% hits', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(0,30)
+    plt.ylim(0,100)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(10))
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax, 100)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/hit_percentage.png', dpi=200)
 
 def plot_all_first_stops(mouse_df, save_path, track_length=200):
     stops_on_track = plt.figure(figsize=(6,30))
     ax = stops_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
     mouse_df = curate_stops(mouse_df, track_length)
     mouse_df = mouse_df[mouse_df["session_number"]<=30]
+    mouse_df = mouse_df.sort_values(by=['session_number', 'trial_number'])
+
     trial_number=1
     for session_number in np.unique(mouse_df["session_number"]):
         session_df = mouse_df[mouse_df["session_number"] == session_number]
@@ -1181,6 +1296,12 @@ def plot_all_first_stops(mouse_df, save_path, track_length=200):
             trial_stop_color = get_trial_color(trial_type)
             ax.plot(trial_row["first_stop_location_cm"].iloc[0], trial_number, 'o', color=trial_stop_color, markersize=2, alpha=1)
             trial_number+=1
+
+
+    mouse_df["elapsed_trial_number"] = np.arange(1, len(mouse_df)+1, 1)
+    first_trials = mouse_df[mouse_df["trial_number"] == 1]
+    for i in range(len(first_trials)):
+        ax.axhline(y=first_trials["elapsed_trial_number"].iloc[i], color="red", linewidth=3, zorder=2)
 
     plt.ylabel('First stops on trials', fontsize=25, labelpad = 10)
     plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
@@ -1266,6 +1387,55 @@ def plot_stops_on_track_fs(mouse_df, session_number, save_path, track_length=200
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/stop_raster_fs_'+str(session_number)+'.png', dpi=200)
 
+def number_stops_in_rz_vs_training_day(mouse_df, save_path, percentile=99):
+    max_session_number = max(mouse_df["session_number"])
+    bin_size = 5
+
+    # plot figure
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+        percent_in_RZ = []
+        session_numbers = []
+        for session_number in np.unique(tt_session_df.session_number):
+            session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+            session_df = drop_first_and_last_trial(session_df)
+            track_length = session_df.track_length.iloc[0]
+            rz_start = track_length-60-30-20
+            rz_end = track_length-60-30
+
+            session_df = curate_stops(session_df, track_length) # filter stops
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(session_df["stop_location_cm"])
+
+            tt_stops_in_RZ = tt_stops[(tt_stops >= rz_start) & (tt_stops <= rz_end)]
+            percent = len(tt_stops_in_RZ)/len(tt_session_df)
+            percent_in_RZ.append(percent)
+            session_numbers.append(session_number)
+
+        ax.plot(session_numbers, percent_in_RZ, '-', color=tt_color)
+
+    plt.ylabel('stops/trial in RZ', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,30)
+    #plt.ylim(0,100)
+    #ax.set_yticks([0, 1])
+    #ax.set_yticklabels(["0", "1"])
+    ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/number_stops_in_RZ_vs_training_day.png', dpi=200)
+    plt.close()
+
 def percentage_stops_in_rz_vs_training_day(mouse_df, save_path, percentile=99):
     max_session_number = max(mouse_df["session_number"])
     bin_size = 5
@@ -1315,6 +1485,54 @@ def percentage_stops_in_rz_vs_training_day(mouse_df, save_path, percentile=99):
     plt.savefig(save_path + '/percentage_stops_in_RZ_vs_training_day.png', dpi=200)
     plt.close()
 
+def number_first_stops_in_rz_vs_training_day(mouse_df, save_path, percentile=99):
+    max_session_number = max(mouse_df["session_number"])
+    bin_size = 5
+
+    # plot figure
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+        percent_in_RZ = []
+        session_numbers = []
+        for session_number in np.unique(tt_session_df.session_number):
+            session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+            session_df = drop_first_and_last_trial(session_df)
+            track_length = session_df.track_length.iloc[0]
+            rz_start = track_length-60-30-20
+            rz_end = track_length-60-30
+
+            session_df = curate_stops(session_df, track_length) # filter stops
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(session_df["first_stop_location_cm"])
+
+            tt_stops_in_RZ = tt_stops[(tt_stops >= rz_start) & (tt_stops <= rz_end)]
+            percent = len(tt_stops_in_RZ)/len(tt_session_df)
+            percent_in_RZ.append(percent)
+            session_numbers.append(session_number)
+
+        ax.plot(session_numbers, percent_in_RZ, '-', color=tt_color)
+
+    plt.ylabel('first stops / trial in RZ', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,30)
+    #plt.ylim(0,100)
+    #ax.set_yticks([0, 1])
+    #ax.set_yticklabels(["0", "1"])
+    ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/number_first_stops_in_RZ_vs_training_day.png', dpi=200)
+    plt.close()
 
 def percentage_first_stops_in_rz_vs_training_day(mouse_df, save_path, percentile=99):
     max_session_number = max(mouse_df["session_number"])
@@ -1811,6 +2029,413 @@ def plot_shuffled_stops_fs(mouse_df, session_number, save_path, percentile=99, y
             plt.close()
     return
 
+
+def population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    bin_size = 5
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            percent_in_RZ = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)>0:
+                    track_length = session_df.track_length.iloc[0]
+                    rz_start = track_length-60-30-20
+                    rz_end = track_length-60-30
+
+                    session_df = curate_stops(session_df, track_length) # filter stops
+                    tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(session_df['first_stop_location_cm'])
+                    if len(tt_stops)==0:
+                        percent=0
+                    else:
+                        tt_stops_in_RZ = tt_stops[(tt_stops >= rz_start) & (tt_stops <= rz_end)]
+                        percent = len(tt_stops_in_RZ)/len(session_df)
+                    percent_in_RZ.append(percent)
+                    session_numbers.append(session_number)
+
+                    mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+            # plot per mouse
+            ax.plot(session_numbers, percent_in_RZ, '-', label=mouse_id, color=mouse_color)
+        plt.ylabel('first stops / trial in RZ', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/number_first_stops_vs_training_day_fs_tt_'+str(tt)+'_by_mouse.png', dpi=200)
+        plt.close()
+
+        # plot average across mouse
+        tt_mouse_array = mouse_array[tt]
+
+
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'n_first_stops_in_rz': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='n_first_stops_in_rz', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("tt = ", str(tt), ", test for n_first_stops_in_rz")
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+        nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+        plt.ylabel('n first stops in RZ', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/number_first_stops_vs_training_day_fs_tt_'+str(tt)+'.png', dpi=200)
+        plt.close()
+
+    # plot average across mouse for all trial types
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_mouse_array = mouse_array[tt]
+        nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 0.65, "*", fontsize=20, color="red")
+    plt.ylabel('n first stops in RZ', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    #plt.ylim(0, 100)
+    #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/number_first_stops_vs_training_day_fs_all_tt.png', dpi=200)
+    plt.close()
+
+
+def reassign_session_numbers(df):
+    new_df = pd.DataFrame()
+    for mouse_id in np.unique(df["mouse_id"]):
+        mouse_df = df[df["mouse_id"] == mouse_id]
+        i=0
+        for index, session_df in mouse_df.iterrows():
+            session_df = session_df.to_frame().T.reset_index(drop=True)
+            session_df["session_id"] = [i]
+            new_df = pd.concat([new_df, session_df], ignore_index=True)
+            i+=1
+    return new_df
+
+def plot_track_speeds_by_mouse(processed_position_data, save_path):
+    max_session = 30
+    all_behaviour200cm_tracks = processed_position_data[processed_position_data["session_number"] <= max_session]
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+    mouse_array = np.zeros((len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+
+    # plot figure
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    mouse_i = 0
+    for mouse_id, mouse_color in zip(mouse_ids, colors):
+        mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+        avg_trial_speeds = []
+        session_numbers = []
+        for session_number in np.unique(mouse_df.session_number):
+            session_df = mouse_df[mouse_df["session_number"] == session_number]
+            avg_trial_speed = np.nanmean(session_df["avg_trial_speed"])
+            avg_trial_speeds.append(avg_trial_speed)
+            session_numbers.append(session_number)
+            mouse_array[mouse_i, session_number-1] = avg_trial_speed
+        mouse_i +=1
+        # plot per mouse
+        ax.plot(session_numbers, avg_trial_speeds, '-', label=mouse_id, color=mouse_color)
+
+    plt.ylabel('Avg trial speed', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    plt.ylim(0, 80)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/trial_speed_by_mouse.png', dpi=200)
+    plt.close()
+
+    # plot average across mouse
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    nan_mask = ~np.isnan(np.nanmean(mouse_array, axis=0))
+    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(mouse_array, axis=0)+stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], color="black", alpha=0.3)
+    ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(mouse_array, axis=0)[nan_mask], color="black")
+    plt.ylabel('Avg trial speed', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    plt.ylim(0, 80)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/trial_speeds_across_animals.png', dpi=200)
+    plt.close()
+    return
+
+def plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            percent_hits = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)==0:
+                    percent = 0
+                else:
+                    percent = (len(session_df[session_df["hit_miss_try"] == "hit"])/len(session_df))*100
+
+                percent_hits.append(percent)
+                session_numbers.append(session_number)
+
+                mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+    for i, mouse_id in enumerate(mouse_ids):
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        # plot per mouse
+        ax.plot(np.arange(1,max_session+1), mouse_array[0][i], '-', color="black")
+        ax.plot(np.arange(1,max_session+1), mouse_array[1][i], '-', color="blue")
+        ax.plot(np.arange(1,max_session+1), mouse_array[2][i], '-', color="deepskyblue")
+        plt.title(mouse_id, fontsize=25)
+        plt.ylabel('% hits', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.9)
+        plt.savefig(save_path + '/percentage_hits_'+mouse_id+'.png', dpi=200)
+        plt.close()
+
+
+def plot_percentage_hits_by_mouse(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            percent_hits = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)==0:
+                    percent = 0
+                else:
+                    percent = (len(session_df[session_df["hit_miss_try"] == "hit"])/len(session_df))*100
+
+                percent_hits.append(percent)
+                session_numbers.append(session_number)
+
+                mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+            # plot per mouse
+            ax.plot(session_numbers, percent_hits, '-', label=mouse_id, color=mouse_color)
+        plt.ylabel('% hits', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/percentage_hits_tt_'+str(tt)+'_by_mouse.png', dpi=200)
+        plt.close()
+
+        # plot average across mouse
+        tt_mouse_array = mouse_array[tt]
+
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'percentage_hits': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='percentage_hits', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+        nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+        plt.ylabel('% hits', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/percentage_hits_tt_'+str(tt)+'.png', dpi=200)
+        plt.close()
+
+    # plot average across mouse for all trial types
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_mouse_array = mouse_array[tt]
+        nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 95, "*", fontsize=20, color="red")
+
+    plt.ylabel('% hits', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    plt.ylim(0, 100)
+    #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/percentage_hits_all_tt.png', dpi=200)
+    plt.close()
+
+
 def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
     max_session = 30
     all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
@@ -1877,6 +2502,24 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
         # plot average across mouse
         tt_mouse_array = mouse_array[tt]
 
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'proportion_first_stops_in_rz': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='proportion_first_stops_in_rz', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("tt = ", str(tt), ", test for proportion_first_stops_in_rz")
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
@@ -1907,6 +2550,12 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
         ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 95, "*", fontsize=20, color="red")
     plt.ylabel('% first stops in RZ', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
     plt.xlim(1,max_session)
@@ -1924,6 +2573,85 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
     plt.savefig(save_path + '/percentage_first_stops_vs_training_day_fs_all_tt.png', dpi=200)
     plt.close()
 
+def plot_trial_ratio_vs_percentage_correct_across_time(meta_df, save_path):
+
+
+    for mouse_id in np.unique(meta_df["mouse_id"]):
+        mouse_meta_df = meta_df[meta_df["mouse_id"] == mouse_id]
+        mouse_meta_df = mouse_meta_df.sort_values(by=["session_number"], ascending=True)
+
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        ax.plot(mouse_meta_df["session_number"], mouse_meta_df["percent_beaconed_trials_correct"], color="black")
+        ax.plot(mouse_meta_df["session_number"], mouse_meta_df["percent_nonbeaconed_trials_correct"], color="blue")
+        ax.set_ylim([0,100])
+        ax2=ax.twinx()
+        ax.plot(mouse_meta_df["session_number"], mouse_meta_df["trial_type_ratio_numeric"], color="green")
+
+        ax.set_xlabel("Session number", fontsize=25, labelpad = 10)
+        ax.set_ylabel("% correct", fontsize=25, labelpad = 10)
+        ax2.set_ylabel("trial type ratio", fontsize=25, labelpad = 10)
+        ax.xaxis.set_tick_params(labelsize=17)
+        ax.yaxis.set_tick_params(labelsize=17)
+        ax2.yaxis.set_tick_params(labelsize=17)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/trial_ratio_vs_percentage_success_across_sessions_mouse'+str(mouse_id)+'.png', dpi=200)
+        plt.close()
+
+
+def plot_trial_ratios_against_success(meta_df, save_path):
+    X = ['4:1','3:1','2:1','1:1', '1:2','3:7','1:3']
+    X_axis = np.arange(len(X))
+
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    success_u = meta_df.groupby(by=["trial_type_ratio_numeric"], as_index=False).mean()
+    success_u= success_u.sort_values(by="trial_type_ratio_numeric", ascending=False)
+    success_sem = meta_df.groupby(by=["trial_type_ratio_numeric"], as_index=False).sem()
+    success_sem= success_sem.sort_values(by="trial_type_ratio_numeric", ascending=False)
+    ax.bar(X_axis-0.2, success_u["percent_beaconed_trials_correct"], 0.4, color="black",alpha=0.6)
+    ax.bar(X_axis+0.2, success_u["percent_nonbeaconed_trials_correct"], 0.4, color ='blue',alpha=0.6)
+    ax.errorbar(X_axis-0.2, success_u["percent_beaconed_trials_correct"], yerr=success_sem["percent_beaconed_trials_correct"], color="black",fmt='none', capsize=5)
+    ax.errorbar(X_axis+0.2, success_u["percent_nonbeaconed_trials_correct"], yerr=success_sem["percent_nonbeaconed_trials_correct"], color="black",fmt='none', capsize=5)
+    plt.xticks(X_axis, X)
+    plt.xlabel("B/NB ratio", fontsize=25, labelpad = 10)
+    plt.ylabel("% correct", fontsize=25, labelpad = 10)
+    plt.ylim(0,100)
+    ax.xaxis.set_tick_params(labelsize=17)
+    ax.yaxis.set_tick_params(labelsize=17)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/trial_ratio_vs_percentage_success.png', dpi=200)
+    plt.close()
+
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    success_u = meta_df.groupby(by=["trial_type_ratio_numeric"], as_index=False).mean()
+    success_u= success_u.sort_values(by="trial_type_ratio_numeric", ascending=False)
+    success_sem = meta_df.groupby(by=["trial_type_ratio_numeric"], as_index=False).sem()
+    success_sem= success_sem.sort_values(by="trial_type_ratio_numeric", ascending=False)
+    ax.bar(X_axis-0.2, success_u["n_beaconed_trials_correct"], 0.4, color="black",alpha=0.6)
+    ax.bar(X_axis+0.2, success_u["n_nonbeaconed_trials_correct"], 0.4, color ='blue',alpha=0.6)
+    ax.errorbar(X_axis-0.2, success_u["n_beaconed_trials_correct"], yerr=success_sem["n_beaconed_trials_correct"], color="black",fmt='none', capsize=5)
+    ax.errorbar(X_axis+0.2, success_u["n_nonbeaconed_trials_correct"], yerr=success_sem["n_nonbeaconed_trials_correct"], color="black",fmt='none', capsize=5)
+    plt.xticks(X_axis, X)
+    plt.xlabel("B/NB ratio", fontsize=25, labelpad = 10)
+    plt.ylabel("Number of trials", fontsize=25, labelpad = 10)
+    ax.set_ylim(bottom=0)
+    ax.xaxis.set_tick_params(labelsize=17)
+    ax.yaxis.set_tick_params(labelsize=17)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/trial_ratio_vs_number_of_trials_success.png', dpi=200)
+    plt.close()
 
 def population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
     max_session = 30
@@ -2055,6 +2783,279 @@ def population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path,
     plt.savefig(save_path + '/shuffle_vs_training_day_fs_all_tt.png', dpi=200)
     plt.close()
 
+def population_shuffled_vs_training_day_numbers_stops(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    bin_size = 5
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            percent_in_RZ = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)>0:
+                    track_length = session_df.track_length.iloc[0]
+                    rz_start = track_length-60-30-20
+                    rz_end = track_length-60-30
+
+                    session_df = curate_stops(session_df, track_length) # filter stops
+                    tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(session_df["stop_location_cm"])
+                    tt_stops_in_RZ = tt_stops[(tt_stops >= rz_start) & (tt_stops <= rz_end)]
+                    if len(tt_stops)==0:
+                        percent = 0
+                    else:
+                        percent = len(tt_stops_in_RZ)/len(session_df)
+                    percent_in_RZ.append(percent)
+                    session_numbers.append(session_number)
+
+                    mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+            # plot per mouse
+            ax.plot(session_numbers, percent_in_RZ, '-', label=mouse_id, color=mouse_color)
+        plt.ylabel('stops / trial in RZ', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/number_stops_vs_training_day_tt_'+str(tt)+'_by_mouse.png', dpi=200)
+        plt.close()
+
+        # plot average across mouse
+        tt_mouse_array = mouse_array[tt]
+
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'n_stops_per_trial': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='n_stops_per_trial', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("tt = ", str(tt), ", test for n_stops_per_trial")
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+        nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+        plt.ylabel('n stops in RZ', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/number_stops_vs_training_day_tt_'+str(tt)+'.png', dpi=200)
+        plt.close()
+
+    # plot average across mouse for all trial types
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_mouse_array = mouse_array[tt]
+        nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 3.5, "*", fontsize=20, color="red")
+    plt.ylabel('n stops in RZ', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    #plt.ylim(0, 100)
+    #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/number_stops_vs_training_day_all_tt.png', dpi=200)
+    plt.close()
+
+
+def population_shuffled_vs_training_day_numbers_stops_all_track(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    bin_size = 5
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            n_in_track = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)>0:
+                    track_length = session_df.track_length.iloc[0]
+                    rz_start = track_length-60-30-20
+                    rz_end = track_length-60-30
+
+                    session_df = curate_stops(session_df, track_length) # filter stops
+                    tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(session_df["stop_location_cm"])
+                    if len(tt_stops)==0:
+                        percent = 0
+                    else:
+                        percent = len(tt_stops)/len(session_df)
+                    n_in_track.append(percent)
+                    session_numbers.append(session_number)
+
+                    mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+            # plot per mouse
+            ax.plot(session_numbers, n_in_track, '-', label=mouse_id, color=mouse_color)
+        plt.ylabel('stops / trial', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/all_track_number_stops_vs_training_day_tt_'+str(tt)+'_by_mouse.png', dpi=200)
+        plt.close()
+
+        # plot average across mouse
+        tt_mouse_array = mouse_array[tt]
+
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'n_stops_per_trial_whole_track': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='n_stops_per_trial_whole_track', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("tt = ", str(tt), ", test for n_stops_per_trial_whole_track")
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+        nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+        plt.ylabel('stops / trial', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        #plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/all_track_number_stops_vs_training_day_tt_'+str(tt)+'.png', dpi=200)
+        plt.close()
+
+    # plot average across mouse for all trial types
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_mouse_array = mouse_array[tt]
+        nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+    plt.ylabel('stops / trial', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 30, "*", fontsize=20, color="red")
+    plt.xlim(1,max_session)
+    #plt.ylim(0, 100)
+    #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/all_track_number_stops_vs_training_day_all_tt.png', dpi=200)
+    plt.close()
+
 def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
     max_session = 30
     all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
@@ -2121,6 +3122,24 @@ def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_trac
         # plot average across mouse
         tt_mouse_array = mouse_array[tt]
 
+        # do stats test
+        df = pd.DataFrame({'mouse_id': np.repeat(np.arange(0,len(mouse_ids)), len(tt_mouse_array[0])),
+                           'session_id': np.tile(np.arange(0,max_session),  len(tt_mouse_array)),
+                           'proportion_stops_in_rz': tt_mouse_array.flatten()})
+        df = df.dropna()
+        df = reassign_session_numbers(df)
+        # Conduct the repeated measures ANOVA
+        df = df[df["mouse_id"]!=0]
+        df = df[df["mouse_id"]!=4]
+        df = df[df["mouse_id"]!=6]
+        df = df[df["mouse_id"]!=11]
+        df = df[df["session_id"]<25]
+        if tt == 0 or tt==1:
+            a = AnovaRM(data=df, depvar='proportion_stops_in_rz', subject='mouse_id', within=['session_id'], aggregate_func='mean').fit()
+            print("tt = ", str(tt), ", test for proportion_stops_in_rz")
+            print("p= ", str(a.anova_table["Pr > F"].iloc[0]))
+
+
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
@@ -2151,6 +3170,12 @@ def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_trac
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
         ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 95, "*", fontsize=20, color="red")
     plt.ylabel('% stops in RZ', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
     plt.xlim(1,max_session)
@@ -2167,6 +3192,73 @@ def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_trac
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/percentage_stops_vs_training_day_all_tt.png', dpi=200)
     plt.close()
+
+def plot_population_n_trials(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
+    max_session = 30
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
+    bin_size = 5
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    colors = cm.Paired(np.linspace(0, 1, len(mouse_ids)))
+
+    mouse_array = np.zeros((len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+
+    # plot figure
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+
+    mouse_i = 0
+    for mouse_id, mouse_color in zip(mouse_ids, colors):
+        mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+
+        trial_numbers = []
+        session_numbers = []
+        for session_number in np.unique(mouse_df.session_number):
+            session_df = mouse_df[mouse_df["session_number"] == session_number]
+
+            trial_numbers.append(len(session_df))
+            session_numbers.append(session_number)
+            mouse_array[mouse_i, session_number-1] = len(session_df)
+        mouse_i +=1
+
+        # plot per mouse
+        ax.plot(session_numbers, trial_numbers, '-', label=mouse_id, color=mouse_color)
+    plt.ylabel('n trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/n_trials_by_mouse.png', dpi=200)
+    plt.close()
+
+    stop_histogram = plt.figure(figsize=(6,4))
+    ax = stop_histogram.add_subplot(1, 1, 1)
+    nan_mask = ~np.isnan(np.nanmean(mouse_array, axis=0))
+    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(mouse_array, axis=0)+stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], color="black", alpha=0.3)
+    ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(mouse_array, axis=0)[nan_mask], color="black")
+    plt.ylabel('n trials', fontsize=25, labelpad = 10)
+    plt.xlabel('Session number', fontsize=25, labelpad = 10)
+    plt.xlim(1,max_session)
+    ax.xaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    tick_spacing = 10
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    plt.xticks(fontsize=20)
+    Edmond.plot_utility2.style_vr_plot(ax)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/n_trials_by_day.png', dpi=200)
+    plt.close()
+
+
 
 def population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
     max_session = 30
@@ -2281,6 +3373,14 @@ def population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path, pe
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
         ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
+
+
+    for session in np.arange(1,max_session+1)-1:
+        # do pairwise comparison
+        f, p = stats.wilcoxon(mouse_array[0,:,session], mouse_array[1,:,session], nan_policy="omit")
+        if p<0.05:
+            ax.text(session, 2, "*", fontsize=20, color="red")
+
     plt.ylabel('Peak stops / trial\n vs shuffle', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
     plt.xlim(1,max_session)
@@ -2333,27 +3433,149 @@ def process_recordings(vr_recording_path_list):
 
     return all_behaviour
 
+def search_sequence_numpy(arr,seq):
+    """ Find sequence in an array using NumPy only.
+
+    Parameters
+    ----------
+    arr    : input 1D array
+    seq    : input 1D array
+
+    Output
+    ------
+    Output : 1D Array of indices in the input array that satisfy the
+    matching of input sequence in the input array.
+    In case of no match, an empty list is returned.
+    """
+
+    # Store sizes of input array and sequence
+    Na, Nseq = arr.size, seq.size
+
+    # Range of sequence
+    r_seq = np.arange(Nseq)
+
+    # Create a 2D array of sliding indices across the entire length of input array.
+    # Match up with the input sequence & get the matching starting indices.
+    M = (arr[np.arange(Na-Nseq+1)[:,None] + r_seq] == seq).all(1)
+
+    # Get the range of those indices as final output
+    if M.any() >0:
+        return np.where(np.convolve(M,np.ones((Nseq),dtype=int))>0)[0]
+    else:
+        return []         # No match found
+
+def generate_metadata(behaviour_df):
+    meta = pd.DataFrame()
+
+    for mouse_id in np.unique(behaviour_df["mouse_id"]):
+        mouse_data = behaviour_df[(behaviour_df["mouse_id"] == mouse_id)]
+        for session_number in np.unique(mouse_data["session_number"]):
+            session_data = mouse_data[(mouse_data["session_number"] == session_number)]
+
+            n_trials = len(session_data)
+            n_probe_trials = len(session_data[session_data["trial_type"] == 2])
+            n_beaconed_trials = len(session_data[session_data["trial_type"] == 0])
+            n_nonbeaconed_trials = len(session_data[session_data["trial_type"] == 1])
+            n_probe_trials_correct = len(session_data[(session_data["trial_type"] == 2) & (session_data["rewarded"] == 1)])
+            n_beaconed_trials_correct = len(session_data[(session_data["trial_type"] == 0) & (session_data["rewarded"] == 1)])
+            n_nonbeaconed_trials_correct = len(session_data[(session_data["trial_type"] == 1) & (session_data["rewarded"] == 1)])
+            track_length = session_data["track_length"].iloc[0]
+            mouse_id = session_data["mouse_id"].iloc[0]
+            session_number = session_data["session_number"].iloc[0]
+
+            # search for the ratio used out of 4:1, 3:1, 2:1, 3:2
+            trial_types = np.array(session_data["trial_type"])
+            if len(search_sequence_numpy(trial_types, np.array([0,0,0,0,1])))>0:
+                ratio= "4:1"
+                ratio_numeric = 4/1
+            elif len(search_sequence_numpy(trial_types, np.array([0,0,0,1])))>0:
+                ratio= "3:1"
+                ratio_numeric = 3/1
+            elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0])))>0:
+                ratio= "2:1"
+                ratio_numeric = 2/1
+            elif len(search_sequence_numpy(trial_types, np.array([0,1,0,1,0,1])))>0:
+                ratio = "1:1"
+                ratio_numeric = 1/1
+            elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1])))>0:
+                ratio = "3:7"
+                ratio_numeric = 3/7
+            elif len(search_sequence_numpy(trial_types, np.array([0,1,1,0,1,1,0])))>0:
+                ratio = "1:2"
+                ratio_numeric = 1/2
+            elif len(search_sequence_numpy(trial_types, np.array([0,1,1,1])))>0:
+                ratio = "1:3"
+                ratio_numeric = 1/3
+            else:
+                ratio= ""
+
+            # make the session meta data and concatenate
+            session_meta = pd.DataFrame()
+            session_meta["n_trials"] = [n_trials]
+            session_meta["n_probe_trials"] = [n_probe_trials]
+            session_meta["n_beaconed_trials"] = [n_beaconed_trials]
+            session_meta["n_nonbeaconed_trials"] = [n_nonbeaconed_trials]
+            session_meta["n_probe_trials_correct"] =[n_probe_trials_correct]
+            session_meta["n_beaconed_trials_correct"] = [n_beaconed_trials_correct]
+            session_meta["n_nonbeaconed_trials_correct"] = [n_nonbeaconed_trials_correct]
+            session_meta["percent_probe_trials_correct"] =[100*pass_div_by_zero(n_probe_trials_correct, n_probe_trials)]
+            session_meta["percent_beaconed_trials_correct"] = [100*pass_div_by_zero(n_beaconed_trials_correct, n_beaconed_trials)]
+            session_meta["percent_nonbeaconed_trials_correct"] = [100*pass_div_by_zero(n_nonbeaconed_trials_correct, n_nonbeaconed_trials)]
+            session_meta["trial_type_ratio"] = [ratio]
+            session_meta["trial_type_ratio_numeric"] = [ratio_numeric]
+            session_meta["track_length"] = [track_length]
+            session_meta["mouse_id"] = [mouse_id]
+            session_meta["session_number"] = [session_number]
+
+            meta = pd.concat([meta, session_meta], ignore_index=True)
+    return meta
+
+def pass_div_by_zero(a, b):
+    if b == 0:
+        return 0
+    else:
+        return a/b
 
 def main():
     print('-------------------------------------------------------------')
 
-    '''
+
     # give a path for a directory of recordings or path of a single recording
     vr_path_list = []
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()])
-    #vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_Junji/vr") if f.is_dir()])
     all_behaviour = process_recordings(vr_path_list)
 
     # save dataframes
     all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
     all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl")
-    '''
+
 
     # load dataframe
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
 
+    meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
+    plot_trial_ratios_against_success(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
+    plot_trial_ratio_vs_percentage_correct_across_time(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
+
+    # population level statistics
+    plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    plot_track_speeds_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    plot_percentage_hits_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    #population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_numbers_stops_all_track(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_numbers_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    #population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+
+
+
+    #population_speed_per_session_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
 
     # Example plots for spatial learning. Using M11.
     example_mouse = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == "M11"]
@@ -2368,6 +3590,7 @@ def main():
     # all stops
     shuffled_vs_training_day(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     percentage_stops_in_rz_vs_training_day(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
+    number_stops_in_rz_vs_training_day(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_all_stops(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_shuffled_stops(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse", y_max=10)
     plot_shuffled_stops(example_mouse, session_number=24, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse", y_max=1)
@@ -2377,24 +3600,21 @@ def main():
     plot_all_first_stops(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     shuffled_vs_training_day_fs(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     percentage_first_stops_in_rz_vs_training_day(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
+    number_first_stops_in_rz_vs_training_day(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_shuffled_stops_fs(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse", y_max=1)
     plot_shuffled_stops_fs(example_mouse, session_number=24, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse", y_max=1)
     plot_stops_on_track_fs(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_stops_on_track_fs(example_mouse, session_number=24, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     # hits
+    plot_percentage_hits(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
+    plot_n_trials(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
 
-
-
-    # population level statistics
-    population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
 
     print_population_stats(all_behaviour200cm_tracks)
+
+
     plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_percentage_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_percentage_trial_per_session_by_mouse_short_plot(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     plot_percentage_trial_per_session_all_mice_b_vs_nb(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")

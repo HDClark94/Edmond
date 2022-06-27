@@ -129,21 +129,9 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-
-    #delete_files_with_extension(path_to_folder="", extension="_shuffle.pkl")
-
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort9_Junji/vr") if f.is_dir()]
-    J1_list = [k for k in vr_path_list if 'J1' in k]
-    J2_list = [k for k in vr_path_list if 'J2' in k]
-    J3_list = [k for k in vr_path_list if 'J3' in k]
-    J4_list = [k for k in vr_path_list if 'J4' in k]
-    J5_list = [k for k in vr_path_list if 'J5' in k]
-    vr_path_list = []
-    #vr_path_list.extend(J1_list)
-    #vr_path_list.extend(J2_list)
-    #vr_path_list.extend(J3_list)
-    #vr_path_list.extend(J4_list)
-    #vr_path_list.extend(J5_list)
+    #delete_files_with_extension(path_to_folder="/mnt/datastore/Harry/cohort8_may2021/vr/", extension="_shuffle.pkl")
+    #delete_files_with_extension(path_to_folder="/mnt/datastore/Harry/cohort7_october2020/vr/", extension="_shuffle.pkl")
+    #delete_files_with_extension(path_to_folder="/mnt/datastore/Harry/cohort6_july2020/vr/", extension="_shuffle.pkl")
 
     #for path in vr_path_list:
         #delete_files_with_extension(path_to_folder=path, extension='100_ADC1.continuous') # of sync pulse
@@ -175,18 +163,6 @@ def main():
         #delete_files_with_extension(path_to_folder=path, extension='100_CH16.continuous')
 
     #rename_files(vr_path_list, sub_out="101", sub_in="100")
-
-
-    #for folder in ["/mnt/datastore/Harry/Cohort7_october2020/of",
-    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort5/OpenField",
-    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort4/OpenFeild",
-    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort3/OpenFeild",
-    #               "/mnt/datastore/Sarah/Data/OptoEphys_in_VR/Data/OpenEphys/_cohort2/OpenField"]:
-
-    #    of_path_list = [f.path for f in os.scandir(folder) if f.is_dir()]
-
-    #    for path in of_path_list:
-    #        delete_files_with_extension(path_to_folder=path, extension="/shuffle.pkl")
 
 
 if __name__ == '__main__':

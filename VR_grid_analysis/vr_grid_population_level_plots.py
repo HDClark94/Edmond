@@ -41,6 +41,7 @@ import PostSorting.post_process_sorted_data_vr
 from Edmond.utility_functions.array_manipulations import *
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+import seaborn as sns
 warnings.filterwarnings('ignore')
 from scipy.stats.stats import pearsonr
 from mpl_toolkits.axes_grid1 import host_subplot
@@ -54,6 +55,10 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_wine
 from sklearn.pipeline import make_pipeline
+from statsmodels.stats.anova import AnovaRM
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+import pingouin as pg
 
 def min_max_normalize(x):
     """
@@ -848,7 +853,7 @@ def significance_bar(start,end,height,displaystring,linewidth = 1.2,markersize =
     # draw the text with a bounding box covering up the line
     plt.text(0.5*(start+end),height,displaystring,ha = 'center',va='center',bbox=dict(facecolor='1.', edgecolor='none',boxstyle='Square,pad='+str(boxpad)),size = fontsize)
 
-def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", save_path=""):
+def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
     print('plotting lomb classifers...')
 
@@ -862,7 +867,7 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
     ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]["ML_SNRs"+suffix])
     ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]["ML_SNRs"+suffix])
 
-    fig, ax = plt.subplots(figsize=(6,6))
+    fig, ax = plt.subplots(figsize=fig_size)
     data = [g_position_cells[~np.isnan(g_position_cells)],
             g_distance_cells[~np.isnan(g_distance_cells)],
             g_null_cells[~np.isnan(g_null_cells)],
@@ -881,19 +886,20 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
     ax.set_ylim(bottom=0, top=0.3)
-    ax.set_xlim(left=0.5, right=7.5)
-    ax.set_xticks([2, 6])
+    ax.set_xlim(left=0.5, right=3.5)
+    #ax.set_xticks([2, 6])
     ax.set_yticks([0, 0.1, 0.2, 0.3])
-    ax.set_xticklabels(["G", "NG"])
+    #ax.set_xticklabels(["G", "NG"])
     fig.tight_layout()
     plt.subplots_adjust(left=0.25, bottom=0.2)
     ax.set_xlabel("", fontsize=20)
     ax.set_ylabel("Peak power", fontsize=20)
     significance_bar(start=1, end=2, height=0.292, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
-    significance_bar(start=5, end=6, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[4], data[5])[1]))
-    significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
-    significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
+    #significance_bar(start=5, end=6, height=0.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[4], data[5])[1]))
+    #significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
+    #significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
     plt.savefig(save_path + '/lomb_classifier_powers_vs_groups.png', dpi=300)
     plt.close()
 
@@ -934,24 +940,51 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
     plt.savefig(save_path + '/lomb_classifier_powers_vs_groups_voliin.png', dpi=300)
     plt.close()
 
+    print("comping peak powers between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
+
     return
 
-
-def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_path=""):
+def plot_lomb_classifier_mfr_vs_groups_vs_open_field(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
     print('plotting lomb classifers...')
 
     grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
     non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
 
-    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_fr_tt_all_hmt_all'])
-    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_fr_tt_all_hmt_all'])
-    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_fr_tt_all_hmt_all'])
-    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_fr_tt_all_hmt_all'])
-    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_fr_tt_all_hmt_all'])
-    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_fr_tt_all_hmt_all'])
+    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_vr'])
+    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_vr'])
+    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_vr'])
+    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_vr'])
+    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_vr'])
+    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_vr'])
 
-    fig, ax = plt.subplots(figsize=(6,6))
+    g_distance_cells_of = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_of'])
+    g_position_cells_of = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_of'])
+    g_null_cells_of = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_of'])
+    ng_distance_cells_of = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_of'])
+    ng_position_cells_of = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_of'])
+    ng_null_cells_of = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_of'])
+
+    print("comping mean firing rates between postion vr and position of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_position_cells, y=g_position_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_position_cells, y=g_position_cells_of)[0]),", df = ",str(len(g_position_cells)-1))
+    print("comping mean firing rates between distnace vr and distnace of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_distance_cells, y=g_distance_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_distance_cells, y=g_distance_cells_of)[0]),", df = ",str(len(g_distance_cells)-1))
+    print("comping mean firing rates between null vr and null of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_null_cells, y=g_null_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_null_cells, y=g_null_cells_of)[0]),", df = ",str(len(g_null_cells)-1))
+    return
+
+def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_vr'])
+    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_vr'])
+    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_vr'])
+    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['mean_firing_rate_vr'])
+    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_vr'])
+    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_vr'])
+
+    fig, ax = plt.subplots(figsize=fig_size)
     data = [g_position_cells[~np.isnan(g_position_cells)],
             g_distance_cells[~np.isnan(g_distance_cells)],
             g_null_cells[~np.isnan(g_null_cells)],
@@ -970,11 +1003,12 @@ def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
     ax.set_ylim(bottom=0, top=15)
-    ax.set_xlim(left=0.5, right=7.5)
-    ax.set_xticks([2, 6])
+    ax.set_xlim(left=0.5, right=3.5)
+    #ax.set_xticks([2, 6])
     ax.set_yticks([0, 5, 10, 15])
-    ax.set_xticklabels(["G", "NG"])
+    #ax.set_xticklabels(["G", "NG"])
     fig.tight_layout()
     plt.subplots_adjust(left=0.25, bottom=0.2)
     ax.set_xlabel("", fontsize=20)
@@ -986,8 +1020,71 @@ def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_
     #significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
     plt.savefig(save_path + '/lomb_classifier_mfr_vs_groups.png', dpi=300)
     plt.close()
+
+
+
+    print("comping mean firing rates between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
+    print("comping mean firing rates postion and null encoding grid cells, df=",str(len(data[0])+len(data[2])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[2])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[2])[0]))
+    print("comping mean firing rates null and distance encoding grid cells, df=",str(len(data[2])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[2], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[2], data[1])[0]))
+
     return
 
+
+def plot_lomb_classifier_peak_width_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers...')
+
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+    non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
+
+    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['ML_peak_width'])
+    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['ML_peak_width'])
+    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['ML_peak_width'])
+    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['ML_peak_width'])
+    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['ML_peak_width'])
+    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['ML_peak_width'])
+
+    fig, ax = plt.subplots(figsize=fig_size)
+    data = [g_position_cells[~np.isnan(g_position_cells)],
+            g_distance_cells[~np.isnan(g_distance_cells)],
+            g_null_cells[~np.isnan(g_null_cells)],
+            ng_position_cells[~np.isnan(ng_position_cells)],
+            ng_distance_cells[~np.isnan(ng_distance_cells)],
+            ng_null_cells[~np.isnan(ng_null_cells)]]
+    colors=[Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3,5,6,7], boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.set_ylim(bottom=0, top=1.5)
+    ax.set_xlim(left=0.5, right=3.5)
+    #ax.set_xticks([2, 6])
+    ax.set_yticks([0, 0.5, 1, 1.5])
+    #ax.set_xticklabels(["G", "NG"])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("", fontsize=20)
+    ax.set_ylabel("Peak width", fontsize=20)
+    significance_bar(start=1, end=2, height=1.5, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
+    significance_bar(start=1, end=3, height=1.4, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[2])[1]))
+    significance_bar(start=2, end=3, height=1.3, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[2])[1]))
+    #significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
+    #significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
+    plt.savefig(save_path + '/lomb_classifier_peak_width_vs_groups.png', dpi=300)
+    plt.close()
+
+
+    print("comping peak widths between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
+
+    return
 
 def plot_lomb_classifiers_proportions_by_probe_hmt(concantenated_dataframe, save_path=""):
     print('plotting lomb classifers proportions...')
@@ -1024,6 +1121,173 @@ def plot_lomb_classifiers_proportions_by_probe_hmt(concantenated_dataframe, save
     plt.close()
     return
 
+def get_rolling_percent_encoding(df, code="P", tt=1, hmt="hit"):
+    if code == "P":
+        result_column = "rolling:encoding_position_by_trial_category"
+    elif code == "D":
+        result_column = "rolling:encoding_distance_by_trial_category"
+    elif code == "N":
+        result_column = "rolling:encoding_null_by_trial_category"
+
+    # tt and i index are shared
+    i = int(tt)
+
+    if hmt == "hit":
+        j =0
+    elif hmt == "try":
+        j=1
+    elif hmt == "miss":
+        j=2
+
+    result=[]
+    for m in range(len(df)):
+        if isinstance(df[result_column].iloc[m], list):
+            result.append(df[result_column].iloc[m][i][j])
+        else:
+            print(df["session_id"].iloc[m], " is missing an entry in ", result_column)
+    return np.array(result)
+
+
+def plot_percentage_encoding_by_trial_category(concantenated_dataframe, save_path=""):
+    print('plotting lomb classifers proportions...')
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+
+    fig, ax = plt.subplots(figsize=(18,6))
+    groups = ["Position", "Distance", "Null"]
+
+    p_b_hit = get_rolling_percent_encoding(grid_cells, code="P", tt=0, hmt="hit")
+    d_b_hit = get_rolling_percent_encoding(grid_cells, code="D", tt=0, hmt="hit")
+    n_b_hit = get_rolling_percent_encoding(grid_cells, code="N", tt=0, hmt="hit")
+    p_b_try = get_rolling_percent_encoding(grid_cells, code="P", tt=0, hmt="try")
+    d_b_try = get_rolling_percent_encoding(grid_cells, code="D", tt=0, hmt="try")
+    n_b_try = get_rolling_percent_encoding(grid_cells, code="N", tt=0, hmt="try")
+    p_b_miss = get_rolling_percent_encoding(grid_cells, code="P", tt=0, hmt="miss")
+    d_b_miss = get_rolling_percent_encoding(grid_cells, code="D", tt=0, hmt="miss")
+    n_b_miss = get_rolling_percent_encoding(grid_cells, code="N", tt=0, hmt="miss")
+    p_nb_hit = get_rolling_percent_encoding(grid_cells, code="P", tt=1, hmt="hit")
+    d_nb_hit = get_rolling_percent_encoding(grid_cells, code="D", tt=1, hmt="hit")
+    n_nb_hit = get_rolling_percent_encoding(grid_cells, code="N", tt=1, hmt="hit")
+    p_nb_try = get_rolling_percent_encoding(grid_cells, code="P", tt=1, hmt="try")
+    d_nb_try = get_rolling_percent_encoding(grid_cells, code="D", tt=1, hmt="try")
+    n_nb_try = get_rolling_percent_encoding(grid_cells, code="N", tt=1, hmt="try")
+    p_nb_miss = get_rolling_percent_encoding(grid_cells, code="P", tt=1, hmt="miss")
+    d_nb_miss = get_rolling_percent_encoding(grid_cells, code="D", tt=1, hmt="miss")
+    n_nb_miss = get_rolling_percent_encoding(grid_cells, code="N", tt=1, hmt="miss")
+    p_p_hit = get_rolling_percent_encoding(grid_cells, code="P", tt=2, hmt="hit")
+    d_p_hit = get_rolling_percent_encoding(grid_cells, code="D", tt=2, hmt="hit")
+    n_p_hit = get_rolling_percent_encoding(grid_cells, code="N", tt=2, hmt="hit")
+    p_p_try = get_rolling_percent_encoding(grid_cells, code="P", tt=2, hmt="try")
+    d_p_try = get_rolling_percent_encoding(grid_cells, code="D", tt=2, hmt="try")
+    n_p_try = get_rolling_percent_encoding(grid_cells, code="N", tt=2, hmt="try")
+    p_p_miss = get_rolling_percent_encoding(grid_cells, code="P", tt=2, hmt="miss")
+    d_p_miss = get_rolling_percent_encoding(grid_cells, code="D", tt=2, hmt="miss")
+    n_p_miss = get_rolling_percent_encoding(grid_cells, code="N", tt=2, hmt="miss")
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(p_b_try) & ~np.isnan(p_b_miss)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(p_nb_try) & ~np.isnan(p_nb_miss)
+    p_mask = ~np.isnan(p_p_hit) & ~np.isnan(p_p_try) & ~np.isnan(p_p_miss)
+
+    colors = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color]
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], n_b_hit[b_mask],
+            p_b_try[b_mask], d_b_try[b_mask], n_b_try[b_mask],
+            p_b_miss[b_mask], d_b_miss[b_mask], n_b_miss[b_mask],
+            p_nb_hit[nb_mask], d_nb_hit[nb_mask], n_nb_hit[nb_mask],
+            p_nb_try[nb_mask], d_nb_try[nb_mask], n_nb_try[nb_mask],
+            p_nb_miss[nb_mask], d_nb_miss[nb_mask], n_nb_miss[nb_mask],
+            p_p_hit[p_mask], d_p_hit[p_mask], n_p_hit[p_mask],
+            p_p_try[p_mask], d_p_try[p_mask], n_p_try[p_mask],
+            p_p_miss[p_mask], d_p_miss[p_mask], n_p_miss[p_mask]]
+    """
+    ax.bar(x=[1,2,3, 5,6,7, 9,10,11, 13,14,15 ,17,18,19, 21,22,23],
+           height=[np.nanmean(p_b_hit), np.nanmean(d_b_hit),np.nanmean(n_b_hit),
+              np.nanmean(p_b_try), np.nanmean(d_b_try),np.nanmean(n_b_try),
+              np.nanmean(p_b_miss), np.nanmean(d_b_miss),np.nanmean(n_b_miss),
+              np.nanmean(p_nb_hit), np.nanmean(d_nb_hit),np.nanmean(n_nb_hit),
+              np.nanmean(p_nb_try), np.nanmean(d_nb_try),np.nanmean(n_nb_try),
+              np.nanmean(p_nb_miss), np.nanmean(d_nb_miss),np.nanmean(n_nb_miss)], color=colors,
+           yerr=[stats.sem(p_b_hit, nan_policy='omit'), stats.sem(d_b_hit, nan_policy='omit'),stats.sem(n_b_hit, nan_policy='omit'),
+                 stats.sem(p_b_try, nan_policy='omit'), stats.sem(d_b_try, nan_policy='omit'),stats.sem(n_b_try, nan_policy='omit'),
+                 stats.sem(p_b_miss, nan_policy='omit'), stats.sem(d_b_miss, nan_policy='omit'),stats.sem(n_b_miss, nan_policy='omit'),
+                 stats.sem(p_nb_hit, nan_policy='omit'), stats.sem(d_nb_hit, nan_policy='omit'),stats.sem(n_nb_hit, nan_policy='omit'),
+                 stats.sem(p_nb_try, nan_policy='omit'), stats.sem(d_nb_try, nan_policy='omit'),stats.sem(n_nb_try, nan_policy='omit'),
+                 stats.sem(p_nb_miss, nan_policy='omit'), stats.sem(d_nb_miss, nan_policy='omit'),stats.sem(n_nb_miss, nan_policy='omit')])
+    """
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11, 14,15,16 ,18,19,20, 22,23,24, 27,28,29, 31,32,33, 35,36,37], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=30)
+    plt.yticks(fontsize=20)
+    ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10, 15,19,23, 28,32,36])
+    ax.set_xticklabels(["Hit", "Try", "Run", "Hit", "Try", "Run",  "Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=39)
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_ylabel("frac. session encoding", fontsize=20)
+    #significance_bar(start=1, end=2, height=15, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
+    #significance_bar(start=1, end=3, height=16, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[2])[1]))
+    #significance_bar(start=2, end=3, height=17, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[2])[1]))
+    plt.savefig(save_path + '/rolling_percent_encooding over trial types.png', dpi=300)
+    plt.close()
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_hit[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_try[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_miss[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_nb_hit[nb_mask])),'percentage_position_encoding': p_nb_hit[nb_mask],'unique_id':np.arange(len(p_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(p_nb_hit[nb_mask])),'percentage_position_encoding': p_nb_try[nb_mask],'unique_id':np.arange(len(p_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(p_nb_hit[nb_mask])),'percentage_position_encoding': p_nb_miss[nb_mask],'unique_id':np.arange(len(p_nb_hit[nb_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_p_hit[p_mask])),'percentage_position_encoding': p_p_hit[p_mask],'unique_id':np.arange(len(p_p_hit[p_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(p_p_hit[p_mask])),'percentage_position_encoding': p_p_try[p_mask],'unique_id':np.arange(len(p_p_hit[p_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(p_p_hit[p_mask])),'percentage_position_encoding': p_p_miss[p_mask],'unique_id':np.arange(len(p_p_hit[p_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+
+    return
 
 def plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(concantenated_dataframe, save_path=""):
     print('plotting lomb classifers proportions...')
@@ -4681,6 +4945,69 @@ def plot_allo_minus_ego_component(concantenated_dataframe,  save_path):
 
     return
 
+def get_percentage_hit_column(df, tt):
+    percentage_hits = []
+    for index, cluster_df in df.iterrows():
+        cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+        percentage = cluster_df["percentage_hits"].iloc[0][tt]
+        percentage_hits.append(percentage)
+    return np.array(percentage_hits)
+
+def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+
+    stable_position_grid_cells = Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"] > 0.85]
+    stable_distance_grid_cells = Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"] > 0.85]
+
+    stable_position_grid_cells = Position_grid_cells
+    stable_distance_grid_cells = Distance_grid_cells
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+
+    beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_grid_cells, tt=0)
+    non_beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_grid_cells, tt=1)
+    beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=0)
+    non_beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=1)
+
+    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
+
+    data = [beaconed_percentage_hits_stable_position_grid_cells, non_beaconed_percentage_hits_stable_position_grid_cells,
+            beaconed_percentage_hits_stable_distance_grid_cells, non_beaconed_percentage_hits_stable_distance_grid_cells]
+
+    print("comping % hits between postion and distance encoding grid cells for beaconed trials, df=",str(len(beaconed_percentage_hits_stable_position_grid_cells)+len(beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[0]))
+    print("comping % hits between postion and distance encoding grid cells for non beaconed trials, df=",str(len(non_beaconed_percentage_hits_stable_position_grid_cells)+len(non_beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[0]))
+
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,4, 5], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xticks([1,2,4,5])
+    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([0, 100])
+    ax.set_xlim([0, 6])
+    ax.set_xlabel("Encoding grid cells", fontsize=20)
+    ax.set_ylabel("Percentage hits", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/percentage_hits_for_stable_grid_cells.png', dpi=300)
+    plt.close()
+
+
 def plot_rolling_lomb_block_sizes(combined_df, save_path):
     print("do stuff")
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
@@ -4745,58 +5072,271 @@ def plot_rolling_lomb_block_sizes(combined_df, save_path):
     plt.savefig(save_path + '/block_length_encoding_vs_shuffled.png', dpi=300)
     plt.close()
 
-    fig, ax = plt.subplots(1,1, figsize=(6,6))
-    #ax.set_xticks([0,1])
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
     #ax.set_yticks([-1, 0, 1])
     #ax.set_ylim([-1, 1])
     ax.set_xlim([0, 1])
-    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_position"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
-    ax.set_xlabel("frac. session", fontsize=20)
-    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    colors=[Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_position"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_position"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_position"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
-    ax.tick_params(axis='both', which='both', labelsize=20)
-    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    ax.tick_params(axis='both', which='both', labelsize=30)
     plt.savefig(save_path + '/block_length_encoding_position.png', dpi=300)
     plt.close()
 
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_distance"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_distance"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_distance"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
+    plt.savefig(save_path + '/block_length_encoding_distance.png', dpi=300)
+    plt.close() 
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_null"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_null"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_null"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
+    plt.savefig(save_path + '/block_length_encoding_null.png', dpi=300)
+    plt.close()
+    return
+
+def add_max_block_lengths(df):
+    max_block_length = []
+    max_block_length_shuffled = []
+    for index, cluster_df in df.iterrows():
+        cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+        block_lengths = pandas_collumn_to_numpy_array(cluster_df["rolling:block_lengths"])
+        block_lengths_shuffled = pandas_collumn_to_numpy_array(cluster_df["rolling:block_lengths_shuffled"])
+        if len(block_lengths)>0:
+            max_block_length.append(np.nanmax(block_lengths))
+        else:
+            max_block_length.append(np.nan)
+        if len(block_lengths_shuffled)>0:
+            max_block_length_shuffled.append(np.nanmax(block_lengths_shuffled))
+        else:
+            max_block_length_shuffled.append(np.nan)
+
+    df["rolling:max_block_length"] = max_block_length
+    df["rolling:max_block_lengths_shuffled"] = max_block_length_shuffled
+    return df
+
+def plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    grid_cells = add_max_block_lengths(grid_cells)
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    block_lengths = pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths"])
+    block_lengths_shuffled = pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_shuffled"])
+    _, _, patches0 = ax.hist(block_lengths, density=True, bins=1000, cumulative=True, range=(0,1), histtype="step", color="red",linewidth=2)
+    _, _, patches1 = ax.hist(block_lengths_shuffled, density=True, bins=1000, cumulative=True, range=(0,1), histtype="step", color="grey",linewidth=2)
+    patches0[0].set_xy(patches0[0].get_xy()[:-1])
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    #ax.set_xlabel("Frac. session", fontsize=20)
+    #ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    #ax.set_xscale('log')
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_lengths_vs_shuffled_trials.png', dpi=300)
+    plt.close()
+    ks, p = scipy.stats.ks_2samp(block_lengths, block_lengths_shuffled)
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    max_block_lengths = pandas_collumn_to_numpy_array(grid_cells["rolling:max_block_length"])
+    max_block_lengths_shuffled = pandas_collumn_to_numpy_array(grid_cells["rolling:max_block_lengths_shuffled"])
+    _, _, patches0 = ax.hist(max_block_lengths, density=True, bins=1000, cumulative=True, range=(0,1), histtype="step", color="red",linewidth=2)
+    _, _, patches1 = ax.hist(max_block_lengths_shuffled, density=True, bins=1000, cumulative=True, range=(0,1), histtype="step", color="grey",linewidth=2)
+    patches0[0].set_xy(patches0[0].get_xy()[:-1])
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    #ax.set_xlabel("Frac. session", fontsize=20)
+    #ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    #ax.set_xscale('log')
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/max_block_lengths_vs_shuffled_trials.png', dpi=300)
+    plt.close()
+    ks, p = scipy.stats.ks_2samp(max_block_lengths, max_block_lengths_shuffled)
+    return
+
+def plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+    Null_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Null"]
+
     fig, ax = plt.subplots(1,1, figsize=(6,6))
     #ax.set_xticks([0,1])
     #ax.set_yticks([-1, 0, 1])
     #ax.set_ylim([-1, 1])
     ax.set_xlim([0, 1])
-    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_distance"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
-    ax.set_xlabel("frac. session", fontsize=20)
-    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    ax.hist(pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_encoder"]), density=True, bins=20, range=(0,1), alpha=0.5, color=Settings.null_color)
+    ax.set_xlabel("Frac. session", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
     ax.tick_params(axis='both', which='both', labelsize=20)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/fraction_encoding.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist(pandas_collumn_to_numpy_array(Position_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.allocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.egocentric_color)
+    ax.hist(pandas_collumn_to_numpy_array(Null_grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.null_color)
+    ax.set_xlabel("Block length (frac. session)", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    #ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    _, _, patches0 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), histtype="step", cumulative=True, alpha=0.5, color="r")
+    _, _, patches1 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder_shuffled"]), density=True, bins=10, histtype="step", cumulative=True, range=(0,1), alpha=0.5, color="grey")
+    patches0[0].set_xy(patches0[0].get_xy()[:-1])
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    ax.set_xlabel("Block length (frac. session)", fontsize=20)
+    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/block_length_encoding_vs_shuffled.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    colors=[Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_position"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_position"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_position"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
+    plt.savefig(save_path + '/block_length_encoding_position.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([-1, 1])
+    ax.set_xlim([0, 1])
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_distance"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_distance"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_distance"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=30)
     plt.savefig(save_path + '/block_length_encoding_distance.png', dpi=300)
     plt.close()
 
-    fig, ax = plt.subplots(1,1, figsize=(6,6))
-    #ax.set_xticks([0,1])
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    ax.set_xticks([0,1])
     #ax.set_yticks([-1, 0, 1])
     #ax.set_ylim([-1, 1])
     ax.set_xlim([0, 1])
-    ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:proportion_encoding_null"]), density=True, bins=10, range=(0,1), alpha=0.5, color=Settings.null_color)
-    ax.set_xlabel("frac. session", fontsize=20)
-    ax.set_ylabel("N", fontsize=20, labelpad=10)
+    ax.hist([pandas_collumn_to_numpy_array(Position_grid_cells["rolling:proportion_encoding_null"]),
+             pandas_collumn_to_numpy_array(Distance_grid_cells["rolling:proportion_encoding_null"]),
+             pandas_collumn_to_numpy_array(Null_grid_cells["rolling:proportion_encoding_null"])], bins=20, range=(0,1), color=colors, stacked=True)
+    #ax.set_xlabel("frac. session", fontsize=20)
+    #ax.set_ylabel("Number of cells", fontsize=20, labelpad=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
-    ax.tick_params(axis='both', which='both', labelsize=20)
-    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    ax.tick_params(axis='both', which='both', labelsize=30)
     plt.savefig(save_path + '/block_length_encoding_null.png', dpi=300)
     plt.close()
-
-
     return
 
+def get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05):
+    local_maxima_idx, _ = signal.find_peaks(avg_subset_powers, height=0, distance=5)
+    power = 0; freq=0; i_max=0
+    for i in local_maxima_idx:
+        if (distance_from_integer(frequency[i])<=tolerance) and (avg_subset_powers[i]>power):
+            freq = frequency[i]
+            power = avg_subset_powers[i]
+            i_max = i
+    return freq, power, i_max
 
+def add_peak_width(combined_df):
+    peak_widths = []
+    for index, row in combined_df.iterrows():
+        avg_powers = row["MOVING_LOMB_avg_power"]
+        if np.sum(np.isnan(avg_powers))==0:
+            width, _, _, _ = signal.peak_widths(avg_powers, np.array([np.nanargmax(avg_powers)]))
+            width = width[0]*Settings.frequency_step
+        else:
+            width = np.nan
+        peak_widths.append(width)
+    combined_df["ML_peak_width"] = peak_widths
+    return combined_df
 
 def main():
     print('-------------------------------------------------------------')
@@ -4811,22 +5351,36 @@ def main():
     combined_df = combined_df[combined_df["track_length"] == 200]
     combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
+    combined_df = add_peak_width(combined_df)
     #read_df(combined_df)
 
     # Figure 2 population level plots
+    fig_size = (3.5,6)
     plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
 
     # Figure 3 plots remapping
     plot_rolling_lomb_block_sizes(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
+    # Figure 4 behaviours
+    plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+
+    # Figure 5 plots
+    plot_percentage_encoding_by_trial_category(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_proportions_by_probe_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     # Figure 5 plots
+
+
+
     plot_lomb_classifiers_proportions_by_hits_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     # Remapping figure

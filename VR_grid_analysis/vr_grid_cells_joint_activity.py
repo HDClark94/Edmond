@@ -1061,9 +1061,153 @@ def plot_jitter_correlations(matched_recording_df, output_path):
         plt.close()
 
 
+def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df):
+    print('plotting agreement matrices...')
+    save_path = output_path + '/Figures/agreement_matrices'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell"]], on="cluster_id")
+    spike_data = spike_data[spike_data["grid_cell"] == True]
+    cluster_ids = np.array(spike_data["cluster_id"])
+
+    agreement_matrix = np.zeros((len(spike_data), len(spike_data)))
+    agreement_matrix_shuffled = np.zeros((len(spike_data), len(spike_data)))
+
+    for i in range(len(agreement_matrix)):
+        for j in range(len(agreement_matrix[0])):
+            cluster_j_df = spike_data[spike_data["cluster_id"] == cluster_ids[j]]
+            cluster_i_df = spike_data[spike_data["cluster_id"] == cluster_ids[i]]
+            rolling_classifier_i = np.array(cluster_i_df["rolling:rolling_lomb_classifiers"].iloc[0])
+            rolling_classifier_j = np.array(cluster_j_df["rolling:rolling_lomb_classifiers"].iloc[0])
+            rolling_classifier_i_shuffled = np.array(cluster_i_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
+            rolling_classifier_j_shuffled = np.array(cluster_j_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
+
+            encoding_p_j = cluster_j_df["rolling:proportion_encoding_position"].iloc[0]
+            encoding_d_j = cluster_j_df["rolling:proportion_encoding_distance"].iloc[0]
+            encoding_n_j = cluster_j_df["rolling:proportion_encoding_null"].iloc[0]
+            encoding_p_i = cluster_i_df["rolling:proportion_encoding_position"].iloc[0]
+            encoding_d_i = cluster_i_df["rolling:proportion_encoding_distance"].iloc[0]
+            encoding_n_i = cluster_i_df["rolling:proportion_encoding_null"].iloc[0]
+
+            agreement = np.sum(rolling_classifier_i==rolling_classifier_j)/len(rolling_classifier_i)
+            agreement_shuffled_blocks = np.sum(rolling_classifier_i_shuffled==rolling_classifier_j_shuffled)/len(rolling_classifier_i_shuffled)
+
+            agreement_matrix[i, j] = agreement
+            agreement_matrix_shuffled[i, j] = agreement_shuffled_blocks
+
+            if ((((encoding_p_j > 0.15) and  (encoding_p_j < 0.85)) and ((encoding_p_i > 0.15) and  (encoding_p_i < 0.85))) or
+                (((encoding_d_j > 0.15) and  (encoding_d_j < 0.85)) and ((encoding_d_i > 0.15) and  (encoding_d_i < 0.85))) or
+                (((encoding_n_j > 0.15) and  (encoding_n_j < 0.85)) and ((encoding_n_i > 0.15) and  (encoding_n_i < 0.85)))):
+
+
+
+                # determine if the pair were on the same tetrode
+                if cluster_i_df.tetrode.iloc[0] == cluster_j_df.tetrode.iloc[0]:
+                    tetrode_level = "same"
+                else:
+                    tetrode_level = "different"
+                cell_pair_df = pd.DataFrame()
+                cell_pair_df["session_id_i"] = [cluster_i_df.session_id.iloc[0]]
+                cell_pair_df["session_id_j"] = [cluster_j_df.session_id.iloc[0]]
+                cell_pair_df["cluster_id_i"] = [cluster_i_df.cluster_id.iloc[0]]
+                cell_pair_df["cluster_id_j"] = [cluster_j_df.cluster_id.iloc[0]]
+                cell_pair_df["tetrode_level"] = [tetrode_level]
+                cell_pair_df["agreement"] = [agreement]
+                cell_pair_df["agreement_shuffled_blocks"] = [agreement_shuffled_blocks]
+                agreement_comparions_df = pd.concat([agreement_comparions_df, cell_pair_df], ignore_index=True)
+
+    fig, ax = plt.subplots()
+    np.fill_diagonal(agreement_matrix, np.nan)
+    im= ax.imshow(agreement_matrix, cmap="coolwarm", vmin=0, vmax=1)
+    ax.set_xticks(np.arange(len(cluster_ids)))
+    ax.set_yticks(np.arange(len(cluster_ids)))
+    ax.set_yticklabels(cluster_ids)
+    ax.set_xticklabels(cluster_ids)
+    ax.set_ylabel("Cluster ID", fontsize=20)
+    ax.set_xlabel("Cluster ID", fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    fig.tight_layout()
+    fig.colorbar(im, ax=ax)
+    plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'agreement_matrix_rolling_classifiers.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots()
+    np.fill_diagonal(agreement_matrix_shuffled, np.nan)
+    im= ax.imshow(agreement_matrix_shuffled, cmap="coolwarm", vmin=0, vmax=1)
+    ax.set_xticks(np.arange(len(cluster_ids)))
+    ax.set_yticks(np.arange(len(cluster_ids)))
+    ax.set_yticklabels(cluster_ids)
+    ax.set_xticklabels(cluster_ids)
+    ax.set_ylabel("Cluster ID", fontsize=20)
+    ax.set_xlabel("Cluster ID", fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    fig.tight_layout()
+    fig.colorbar(im, ax=ax)
+    plt.savefig(save_path + '/' + spike_data.session_id.iloc[0] + 'agreement_matrix_rolling_classifiers_shuffled_blocks.png', dpi=300)
+    plt.close()
+
+    return agreement_comparions_df
+
+def remove_same_cell_comparisons(agreement_comparions_df):
+    new=pd.DataFrame()
+    for index, cluster_row in agreement_comparions_df.iterrows():
+        cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
+        cluster_id_i =cluster_row["cluster_id_i"].iloc[0]
+        cluster_id_j =cluster_row["cluster_id_j"].iloc[0]
+
+        if cluster_id_j != cluster_id_i:
+            new = pd.concat([new, cluster_row], ignore_index=True)
+
+    return new
+
+
+def plot_agreement_vs_shuffled_blocks(agreement_comparions_df, save_path):
+    agreement_comparions_df = remove_same_cell_comparisons(agreement_comparions_df)
+    print(len(agreement_comparions_df))
+    _, p = stats.ttest_rel(agreement_comparions_df["agreement"], agreement_comparions_df["agreement_shuffled_blocks"])
+    on_tetrode = agreement_comparions_df[agreement_comparions_df["tetrode_level"] == "same"]
+    off_tetrode = agreement_comparions_df[agreement_comparions_df["tetrode_level"] == "different"]
+    fig, ax = plt.subplots(figsize=(4,6))
+    for i in range(len(agreement_comparions_df)):
+        ax.scatter([0,1], [agreement_comparions_df["agreement"].iloc[i], agreement_comparions_df["agreement_shuffled_blocks"].iloc[i]], marker="o", color="black")
+        ax.plot([0,1], [agreement_comparions_df["agreement"].iloc[i], agreement_comparions_df["agreement_shuffled_blocks"].iloc[i]], color="black")
+    ax.set_xticks([0,1])
+    ax.set_yticks([0, 0.5, 1])
+    ax.set_xlim([-0.5,1.5])
+    plt.xticks(rotation = 30)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_xticklabels(["True", "Shuffled blocks"])
+    ax.set_ylabel("Block agreement (frac. session)", fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    fig.tight_layout()
+    plt.savefig(save_path + '/' +'agreement_vs_shuffle.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots()
+    for i in range(len(on_tetrode)):
+        ax.scatter([0,1], [on_tetrode["agreement"].iloc[i], on_tetrode["agreement_shuffled_blocks"].iloc[i]], marker="o", color="black")
+        ax.plot([0,1], [on_tetrode["agreement"].iloc[i], on_tetrode["agreement_shuffled_blocks"].iloc[i]], color="black")
+    for i in range(len(off_tetrode)):
+        ax.scatter([3,4], [off_tetrode["agreement"].iloc[i], off_tetrode["agreement_shuffled_blocks"].iloc[i]], marker="o", color="black")
+        ax.plot([3,4], [off_tetrode["agreement"].iloc[i], off_tetrode["agreement_shuffled_blocks"].iloc[i]], color="black")
+
+    ax.set_xticks([0,1,3,4])
+    ax.set_yticks([0, 0.5, 1])
+    ax.set_xticklabels(["TrueON", "Shuffled blocksON", "TrueOFF", "Shuffled blocksOFF"])
+    ax.set_ylabel("Block agreement (frac. session)", fontsize=20)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    fig.tight_layout()
+    plt.savefig(save_path + '/' +'agreement_vs_shuffle_by_tetrode.png', dpi=300)
+    plt.close()
+
+
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     concat_matched_recording_df = pd.DataFrame()
+
+    agreement_comparions_df = pd.DataFrame()
     for recording in vr_recording_path_list:
         print("processing ", recording)
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
@@ -1080,19 +1224,19 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_firing_rate_maps_per_trial_aligned_other_neuron(spike_data=spike_data, of_spike_data=of_spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), shuffled=False)
                 #plot_firing_rate_maps_per_trial_aligned_other_neuron(spike_data=spike_data, of_spike_data=of_spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), shuffled=True)
 
+                # ANALYSIS OF ROLLING CLASSIFICATION
+                agreement_comparions_df = plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df)
+                agreement_comparions_df.to_pickle("/mnt/datastore/Harry/VR_grid_cells/agreement_comparions_df.pkl")
+
                 #spike_data = spike_data.head(10)
                 #of_spike_data = of_spike_data.head(10)
                 #spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell"]], on="cluster_id")
                 #spike_data = spike_data[spike_data["grid_cell"] == True]
                 #of_spike_data = of_spike_data[of_spike_data["grid_cell"] == True]
-
-                matched_recording_df = analyse_jitter_correlations(spike_data, of_spike_data, processed_position_data)
-                plot_jitter_correlations(matched_recording_df, output_path)
-
-                concat_matched_recording_df = pd.concat([concat_matched_recording_df, matched_recording_df], ignore_index=True)
-                concat_matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
-
-
+                #matched_recording_df = analyse_jitter_correlations(spike_data, of_spike_data, processed_position_data)
+                #plot_jitter_correlations(matched_recording_df, output_path)
+                #concat_matched_recording_df = pd.concat([concat_matched_recording_df, matched_recording_df], ignore_index=True)
+                #concat_matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
                 #plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, trial_types=[1])
                 #matched_recording_df = plot_joint_jitter_correlations(spike_data, of_spike_data, processed_position_data, position_data, output_path, get_track_length(recording), matched_recording_df)
                 #matched_recording_df.to_pickle("/mnt/datastore/Harry/cohort8_may2021/matched_grid_recording_df.pkl")
@@ -1166,6 +1310,9 @@ def main():
     #plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     #plot_n_cells_simulatenously_recorded(combined_df,  save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity", normalised=True)
 
+
+    agreement_comparions_df = pd.read_pickle("/mnt/datastore/Harry/VR_grid_cells/agreement_comparions_df.pkl")
+    plot_agreement_vs_shuffled_blocks(agreement_comparions_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/joint_activity")
     print("look now")
 
 if __name__ == '__main__':

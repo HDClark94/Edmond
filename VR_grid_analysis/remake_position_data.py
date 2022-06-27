@@ -280,12 +280,21 @@ def syncronise_position_data(recording_folder, track_length):
     position_data = downsampled_position_data(raw_position_data)
 
     rpd = np.asarray(raw_position_data["x_position_cm"])
+    trial_numbers_raw = np.array(raw_position_data['trial_number'], dtype=np.int64)
+    rpd_elapsed = (track_length*(trial_numbers_raw-1))+rpd
     gauss_kernel = Gaussian1DKernel(stddev=200)
     rpd = convolve(rpd, gauss_kernel)
     rpd = moving_sum(rpd, window=100)/100
     rpd = np.append(rpd, np.zeros(len(raw_position_data["x_position_cm"])-len(rpd)))
     raw_position_data["x_position_cm"] = rpd
 
+    # potential bug fix
+    rpd_elapsed = convolve(rpd_elapsed, gauss_kernel)
+    rpd_elapsed = moving_sum(rpd_elapsed, window=100)/100
+    rpd_elapsed = np.append(rpd_elapsed, np.zeros(len(raw_position_data["x_position_cm"])-len(rpd_elapsed)))
+    rpd = rpd_elapsed%track_length
+
+    raw_position_data["x_position_cm"] = rpd
     gc.collect()
     return raw_position_data, position_data
 

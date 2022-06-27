@@ -3,7 +3,7 @@ import os
 import numpy as np
 import time
 from scipy.signal import find_peaks
-import VR_grid_analysis.analysis_settings as Settings
+import Edmond.VR_grid_analysis.analysis_settings as Settings
 from astropy.timeseries import LombScargle
 from astropy.convolution import convolve, Gaussian1DKernel
 

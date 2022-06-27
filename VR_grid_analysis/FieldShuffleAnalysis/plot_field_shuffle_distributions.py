@@ -4,12 +4,14 @@ import os
 import sys
 import traceback
 import warnings
+
+import matplotlib.pylab as plt
 from Edmond.VR_grid_analysis import analysis_settings
 from Edmond.utility_functions.array_manipulations import *
 warnings.filterwarnings("ignore")
 
 
-def add_shuffled_cutoffs(recordings_folder_to_process):
+def plot_field_shuffle_false_assay(recordings_folder_to_process):
 
     recording_list = [f.path for f in os.scandir(recordings_folder_to_process) if f.is_dir()]
 
@@ -30,15 +32,6 @@ def add_shuffled_cutoffs(recordings_folder_to_process):
                 spatial_firing = pd.read_pickle(recording_path+r"/MountainSort/DataFrames/spatial_firing.pkl")
 
                 if len(spatial_firing)>0:
-                    print("cluster IDs in shuffle df: ", np.unique(shuffle.cluster_id))
-                    print("cluster IDs in spatial df: ", np.unique(shuffle.cluster_id))
-
-                    print("There are", len(shuffle)/len(spatial_firing), "shuffles per cell")
-
-                    power_thresholds = []
-                    rolling_thresholds = []
-                    power_n_nans_removed_from_shuffle = []
-
                     for cluster_index, cluster_id in enumerate(spatial_firing.cluster_id):
                         cluster_shuffle_df = shuffle[(shuffle.cluster_id == cluster_id)] # dataframe for that cluster
                         print("For cluster", cluster_id, " there are ", len(cluster_shuffle_df), " shuffles")
@@ -46,25 +39,23 @@ def add_shuffled_cutoffs(recordings_folder_to_process):
                         peak_powers = np.array(cluster_shuffle_df["peak_power"])
                         rolling_powers = pandas_collumn_to_2d_numpy_array(cluster_shuffle_df["rolling_peak_powers"])
                         rolling_peak_sizes = pandas_collumn_to_2d_numpy_array(cluster_shuffle_df["rolling_peak_sizes"])
-                        rolling_powers = rolling_powers[rolling_peak_sizes==analysis_settings.rolling_window_size_for_lomb_classifier]
 
-                        power_n_nans_removed_from_shuffle.append(len(cluster_shuffle_df)-np.count_nonzero(np.isnan(peak_powers)))
-
-                        # print it out for people to see
-                        print("There are this many non-nan values for the shuffle periodic power: ", power_n_nans_removed_from_shuffle[cluster_index])
-
-                        # calculate the 99th percentile threshold for individual clusters
-                        adjusted_peak_threshold = np.nanpercentile(peak_powers, 99)
-                        adjusted_rolling_threshold = np.nanpercentile(rolling_powers, 99)
-
-                        power_thresholds.append(adjusted_peak_threshold)
-                        rolling_thresholds.append(adjusted_rolling_threshold)
-
-                    spatial_firing["power_threshold"] = power_thresholds
-                    spatial_firing["rolling_threshold"] = rolling_thresholds
-                    spatial_firing["power_n_nans_removed_from_shuffle"] = power_n_nans_removed_from_shuffle
-
-                    spatial_firing.to_pickle(recording_path+r"/MountainSort/DataFrames/spatial_firing.pkl")
+                        fig, ax = plt.subplots(figsize=(6,4))
+                        ax.tick_params(axis='both', which='major', labelsize=20)
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+                        ax.spines['bottom'].set_visible(False)
+                        ax.set_ylim(bottom=0, top=1.5)
+                        ax.set_xlim(left=0.5, right=3.5)
+                        #ax.set_xticks([2, 6])
+                        ax.set_yticks([0, 0.5, 1, 1.5])
+                        #ax.set_xticklabels(["G", "NG"])
+                        fig.tight_layout()
+                        plt.subplots_adjust(left=0.25, bottom=0.2)
+                        ax.set_xlabel("", fontsize=20)
+                        ax.set_ylabel("Peak width", fontsize=20)
+                        plt.savefig(save_path + '/lomb_classifier_peak_width_vs_groups.png', dpi=300)
+                        plt.close()
 
                 else:
                     print("There are no cells in this recordings")
@@ -86,7 +77,7 @@ def main():
     #folders.append("/mnt/datastore/Harry/Cohort8_may2021/vr")
 
     for folder in folders:
-        add_shuffled_cutoffs(folder)
+        plot_field_shuffle_false_assay(folder)
     print("look now")
 
 if __name__ == '__main__':

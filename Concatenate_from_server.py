@@ -130,18 +130,6 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
                     if "n_pi_trials_by_hmt" in list(spatial_firing):
                         collumn_names_to_keep.append("n_pi_trials_by_hmt")
-                    if "fields_per_trial_hmt_by_trial_type" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type")
-                    if "fields_per_trial_hmt_by_trial_type_pre_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_pre_rz")
-                    if "fields_per_trial_hmt_by_trial_type_post_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_per_trial_hmt_by_trial_type_post_rz")
-                    if "fields_sizes_hmt_by_trial_type" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type")
-                    if "fields_sizes_hmt_by_trial_type_pre_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type_pre_rz")
-                    if "fields_sizes_hmt_by_trial_type_post_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_sizes_hmt_by_trial_type_post_rz")
                     if "fields_jitter_hmt_by_trial_type" in list(spatial_firing):
                         collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type")
                     if "fields_jitter_hmt_by_trial_type_pre_rz" in list(spatial_firing):
@@ -154,6 +142,27 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("field_realignments_hmt_by_trial_type")
                     if "percentage_hits" in list(spatial_firing):
                         collumn_names_to_keep.append("percentage_hits")
+                    if "rolling:block_lengths_for_encoder" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths_for_encoder")
+                    if "rolling:block_lengths_for_encoder_shuffled" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths_for_encoder_shuffled")
+                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:encoding_position_by_trial_category")
+                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:encoding_distance_by_trial_category")
+                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:encoding_null_by_trial_category")
+                    if "rolling:percentage_trials_encoding_position" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_position")
+                    if "rolling:percentage_trials_encoding_distance" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_distance")
+                    if "rolling:percentage_trials_encoding_null" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_null")
+                    if "rolling:block_lengths_shuffled" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths_shuffled")
+                    if "rolling:block_lengths" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths")
+
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
@@ -163,16 +172,21 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_vr')})
                     spatial_firing["session_id_vr"] = spatial_firing["session_id"]
 
+                    # remove duplicated columns
+                    spatial_firing = spatial_firing.loc[:,~spatial_firing.columns.duplicated()]
+
+                    spatial_firing["n_trials"] = len(processed_position)
+
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
 
                 else:
                     print("There wasn't any cells to add")
                     # make an empty row for the recording day to show no cells were found
-                    session_id = path.split("/")[-1]
-                    data = {'session_id': [session_id]}
-                    spatial_firing = pd.DataFrame(data)
-                    all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
+                    #session_id = path.split("/")[-1]
+                    #data = {'session_id': [session_id]}
+                    #spatial_firing = pd.DataFrame(data)
+                    #all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
 
             except Exception as ex:
                 print('This is what Python says happened:')
@@ -222,6 +236,9 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_of')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_of')})
                     spatial_firing["session_id_of"] = spatial_firing["session_id"]
+
+                    # remove duplicated columns
+                    spatial_firing = spatial_firing.loc[:,~spatial_firing.columns.duplicated()]
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
