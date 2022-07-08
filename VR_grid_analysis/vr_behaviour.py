@@ -2245,6 +2245,63 @@ def plot_track_speeds_by_mouse(processed_position_data, save_path):
     plt.close()
     return
 
+def plot_average_hit_try_run_profile(all_behaviour200cm_tracks, save_path):
+    max_session = np.nanmax(all_behaviour200cm_tracks["session_number"])
+    mouse_ids = ["M1", "M2", "M3", "M4", "M6", "M7",  "M10",  "M11",  "M12", "M13", "M14", "M15"]
+
+    mouse_array = np.zeros((3, len(mouse_ids), max_session)); mouse_array[:, :] = np.nan
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+
+        mouse_i = 0
+        for mouse_id, mouse_color in zip(mouse_ids, colors):
+            mouse_df = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == mouse_id]
+            tt_session_df = mouse_df[mouse_df["trial_type"] == tt]
+
+            percent_hits = []
+            session_numbers = []
+            for session_number in np.unique(tt_session_df.session_number):
+                session_df = tt_session_df[tt_session_df["session_number"] == session_number]
+                session_df = drop_first_and_last_trial(session_df)
+
+                if len(session_df)==0:
+                    percent = 0
+                else:
+                    percent = (len(session_df[session_df["hit_miss_try"] == "hit"])/len(session_df))*100
+
+                percent_hits.append(percent)
+                session_numbers.append(session_number)
+
+                mouse_array[tt, mouse_i, session_number-1] = percent
+
+            mouse_i +=1
+
+    for i, mouse_id in enumerate(mouse_ids):
+        # plot figure
+        stop_histogram = plt.figure(figsize=(6,4))
+        ax = stop_histogram.add_subplot(1, 1, 1)
+
+        # plot per mouse
+        ax.plot(np.arange(1,max_session+1), mouse_array[0][i], '-', color="black")
+        ax.plot(np.arange(1,max_session+1), mouse_array[1][i], '-', color="blue")
+        ax.plot(np.arange(1,max_session+1), mouse_array[2][i], '-', color="deepskyblue")
+        plt.title(mouse_id, fontsize=25)
+        plt.ylabel('% hits', fontsize=25, labelpad = 10)
+        plt.xlabel('Session number', fontsize=25, labelpad = 10)
+        plt.xlim(1,max_session)
+        plt.ylim(0, 100)
+        #ax.axhline(y=0, linestyle="dashed", linewidth=3, color="black")
+        ax.xaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_tick_params(labelsize=20)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 10
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        plt.xticks(fontsize=20)
+        Edmond.plot_utility2.style_vr_plot(ax)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.9)
+        plt.savefig(save_path + '/percentage_hits_'+mouse_id+'.png', dpi=200)
+        plt.close()
+
 def plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path, percentile=99, shuffles=1000):
     max_session = 30
     all_behaviour200cm_tracks = all_behaviour200cm_tracks[all_behaviour200cm_tracks["session_number"] <= max_session]
@@ -3561,6 +3618,7 @@ def main():
     plot_trial_ratio_vs_percentage_correct_across_time(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
 
     # population level statistics
+    plot_average_hit_try_run_profile(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_track_speeds_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")

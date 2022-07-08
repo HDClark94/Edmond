@@ -142,6 +142,16 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("field_realignments_hmt_by_trial_type")
                     if "percentage_hits" in list(spatial_firing):
                         collumn_names_to_keep.append("percentage_hits")
+                    if "stop_locations" in list(spatial_firing):
+                        collumn_names_to_keep.append("stop_locations")
+                    if "stop_trial_numbers" in list(spatial_firing):
+                        collumn_names_to_keep.append("stop_trial_numbers")
+                    if "behaviour_trial_numbers" in list(spatial_firing):
+                        collumn_names_to_keep.append("behaviour_trial_numbers")
+                    if "behaviour_hit_try_miss" in list(spatial_firing):
+                        collumn_names_to_keep.append("behaviour_hit_try_miss")
+                    if "behaviour_trial_types" in list(spatial_firing):
+                        collumn_names_to_keep.append("behaviour_trial_types")
                     if "rolling:block_lengths_for_encoder" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:block_lengths_for_encoder")
                     if "rolling:block_lengths_for_encoder_shuffled" in list(spatial_firing):
@@ -162,6 +172,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("rolling:block_lengths_shuffled")
                     if "rolling:block_lengths" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:block_lengths")
+                    if "rolling:classifier_by_trial_number" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:classifier_by_trial_number")
 
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]

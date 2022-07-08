@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import pickle
+import shutil
+from statsmodels.stats.multitest import fdrcorrection as fdrcorrection
 import Edmond.VR_grid_analysis.analysis_settings as Settings
 from matplotlib.markers import TICKDOWN
 import PostSorting.parameters
@@ -1145,15 +1147,17 @@ def get_rolling_percent_encoding(df, code="P", tt=1, hmt="hit"):
             result.append(df[result_column].iloc[m][i][j])
         else:
             print(df["session_id"].iloc[m], " is missing an entry in ", result_column)
-    return np.array(result)
+    return np.array(result)*100
 
 
 def plot_percentage_encoding_by_trial_category(concantenated_dataframe, save_path=""):
     print('plotting lomb classifers proportions...')
     grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
 
-    fig, ax = plt.subplots(figsize=(18,6))
-    groups = ["Position", "Distance", "Null"]
+    # we only want to look at the remapped coding cells (<85% encoding)
+    grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+                            (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+
 
     p_b_hit = get_rolling_percent_encoding(grid_cells, code="P", tt=0, hmt="hit")
     d_b_hit = get_rolling_percent_encoding(grid_cells, code="D", tt=0, hmt="hit")
@@ -1189,43 +1193,18 @@ def plot_percentage_encoding_by_trial_category(concantenated_dataframe, save_pat
 
     colors = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
                  Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-              Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color,
-              Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color]
+                 Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color]
 
     data = [p_b_hit[b_mask], d_b_hit[b_mask], n_b_hit[b_mask],
             p_b_try[b_mask], d_b_try[b_mask], n_b_try[b_mask],
-            p_b_miss[b_mask], d_b_miss[b_mask], n_b_miss[b_mask],
-            p_nb_hit[nb_mask], d_nb_hit[nb_mask], n_nb_hit[nb_mask],
-            p_nb_try[nb_mask], d_nb_try[nb_mask], n_nb_try[nb_mask],
-            p_nb_miss[nb_mask], d_nb_miss[nb_mask], n_nb_miss[nb_mask],
-            p_p_hit[p_mask], d_p_hit[p_mask], n_p_hit[p_mask],
-            p_p_try[p_mask], d_p_try[p_mask], n_p_try[p_mask],
-            p_p_miss[p_mask], d_p_miss[p_mask], n_p_miss[p_mask]]
-    """
-    ax.bar(x=[1,2,3, 5,6,7, 9,10,11, 13,14,15 ,17,18,19, 21,22,23],
-           height=[np.nanmean(p_b_hit), np.nanmean(d_b_hit),np.nanmean(n_b_hit),
-              np.nanmean(p_b_try), np.nanmean(d_b_try),np.nanmean(n_b_try),
-              np.nanmean(p_b_miss), np.nanmean(d_b_miss),np.nanmean(n_b_miss),
-              np.nanmean(p_nb_hit), np.nanmean(d_nb_hit),np.nanmean(n_nb_hit),
-              np.nanmean(p_nb_try), np.nanmean(d_nb_try),np.nanmean(n_nb_try),
-              np.nanmean(p_nb_miss), np.nanmean(d_nb_miss),np.nanmean(n_nb_miss)], color=colors,
-           yerr=[stats.sem(p_b_hit, nan_policy='omit'), stats.sem(d_b_hit, nan_policy='omit'),stats.sem(n_b_hit, nan_policy='omit'),
-                 stats.sem(p_b_try, nan_policy='omit'), stats.sem(d_b_try, nan_policy='omit'),stats.sem(n_b_try, nan_policy='omit'),
-                 stats.sem(p_b_miss, nan_policy='omit'), stats.sem(d_b_miss, nan_policy='omit'),stats.sem(n_b_miss, nan_policy='omit'),
-                 stats.sem(p_nb_hit, nan_policy='omit'), stats.sem(d_nb_hit, nan_policy='omit'),stats.sem(n_nb_hit, nan_policy='omit'),
-                 stats.sem(p_nb_try, nan_policy='omit'), stats.sem(d_nb_try, nan_policy='omit'),stats.sem(n_nb_try, nan_policy='omit'),
-                 stats.sem(p_nb_miss, nan_policy='omit'), stats.sem(d_nb_miss, nan_policy='omit'),stats.sem(n_nb_miss, nan_policy='omit')])
-    """
+            p_b_miss[b_mask], d_b_miss[b_mask], n_b_miss[b_mask]]
+
+    fig, ax = plt.subplots(figsize=(6,6))
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
     whiskerprops = dict(linewidth=3, color='k')
-    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11, 14,15,16 ,18,19,20, 22,23,24, 27,28,29, 31,32,33, 35,36,37], widths=1, boxprops=boxprops, medianprops=medianprops,
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11], widths=1, boxprops=boxprops, medianprops=medianprops,
                      whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
     for patch, color in zip(box['boxes'], colors):
         patch.set_facecolor(color)
@@ -1234,20 +1213,49 @@ def plot_percentage_encoding_by_trial_category(concantenated_dataframe, save_pat
     ax.spines['right'].set_visible(False)
     ax.yaxis.set_ticks_position('left')
     ax.xaxis.set_ticks_position('bottom')
-    plt.xticks(fontsize=30)
-    plt.yticks(fontsize=20)
-    ax.set_yticks([0,0.5,1])
-    ax.set_xticks([2,6,10, 15,19,23, 28,32,36])
-    ax.set_xticklabels(["Hit", "Try", "Run", "Hit", "Try", "Run",  "Hit", "Try", "Run"])
-    ax.set_xlim(left=0, right=39)
-    fig.tight_layout()
-    plt.subplots_adjust(left=0.25, bottom=0.2)
-    ax.set_ylabel("frac. session encoding", fontsize=20)
-    #significance_bar(start=1, end=2, height=15, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[1])[1]))
-    #significance_bar(start=1, end=3, height=16, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[2])[1]))
-    #significance_bar(start=2, end=3, height=17, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[2])[1]))
-    plt.savefig(save_path + '/rolling_percent_encooding over trial types.png', dpi=300)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_beaconed.png', dpi=300)
     plt.close()
+
+
+    data = [p_nb_hit[nb_mask], d_nb_hit[nb_mask], n_nb_hit[nb_mask],
+            p_nb_try[nb_mask], d_nb_try[nb_mask], n_nb_try[nb_mask],
+            p_nb_miss[nb_mask], d_nb_miss[nb_mask], n_nb_miss[nb_mask]]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed.png', dpi=300)
+    plt.close()
+
 
     # do stats test
     df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_hit[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
@@ -1287,6 +1295,88 @@ def plot_percentage_encoding_by_trial_category(concantenated_dataframe, save_pat
     aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
     print(aov[['Source', 'DF', 'F', 'p-unc']])
 
+    return
+
+
+def get_rolling_percent_encoding2(df, code="P", tt=1, hmt="hit"):
+    if code == "P":
+        result_column = "rolling:percentage_trials_encoding_position"
+    elif code == "D":
+        result_column = "rolling:percentage_trials_encoding_distance"
+    elif code == "N":
+        result_column = "rolling:percentage_trials_encoding_null"
+
+    # tt and i index are shared
+    i = int(tt)
+
+    if hmt == "hit":
+        j =0
+    elif hmt == "try":
+        j=1
+    elif hmt == "miss":
+        j=2
+
+    result=[]
+    for m in range(len(df)):
+        if isinstance(df[result_column].iloc[m], list):
+            result.append(df[result_column].iloc[m][i][j])
+        else:
+            print(df["session_id"].iloc[m], " is missing an entry in ", result_column)
+    return np.array(result)
+
+def plot_percentage_encoding_by_trial_category2(concantenated_dataframe, save_path=""):
+    print('plotting lomb classifers proportions...')
+    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
+
+    # we only want to look at the remapped coding cells (<85% encoding)
+    #grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+    #                        (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    p_b_hit = get_rolling_percent_encoding2(grid_cells, code="P", tt=0, hmt="hit")*100
+    d_b_hit = get_rolling_percent_encoding2(grid_cells, code="D", tt=0, hmt="hit")*100
+    n_b_hit = get_rolling_percent_encoding2(grid_cells, code="N", tt=0, hmt="hit")*100
+    p_nb_hit = get_rolling_percent_encoding2(grid_cells, code="P", tt=1, hmt="hit")*100
+    d_nb_hit = get_rolling_percent_encoding2(grid_cells, code="D", tt=1, hmt="hit")*100
+    n_nb_hit = get_rolling_percent_encoding2(grid_cells, code="N", tt=1, hmt="hit")*100
+    p_p_hit = get_rolling_percent_encoding2(grid_cells, code="P", tt=2, hmt="hit")*100
+    d_p_hit = get_rolling_percent_encoding2(grid_cells, code="D", tt=2, hmt="hit")*100
+    n_p_hit = get_rolling_percent_encoding2(grid_cells, code="N", tt=2, hmt="hit")*100
+
+    data = [p_b_hit[~np.isnan(p_b_hit)], p_nb_hit[~np.isnan(p_nb_hit)], d_b_hit[~np.isnan(d_b_hit)], d_nb_hit[~np.isnan(d_nb_hit)]]
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(d_b_hit)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(d_nb_hit)
+
+    print("comping % hits between postion and distance encoding trials for beaconed trials, df=",str(len(p_b_hit[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[0]))
+    print("comping % hits between postion and distance encoding trials for non beaconed trials, df=",str(len(p_nb_hit[nb_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[0]))
+
+    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2, 4,5], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([1,2,4,5])
+    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xlim(left=0, right=6)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% hit trials", fontsize=20)
+    plt.savefig(save_path + '/percentage_hit_trials_in_coded_trials.png', dpi=300)
+    plt.close()
     return
 
 def plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(concantenated_dataframe, save_path=""):
@@ -4953,6 +5043,274 @@ def get_percentage_hit_column(df, tt):
         percentage_hits.append(percentage)
     return np.array(percentage_hits)
 
+def compile_remapped_grid_cell_stop_histogram(df, tt):
+    #for index, cluster_df in df.iterrows():
+    #    cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+    #    full_session_id = cluster_df["full_session_id_vr"].iloc[0]
+    #    print(full_session_id)
+
+    for index, cluster_df in df.iterrows():
+        cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+        session_id = cluster_df["session_id"].iloc[0]
+        full_session_id = cluster_df["full_session_id_vr"].iloc[0]
+        cluster_id = cluster_df["cluster_id"].iloc[0]
+        path = full_session_id+"/MountainSort/Figures/stop_histogram_for_coding_epochs/stop_histogram_c_"+str(cluster_id)+"_tt_"+str(tt)+".png"
+        if os.path.exists(path):
+            shutil.copyfile(path, "/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/remapped_grid_cell_stop_histograms/"+session_id+"_"+str(cluster_id)+"_tt_"+str(tt)+".png")
+
+
+def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    #grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+    #                        (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+
+    #compile_remapped_grid_cell_stop_histogram(grid_cells, tt=0)
+    #compile_remapped_grid_cell_stop_histogram(grid_cells, tt=1)
+
+    tt=0
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    remapped_position_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme="P", shuffle=False)
+    remapped_distance_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme="D", shuffle=False)
+    remapped_grid_cells_shuffled_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme=None, shuffle=True)
+    remapped_position_grid_cells_stop_histogram_tt = np.array(remapped_position_grid_cells_stop_histogram_tt)
+    remapped_distance_grid_cells_stop_histogram_tt = np.array(remapped_distance_grid_cells_stop_histogram_tt)
+    remapped_grid_cells_shuffled_histogram_tt = np.array(remapped_grid_cells_shuffled_histogram_tt)
+
+    #remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt/remapped_position_grid_cells_stop_histogram_tt[np.argmax(remapped_position_grid_cells_stop_histogram_tt, axis=1)]
+
+    # plot position grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+    # plot distance grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+    # plot_the_baseline_shuffle stop histogram
+    #ax.plot(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
+    #ax.fill_between(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
+    #                np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+
+    if tt == 0:
+        style_track_plot(ax, 200)
+    else:
+        style_track_plot_no_RZ(ax, 200)
+    #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+    #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+    plt.xlim(0, 200)
+    tick_spacing = 100
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    ax.set_ylim([0,0.2])
+    ax.set_yticks([0, 0.1, 0.2])
+    plt.locator_params(axis = 'y', nbins  = 3)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.tight_layout()
+    plt.subplots_adjust(bottom = 0.2, left=0.2)
+    plt.savefig(save_path + '/stop_histogram_for_remapped_grid_cells_encoding_position_and_distance_'+str(tt)+'.png', dpi=300)
+    plt.close()
+
+    tt=1
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    remapped_position_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme="P", shuffle=False)
+    remapped_distance_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme="D", shuffle=False)
+    remapped_grid_cells_shuffled_histogram_tt, _, bin_centres = get_stop_histogram(grid_cells, tt=tt, coding_scheme=None, shuffle=True)
+    remapped_position_grid_cells_stop_histogram_tt = np.array(remapped_position_grid_cells_stop_histogram_tt)
+    remapped_distance_grid_cells_stop_histogram_tt = np.array(remapped_distance_grid_cells_stop_histogram_tt)
+    remapped_grid_cells_shuffled_histogram_tt = np.array(remapped_grid_cells_shuffled_histogram_tt)
+
+    # plot position grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+    # plot distance grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+    # plot_the_baseline_shuffle stop histogram
+    #ax.plot(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
+    #ax.fill_between(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
+    #                np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+
+    if tt == 0:
+        style_track_plot(ax, 200)
+    else:
+        style_track_plot_no_RZ(ax, 200)
+    #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+    #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+    plt.xlim(0, 200)
+    tick_spacing = 100
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    ax.set_ylim([0,0.2])
+    ax.set_yticks([0, 0.1, 0.2])
+    plt.locator_params(axis = 'y', nbins  = 3)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.tight_layout()
+    plt.subplots_adjust(bottom = 0.2, left=0.2)
+    plt.savefig(save_path + '/stop_histogram_for_remapped_grid_cells_encoding_position_and_distance_'+str(tt)+'.png', dpi=300)
+    plt.close()
+    return
+
+
+def plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
+    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+    stable_position_grid_cells = Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"] > 0.85]
+    stable_distance_grid_cells = Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"] > 0.85]
+    stable_position_grid_cells = drop_duplicate_sessions(stable_position_grid_cells)
+    stable_distance_grid_cells = drop_duplicate_sessions(stable_distance_grid_cells)
+
+    stable_grid_cells = pd.concat([stable_position_grid_cells, stable_distance_grid_cells], ignore_index=True)
+    
+    tt=0
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    stable_position_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(stable_position_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
+    stable_distance_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
+    stable_grid_cells_shuffled_histogram_tt, _, bin_centres = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=True)
+    stable_position_grid_cells_stop_histogram_tt = np.array(stable_position_grid_cells_stop_histogram_tt)
+    stable_distance_grid_cells_stop_histogram_tt = np.array(stable_distance_grid_cells_stop_histogram_tt)
+    stable_grid_cells_shuffled_histogram_tt = np.array(stable_grid_cells_shuffled_histogram_tt)
+
+    # plot position grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                                 np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+    # plot distance grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                                 np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+    # plot_the_baseline_shuffle stop histogram
+    #ax.plot(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
+    #ax.fill_between(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
+    #                np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+
+    #pvals=[]
+    #ax.text(140, 0.2, str(len(stable_position_grid_cells_stop_histogram_tt)), color=Settings.allocentric_color)
+    #ax.text(140, 0.175, str(len(stable_distance_grid_cells_stop_histogram_tt)), color=Settings.egocentric_color)
+    #for i in range(len(stable_position_grid_cells_stop_histogram_tt[0])):
+    #    s, p = scipy.stats.mannwhitneyu(stable_position_grid_cells_stop_histogram_tt[:, i], stable_distance_grid_cells_stop_histogram_tt[:,i], nan_policy="omit")
+    #    pvals.append(p)
+    #pvals = np.array(pvals)
+    #_, adjusted_pvals = fdrcorrection(pvals)
+    #for i in range(len(adjusted_pvals)):
+    #    if adjusted_pvals[i]<0.05:
+    #        ax.text(i+0.5, 0.2, "|")
+
+
+    if tt == 0:
+        style_track_plot(ax, 200)
+    else:
+        style_track_plot_no_RZ(ax, 200)
+    #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+    #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+    plt.xlim(0, 200)
+    tick_spacing = 100
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    ax.set_ylim([0,0.2])
+    ax.set_yticks([0, 0.1, 0.2])
+    plt.locator_params(axis = 'y', nbins  = 3)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.tight_layout()
+    plt.subplots_adjust(bottom = 0.2, left=0.2)
+    plt.savefig(save_path + '/stop_histogram_for_stable_grid_cells_encoding_position_and_distance_'+str(tt)+'.png', dpi=300)
+    plt.close()
+    
+
+    tt=1
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
+    stable_position_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(stable_position_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
+    stable_distance_grid_cells_stop_histogram_tt, _, bin_centres = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
+    stable_grid_cells_shuffled_histogram_tt, _, bin_centres = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=True)
+    stable_position_grid_cells_stop_histogram_tt = np.array(stable_position_grid_cells_stop_histogram_tt)
+    stable_distance_grid_cells_stop_histogram_tt = np.array(stable_distance_grid_cells_stop_histogram_tt)
+    stable_grid_cells_shuffled_histogram_tt = np.array(stable_grid_cells_shuffled_histogram_tt)
+
+    # plot position grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+    # plot distance grid cell session stop histogram
+    ax.plot(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color)
+    ax.fill_between(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                    np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+    # plot_the_baseline_shuffle stop histogram
+    #ax.plot(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
+    #ax.fill_between(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
+    #                np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+
+    #pvals=[]
+    #ax.text(140, 0.2, str(len(stable_position_grid_cells_stop_histogram_tt)), color=Settings.allocentric_color)
+    #ax.text(140, 0.175, str(len(stable_distance_grid_cells_stop_histogram_tt)), color=Settings.egocentric_color)
+    #for i in range(len(stable_position_grid_cells_stop_histogram_tt[0])):
+    #    s, p = scipy.stats.mannwhitneyu(stable_position_grid_cells_stop_histogram_tt[:, i], stable_distance_grid_cells_stop_histogram_tt[:,i], nan_policy="omit")
+    #    pvals.append(p)
+    #pvals = np.array(pvals)
+    #_, adjusted_pvals = fdrcorrection(pvals)
+    #for i in range(len(adjusted_pvals)):
+    #    if adjusted_pvals[i]<0.05:
+    #        ax.text(i+0.5, 0.2, "|")
+
+
+    if tt == 0:
+        style_track_plot(ax, 200)
+    else:
+        style_track_plot_no_RZ(ax, 200)
+    #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+    #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+    plt.xlim(0, 200)
+    tick_spacing = 100
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    ax.set_ylim([0,0.2])
+    ax.set_yticks([0, 0.1, 0.2])
+    plt.locator_params(axis = 'y', nbins  = 3)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.tight_layout()
+    plt.subplots_adjust(bottom = 0.2, left=0.2)
+    plt.savefig(save_path + '/stop_histogram_for_stable_grid_cells_encoding_position_and_distance_'+str(tt)+'.png', dpi=300)
+    plt.close()
+    return
+
+def drop_duplicate_sessions(cells_df):
+    sessions = []
+    new_df = pd.DataFrame()
+    for index, cluster_df in cells_df.iterrows():
+        cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+        session_id = cluster_df["session_id"].iloc[0]
+        if session_id not in sessions:
+            new_df = pd.concat([new_df, cluster_df], ignore_index=True)
+            sessions.append(session_id)
+    return new_df
+
 def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     print("do stuff")
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
@@ -4964,8 +5322,13 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     stable_position_grid_cells = Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"] > 0.85]
     stable_distance_grid_cells = Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"] > 0.85]
 
-    stable_position_grid_cells = Position_grid_cells
-    stable_distance_grid_cells = Distance_grid_cells
+    stable_position_grid_cells = drop_duplicate_sessions(stable_position_grid_cells)
+    stable_distance_grid_cells = drop_duplicate_sessions(stable_distance_grid_cells)
+
+    print("n session for stable position grid cells, n = ", str(len(stable_position_grid_cells)))
+    print("n session for stable distance grid cells, n = ", str(len(stable_distance_grid_cells)))
+    #stable_position_grid_cells = Position_grid_cells
+    #stable_distance_grid_cells = Distance_grid_cells
 
     fig, ax = plt.subplots(1,1, figsize=(6,6))
 
@@ -4997,13 +5360,13 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     #ax.set_yticks([-1, 0, 1])
     #ax.set_ylim([0, 100])
     ax.set_xlim([0, 6])
-    ax.set_xlabel("Encoding grid cells", fontsize=20)
-    ax.set_ylabel("Percentage hits", fontsize=20, labelpad=10)
+    #ax.set_xlabel("Encoding grid cells", fontsize=20)
+    #ax.set_ylabel("Percentage hits", fontsize=20, labelpad=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
-    ax.tick_params(axis='both', which='both', labelsize=20)
-    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/percentage_hits_for_stable_grid_cells.png', dpi=300)
     plt.close()
 
@@ -5345,7 +5708,11 @@ def main():
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
-    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
+
+    #combined_df = pd.DataFrame()
+    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort6.pkl")], ignore_index=True)
+    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort7.pkl")], ignore_index=True)
+    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort8.pkl")], ignore_index=True)
 
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
     combined_df = combined_df[combined_df["track_length"] == 200]
@@ -5368,24 +5735,13 @@ def main():
     plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
-    # Figure 4 behaviours
+    # Figure 5 plots behaviours
     plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
-    # Figure 5 plots
     plot_percentage_encoding_by_trial_category(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-
-    plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_proportions_by_probe_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-
-    # Figure 5 plots
-
-
-
-    plot_lomb_classifiers_proportions_by_hits_tt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-
-    # Remapping figure
-    plot_allo_minus_ego_component3(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_allo_minus_ego_component4(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_percentage_encoding_by_trial_category2(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     """
     plot_firing_rates_PDN(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/firing_rate_analysis")

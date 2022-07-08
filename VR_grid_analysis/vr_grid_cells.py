@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from statsmodels.stats.anova import AnovaRM
 import PostSorting.parameters
 import PostSorting.vr_stop_analysis
 import PostSorting.vr_time_analysis
@@ -892,11 +893,11 @@ def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_
             cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
             ax.pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
             plt.title(str(np.round(percentile_99th_display, decimals=1))+" Hz", fontsize=20)
-            plt.ylabel('Trial Number', fontsize=20, labelpad = 20)
-            plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+            #plt.ylabel('Trial Number', fontsize=20, labelpad = 20)
+            #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
             plt.xlim(0, track_length)
             ax.tick_params(axis='both', which='both', labelsize=20)
-            plt.xlabel('Location (cm)', fontsize=25, labelpad = 20)
+            #plt.xlabel('Location (cm)', fontsize=25, labelpad = 20)
             ax.set_xlim([0, track_length])
             ax.set_ylim([0, len(processed_position_data)-1])
             ax.spines['top'].set_visible(False)
@@ -1763,7 +1764,7 @@ def compress_rolling_stats(rolling_centre_trials, rolling_classifiers):
     return rolling_centre_trials, rolling_classifiers
 
 def add_rolling_stats_percentage_hits(spike_data, processed_position_data):
-    processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] != "rejected"]
+    #processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] != "rejected"]
     encoding_position = []
     encoding_distance = []
     encoding_null = []
@@ -1808,6 +1809,36 @@ def add_rolling_stats_percentage_hits(spike_data, processed_position_data):
     spike_data["rolling:percentage_trials_encoding_position"] = encoding_position
     spike_data["rolling:percentage_trials_encoding_distance"] = encoding_distance
     spike_data["rolling:percentage_trials_encoding_null"] = encoding_null
+    return spike_data
+
+
+def add_coding_by_trial_number(spike_data, processed_position_data):
+    cluster_codes = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
+
+        if len(firing_times_cluster)>0:
+            rolling_centre_trials = cluster_spike_data["rolling:rolling_centre_trials"].iloc[0]
+            rolling_classifiers = cluster_spike_data["rolling:rolling_classifiers"].iloc[0]
+
+            rolling_centre_trials, rolling_classifiers = compress_rolling_stats(rolling_centre_trials, rolling_classifiers)
+
+            rolling_classifier_by_trial_number=[]
+            for index, row in processed_position_data.iterrows():
+                trial_number = row["trial_number"]
+                rolling_class = rolling_classifiers[rolling_centre_trials == trial_number]
+                if len(rolling_class)==1:
+                    rolling_class = rolling_class[0]
+                else:
+                    rolling_class = np.nan
+
+                rolling_classifier_by_trial_number.append(rolling_class)
+            cluster_codes.append(rolling_classifier_by_trial_number)
+        else:
+            cluster_codes.append(np.nan)
+
+    spike_data["rolling:classifier_by_trial_number"] = cluster_codes
     return spike_data
 
 def add_rolling_stats_hmt(spike_data, processed_position_data):
@@ -1919,6 +1950,229 @@ def add_rolling_stats_encoding_x(spike_data, track_length):
     spike_data["rolling:proportion_encoding_null"] = proportion_encoding_null
     return spike_data
 
+def add_stop_location_trial_numbers(processed_position_data):
+    trial_numbers=[]
+    for index, row in processed_position_data.iterrows():
+        trial_number = row["trial_number"]
+        trial_stops = row["stop_location_cm"]
+        trial_numbers.append(np.repeat(trial_number, len(trial_stops)).tolist())
+    processed_position_data["stop_trial_numbers"] = trial_numbers
+    return processed_position_data
+
+def curate_stops_spike_data(spike_data, track_length):
+    # stops are calculated as being below the stop threshold per unit time bin,
+    # this function removes successive stops
+
+    stop_locations_clusters = []
+    stop_trials_clusters = []
+    for index, row in spike_data.iterrows():
+        row = row.to_frame().T.reset_index(drop=True)
+        stop_locations=np.array(row["stop_locations"].iloc[0])
+        stop_trials=np.array(row["stop_trial_numbers"].iloc[0])
+        stop_locations_elapsed=(track_length*(stop_trials-1))+stop_locations
+
+        curated_stop_locations=[]
+        curated_stop_trials=[]
+        for i, stop_loc in enumerate(stop_locations_elapsed):
+            if (i==0): # take first stop always
+                add_stop=True
+            elif ((stop_locations_elapsed[i]-stop_locations_elapsed[i-1]) > 1): # only include stop if the last stop was at least 1cm away
+                add_stop=True
+            else:
+                add_stop=False
+
+            if add_stop:
+                curated_stop_locations.append(stop_locations_elapsed[i])
+                curated_stop_trials.append(stop_trials[i])
+
+        # revert back to track positions
+        curated_stop_locations = (np.array(curated_stop_locations)%track_length).tolist()
+
+        stop_locations_clusters.append(curated_stop_locations)
+        stop_trials_clusters.append(curated_stop_trials)
+
+    spike_data["stop_locations"] = stop_locations_clusters
+    spike_data["stop_trial_numbers"] = stop_trials_clusters
+    return spike_data
+
+def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None):
+    gauss_kernel = Gaussian1DKernel(1)
+
+    stop_histograms=[]
+    stop_histogram_sems=[]
+    for index, cluster_df in cells_df.iterrows():
+        cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
+        if track_length is None:
+            track_length = cluster_df["track_length"].iloc[0]
+
+        stops_location_cm = np.array(cluster_df["stop_locations"].iloc[0])
+        stop_trial_numbers = np.array(cluster_df["stop_trial_numbers"].iloc[0])
+
+        trial_numbers = np.array(cluster_df["behaviour_trial_numbers"].iloc[0])
+        trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
+        rolling_classifiers = np.array(cluster_df["rolling:classifier_by_trial_number"].iloc[0])
+
+        # mask out only the trial numbers based on the trial type
+        # and the coding scheme if that argument is given
+        trial_type_mask = np.isin(trial_types, tt)
+        if coding_scheme is not None:
+            classifier_mask = np.isin(rolling_classifiers, coding_scheme)
+            tt_trial_numbers = trial_numbers[trial_type_mask & classifier_mask]
+        else:
+            tt_trial_numbers = trial_numbers[trial_type_mask]
+
+        if shuffle:
+            stops_location_cm = np.random.uniform(low=0, high=track_length, size=len(stops_location_cm))
+
+        number_of_bins = track_length
+        number_of_trials = len(tt_trial_numbers)
+        stop_counts = np.zeros((number_of_trials, number_of_bins))
+
+        for i, tn in enumerate(tt_trial_numbers):
+            stop_locations_on_trial = stops_location_cm[stop_trial_numbers == tn]
+            stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=track_length, range=[0,track_length])
+            stop_counts[i,:] = stop_in_trial_bins
+
+        average_stops = np.nanmean(stop_counts, axis=0)
+        average_stops_se = stats.sem(stop_counts, axis=0, nan_policy="omit")
+
+        average_stops = convolve(average_stops, gauss_kernel)
+        average_stops_se = convolve(average_stops_se, gauss_kernel)
+
+        stop_histograms.append(average_stops)
+        stop_histogram_sems.append(average_stops_se)
+
+        bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+
+    return stop_histograms, stop_histogram_sems, bin_centres
+
+
+def get_stop_histogram_cluster(cluster_df, tt, coding_scheme=None, shuffle=False, track_length=None):
+    gauss_kernel = Gaussian1DKernel(1)
+
+    if track_length is None:
+        track_length = cluster_df["track_length"].iloc[0]
+
+    stops_location_cm = np.array(cluster_df["stop_locations"].iloc[0])
+    stop_trial_numbers = np.array(cluster_df["stop_trial_numbers"].iloc[0])
+
+    trial_numbers = np.array(cluster_df["behaviour_trial_numbers"].iloc[0])
+    trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
+    rolling_classifiers = np.array(cluster_df["rolling:classifier_by_trial_number"].iloc[0])
+
+    # mask out only the trial numbers based on the trial type
+    # and the coding scheme if that argument is given
+    trial_type_mask = np.isin(trial_types, tt)
+    if coding_scheme is not None:
+        classifier_mask = np.isin(rolling_classifiers, coding_scheme)
+        tt_trial_numbers = trial_numbers[trial_type_mask & classifier_mask]
+    else:
+        tt_trial_numbers = trial_numbers[trial_type_mask]
+
+    if shuffle:
+        stops_location_cm = np.random.uniform(low=0, high=track_length, size=len(stops_location_cm))
+
+    number_of_bins = track_length
+    number_of_trials = len(tt_trial_numbers)
+    stop_counts = np.zeros((number_of_trials, number_of_bins))
+    stop_counts_og_shape = np.shape(stop_counts)
+    for i, tn in enumerate(tt_trial_numbers):
+        stop_locations_on_trial = stops_location_cm[stop_trial_numbers == tn]
+        stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=track_length, range=[0,track_length])
+        stop_counts[i,:] = stop_in_trial_bins
+
+    stop_counts = stop_counts.flatten()
+    if np.sum(stop_counts)>0:
+        stop_counts = convolve(stop_counts, gauss_kernel)
+    stop_counts = stop_counts.reshape(stop_counts_og_shape)
+
+    average_stops = np.nanmean(stop_counts, axis=0)
+    average_stops_se = stats.sem(stop_counts, axis=0, nan_policy="omit")
+
+    #average_stops = convolve(average_stops, gauss_kernel)
+    #average_stops_se = convolve(average_stops_se, gauss_kernel)
+
+    #bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+    bin_centres = np.arange(0.5, track_length+0.5, 1)
+    return stop_counts, bin_centres
+    #return average_stops, average_stops_se, bin_centres
+
+def add_stops(spike_data, processed_position_data, track_length):
+    processed_position_data = add_stop_location_trial_numbers(processed_position_data)
+    stop_locations = pandas_collumn_to_numpy_array(processed_position_data["stop_location_cm"])
+    stop_trial_numbers = pandas_collumn_to_numpy_array(processed_position_data["stop_trial_numbers"])
+
+    cluster_stop_locations=[]
+    cluster_stop_trial_number=[]
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_stop_locations.append(stop_locations.tolist())
+        cluster_stop_trial_number.append(stop_trial_numbers.tolist())
+    spike_data["stop_locations"] = cluster_stop_locations
+    spike_data["stop_trial_numbers"] = cluster_stop_trial_number
+
+    spike_data = curate_stops_spike_data(spike_data, track_length)
+    return spike_data
+
+def delete_unused_columns(spike_data):
+    #print(list(spike_data))
+    for column in ['ML_SNRs_all_beaconed', 'ML_Freqs_all_beaconed', 'ML_SNRs_all_nonbeaconed', 'ML_Freqs_all_nonbeaconed',
+                   'ML_SNRs_all_probe', 'ML_Freqs_all_probe', 'ML_SNRs_beaconed_hits', 'ML_Freqs_beaconed_hits',
+                   'ML_SNRs_nonbeaconed_hits', 'ML_Freqs_nonbeaconed_hits', 'ML_SNRs_probe_hits',
+                   'ML_Freqs_probe_hits', 'ML_SNRs_all_hits', 'ML_Freqs_all_hits', 'ML_SNRs_beaconed_tries',
+                   'ML_Freqs_beaconed_tries', 'ML_SNRs_nonbeaconed_tries', 'ML_Freqs_nonbeaconed_tries',
+                   'ML_SNRs_probe_tries', 'ML_Freqs_probe_tries', 'ML_SNRs_all_tries', 'ML_Freqs_all_tries',
+                   'ML_SNRs_beaconed_misses', 'ML_Freqs_beaconed_misses', 'ML_SNRs_nonbeaconed_misses',
+                   'ML_Freqs_nonbeaconed_misses', 'ML_SNRs_probe_misses', 'ML_Freqs_probe_misses',
+                   'ML_SNRs_all_misses', 'ML_Freqs_all_misses', 'ML_SNRs_allo', 'ML_Freqs_allo',
+                   'ML_SNRs_all_beaconed_allo', 'ML_Freqs_all_beaconed_allo', 'ML_SNRs_all_nonbeaconed_allo',
+                   'ML_Freqs_all_nonbeaconed_allo', 'ML_SNRs_all_probe_allo', 'ML_Freqs_all_probe_allo',
+                   'ML_SNRs_beaconed_hits_allo', 'ML_Freqs_beaconed_hits_allo', 'ML_SNRs_nonbeaconed_hits_allo',
+                   'ML_Freqs_nonbeaconed_hits_allo', 'ML_SNRs_probe_hits_allo', 'ML_Freqs_probe_hits_allo',
+                   'ML_SNRs_all_hits_allo', 'ML_Freqs_all_hits_allo', 'ML_SNRs_beaconed_tries_allo',
+                   'ML_Freqs_beaconed_tries_allo', 'ML_SNRs_nonbeaconed_tries_allo', 'ML_Freqs_nonbeaconed_tries_allo',
+                   'ML_SNRs_probe_tries_allo', 'ML_Freqs_probe_tries_allo', 'ML_SNRs_all_tries_allo',
+                   'ML_Freqs_all_tries_allo', 'ML_SNRs_beaconed_misses_allo', 'ML_Freqs_beaconed_misses_allo',
+                   'ML_SNRs_nonbeaconed_misses_allo', 'ML_Freqs_nonbeaconed_misses_allo', 'ML_SNRs_probe_misses_allo',
+                   'ML_Freqs_probe_misses_allo', 'ML_SNRs_all_misses_allo', 'ML_Freqs_all_misses_allo', 'ML_SNRs_ego',
+                   'ML_Freqs_ego', 'ML_SNRs_all_beaconed_ego', 'ML_Freqs_all_beaconed_ego', 'ML_SNRs_all_nonbeaconed_ego',
+                   'ML_Freqs_all_nonbeaconed_ego', 'ML_SNRs_all_probe_ego', 'ML_Freqs_all_probe_ego',
+                   'ML_SNRs_beaconed_hits_ego', 'ML_Freqs_beaconed_hits_ego', 'ML_SNRs_nonbeaconed_hits_ego',
+                   'ML_Freqs_nonbeaconed_hits_ego', 'ML_SNRs_probe_hits_ego', 'ML_Freqs_probe_hits_ego',
+                   'ML_SNRs_all_hits_ego', 'ML_Freqs_all_hits_ego', 'ML_SNRs_beaconed_tries_ego',
+                   'ML_Freqs_beaconed_tries_ego', 'ML_SNRs_nonbeaconed_tries_ego', 'ML_Freqs_nonbeaconed_tries_ego',
+                   'ML_SNRs_probe_tries_ego', 'ML_Freqs_probe_tries_ego', 'ML_SNRs_all_tries_ego',
+                   'ML_Freqs_all_tries_ego', 'ML_SNRs_beaconed_misses_ego', 'ML_Freqs_beaconed_misses_ego',
+                   'ML_SNRs_nonbeaconed_misses_ego', 'ML_Freqs_nonbeaconed_misses_ego', 'ML_SNRs_probe_misses_ego',
+                   'ML_Freqs_probe_misses_ego', 'ML_SNRs_all_misses_ego', 'ML_Freqs_all_misses_ego',
+                   'avg_correlations_hmt_by_trial_type', 'field_realignments_hmt_by_trial_type',
+                   'n_pi_trials_by_hmt', 'mean_fr_tt_all_hmt_all', 'mean_fr_tt_all_hmt_hit',
+                   'mean_fr_tt_all_hmt_miss', 'mean_fr_tt_all_hmt_try', 'mean_fr_tt_0_hmt_all',
+                   'mean_fr_tt_0_hmt_hit', 'mean_fr_tt_0_hmt_miss', 'mean_fr_tt_0_hmt_try',
+                   'mean_fr_tt_1_hmt_all', 'mean_fr_tt_1_hmt_hit', 'mean_fr_tt_1_hmt_miss',
+                   'mean_fr_tt_1_hmt_try', 'mean_fr_tt_2_hmt_all', 'mean_fr_tt_2_hmt_hit',
+                   'mean_fr_tt_2_hmt_miss', 'mean_fr_tt_2_hmt_try',
+                   'allo_minus_ego_hit_proportions_b', 'allo_minus_ego_try_proportions_b', 'allo_minus_ego_miss_proportions_b',
+                   'allo_minus_ego_hit_proportions_nb', 'allo_minus_ego_try_proportions_nb', 'allo_minus_ego_miss_proportions_nb',
+                   'ML_SNRs_by_trial_number', 'ML_Freqs_by_trial_number',]:
+        if column in list(spike_data):
+            del spike_data[column]
+    return spike_data
+
+def add_trials(spike_data, processed_position_data):
+    trial_types = np.array(processed_position_data["trial_type"])
+    trial_numbers = np.array(processed_position_data["trial_number"])
+    hit_try_miss = np.array(processed_position_data["hit_miss_try"])
+    cluster_trial_numbers=[]
+    cluster_hit_try_miss=[]
+    cluster_trial_types=[]
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_trial_numbers.append(trial_numbers.tolist())
+        cluster_hit_try_miss.append(hit_try_miss.tolist())
+        cluster_trial_types.append(trial_types.tolist())
+    spike_data["behaviour_trial_numbers"] = cluster_trial_numbers
+    spike_data["behaviour_hit_try_miss"] = cluster_hit_try_miss
+    spike_data["behaviour_trial_types"] = cluster_trial_types
+    return spike_data
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
@@ -1931,48 +2185,53 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 
-            # remake the spike locations and firing rate maps
-            #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
-            #spike_data = add_position_x(spike_data, raw_position_data)
-            #spike_data = add_trial_number(spike_data, raw_position_data)
-            #spike_data = add_trial_type(spike_data, raw_position_data)
-            #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording), smoothen=True)
-            #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording), smoothen=False)
-            #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=True)
-            #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=False)
-            #spike_data = add_displayed_peak_firing(spike_data)
+            if len(spike_data) != 0:
+                spike_data = delete_unused_columns(spike_data)
+                # remake the spike locations and firing rate maps
+                #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
+                #spike_data = add_position_x(spike_data, raw_position_data)
+                #spike_data = add_trial_number(spike_data, raw_position_data)
+                #spike_data = add_trial_type(spike_data, raw_position_data)
+                #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording), smoothen=True)
+                #spike_data = bin_fr_in_space(spike_data, raw_position_data, track_length=get_track_length(recording), smoothen=False)
+                #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=True)
+                #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=False)
+                #spike_data = add_displayed_peak_firing(spike_data)
 
-            # BEHAVIOURAL
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
-            spike_data = add_percentage_hits(spike_data, processed_position_data)
-            spike_data = add_n_PI_trial(spike_data, processed_position_data)
+                # BEHAVIOURAL
+                processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+                processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+                spike_data = add_percentage_hits(spike_data, processed_position_data)
+                spike_data = add_n_PI_trial(spike_data, processed_position_data)
+                spike_data = add_stops(spike_data, processed_position_data, track_length=get_track_length(recording))
+                spike_data = add_trials(spike_data, processed_position_data)
 
-            # MOVING LOMB PERIODOGRAMS
-            #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
-            #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
-            spike_data = add_lomb_classifier(spike_data)
+                # MOVING LOMB PERIODOGRAMS
+                #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
+                #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
+                spike_data = add_lomb_classifier(spike_data)
 
-            # Rolling classifications
-            #spike_data = add_rolling_stats_shuffled_blocks(spike_data, track_length=get_track_length(recording))
-            #spike_data = add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length=get_track_length(recording))
-            #spike_data = add_rolling_stats_encoding_x(spike_data, track_length=get_track_length(recording))
-            spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
-            #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats
-            spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                # Rolling classifications
+                spike_data = add_rolling_stats_shuffled_blocks(spike_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats_encoding_x(spike_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats
+                spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
 
-            # Joint activity analysis
-            #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
+                # Joint activity analysis
+                #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
 
-            # FIRING AND BEHAVIOURAL PLOTTING
-            #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
-            #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
-            #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
-            #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
+                # FIRING AND BEHAVIOURAL PLOTTING
+                #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
+                #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+                #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+                #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
 
-            spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                print("successfully processed and saved vr_grid analysis on "+recording)
 
-            print("successfully processed and saved vr_grid analysis on "+recording)
         except Exception as ex:
             print('This is what Python says happened:')
             print(ex)
@@ -1992,7 +2251,7 @@ def main():
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
 
-    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21']
+    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
     #vr_path_list = ['/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26','/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
@@ -2001,6 +2260,7 @@ def main():
     #vr_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28"]
     #vr_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21"]
     #vr_path_list= ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15"]
+    #vr_path_list=["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20"]
     process_recordings(vr_path_list, of_path_list)
 
 

@@ -391,10 +391,10 @@ def main():
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
-    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
-    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
-    combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
+    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
+    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
+    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
 
     '''
     # Ramp cell project
