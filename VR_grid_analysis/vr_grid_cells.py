@@ -2023,26 +2023,37 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
 
         if shuffle:
             stops_location_cm = np.random.uniform(low=0, high=track_length, size=len(stops_location_cm))
+            iterations = 100
+        else:
+            iterations = 1
 
         number_of_bins = track_length
         number_of_trials = len(tt_trial_numbers)
-        stop_counts = np.zeros((number_of_trials, number_of_bins))
 
-        for i, tn in enumerate(tt_trial_numbers):
-            stop_locations_on_trial = stops_location_cm[stop_trial_numbers == tn]
-            stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=track_length, range=[0,track_length])
-            stop_counts[i,:] = stop_in_trial_bins
+        stop_counts = np.zeros((iterations, number_of_trials, number_of_bins)); stop_counts[:,:,:] = np.nan
 
+        for j in np.arange(iterations):
+            for i, tn in enumerate(tt_trial_numbers):
+                stop_locations_on_trial = stops_location_cm[stop_trial_numbers == tn]
+                stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=track_length, range=[0,track_length])
+                stop_counts[j,i,:] = stop_in_trial_bins
+
+        stop_counts = np.nanmean(stop_counts, axis=0)
         average_stops = np.nanmean(stop_counts, axis=0)
         average_stops_se = stats.sem(stop_counts, axis=0, nan_policy="omit")
 
-        average_stops = convolve(average_stops, gauss_kernel)
-        average_stops_se = convolve(average_stops_se, gauss_kernel)
+        # only smooth histograms with trials
+        if np.sum(np.isnan(average_stops))>0:
+            average_stops = average_stops
+            average_stops_se = average_stops_se
+        else:
+            average_stops = convolve(average_stops, gauss_kernel)
+            average_stops_se = convolve(average_stops_se, gauss_kernel)
 
         stop_histograms.append(average_stops)
         stop_histogram_sems.append(average_stops_se)
 
-        bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+        bin_centres = np.arange(0.5, track_length+0.5, 1)
 
     return stop_histograms, stop_histogram_sems, bin_centres
 

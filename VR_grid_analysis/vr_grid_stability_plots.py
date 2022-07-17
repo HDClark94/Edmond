@@ -345,9 +345,9 @@ def plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_s
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
-    g = colors.colorConverter.to_rgb("green")
+    k = colors.colorConverter.to_rgb("black")
     r = colors.colorConverter.to_rgb("red")
-    o = colors.colorConverter.to_rgb("orange")
+    b = colors.colorConverter.to_rgb("blue")
 
     fig, axes = plt.subplots(2, 1, figsize=(6,4), sharex=True)
 
@@ -355,8 +355,8 @@ def plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_s
     misses = processed_position_data[processed_position_data["hit_miss_try"] == "miss"]
     tries = processed_position_data[processed_position_data["hit_miss_try"] == "try"]
 
-    axes[0].hist(pandas_collumn_to_numpy_array(hits["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(g[0],g[1],g[2], 0.3), edgecolor=(g[0],g[1],g[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
-    axes[1].hist(pandas_collumn_to_numpy_array(tries["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(o[0],o[1],o[2], 0.3), edgecolor=(o[0],o[1],o[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
+    axes[0].hist(pandas_collumn_to_numpy_array(hits["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(k[0],k[1],k[2], 0.3), edgecolor=(k[0],k[1],k[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
+    axes[1].hist(pandas_collumn_to_numpy_array(tries["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(b[0],b[1],b[2], 0.3), edgecolor=(b[0],b[1],b[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
     axes[1].hist(pandas_collumn_to_numpy_array(misses["avg_speed_in_rz"]), range=(0, 100), bins=25, alpha=0.3, facecolor=(r[0],r[1],r[2], 0.3), edgecolor=(r[0],r[1],r[2], 1), histtype="bar", density=False, cumulative=False, linewidth=1)
 
     #plt.ylabel('Trial', fontsize=20, labelpad = 10)
@@ -4207,6 +4207,7 @@ def plot_both_spatial_periodograms(spike_data, processed_position_data, output_p
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
         rolling_power_threshold =  cluster_spike_data["rolling_threshold"].iloc[0]
+        power_threshold =  cluster_spike_data["power_threshold"].iloc[0]
 
         if len(firing_times_cluster)>1:
 
@@ -4347,23 +4348,66 @@ def plot_stop_histogram_between_coding_epochs(spike_data, processed_position_dat
                 #ax.fill_between(bin_centres, np.nanmean(stops_counts_s, axis=0)-scipy.stats.sem(stops_counts_s, axis=0, nan_policy="omit"),
                 #                np.nanmean(stops_counts_s, axis=0)+scipy.stats.sem(stops_counts_s, axis=0, nan_policy="omit"), color="black", alpha=0.3)
 
-                #pvals=[]
-                ax.text(140, 0.2, str(len(stops_counts_p))+"/"+str(len(tt_processed_position_data)), color=Settings.allocentric_color)
-                ax.text(140, 0.175, str(len(stops_counts_d))+"/"+str(len(tt_processed_position_data)), color=Settings.egocentric_color)
-                #if len(stops_counts_p) == 0:
-                #    print("no samples for statistical test")
-                #else:
-                #    for i in range(len(stops_counts_p[0])):
-                #        if len(stops_counts_p[:, i])>1 and len(stops_counts_d[:,i]>1):
-                #            s, p = scipy.stats.mannwhitneyu(stops_counts_p[:, i], stops_counts_d[:,i], nan_policy="omit")
-                #        else:
-                #            s, p = np.nan, np.nan
-                #        pvals.append(p)
-                #    pvals = np.array(pvals)
-                #    _, adjusted_pvals = fdrcorrection(pvals)
-                #    for i in range(len(adjusted_pvals)):
-                #        if adjusted_pvals[i]<0.01:
-                #            ax.text(i+0.5, 0.2, "|")
+                if tt == 0:
+                    style_track_plot(ax, 200)
+                else:
+                    style_track_plot_no_RZ(ax, 200)
+                #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+                #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+                plt.xlim(0, 200)
+                tick_spacing = 100
+                ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+                ax.yaxis.set_ticks_position('left')
+                ax.xaxis.set_ticks_position('bottom')
+                Edmond.plot_utility2.style_vr_plot(ax)
+                ax.set_ylim([0,0.2])
+                ax.set_yticks([0, 0.1, 0.2])
+                plt.locator_params(axis = 'y', nbins  = 3)
+                plt.xticks(fontsize=25)
+                plt.yticks(fontsize=25)
+                plt.tight_layout()
+                plt.subplots_adjust(bottom = 0.2, left=0.2)
+                plt.savefig(save_path + '/stop_histogram_c_'+str(cluster_id)+"_tt_"+str(tt)+'.png', dpi=300)
+                plt.close()
+
+    return
+
+
+def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length):
+    print('plotting stopping histograms for coding epochs...')
+    save_path = output_path + '/Figures/stop_histogram_for_coding_epochs'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    # only interested in the remappable cells
+    spike_data = spike_data[(spike_data["rolling:proportion_encoding_position"] < 0.9) &
+                            (spike_data["rolling:proportion_encoding_distance"] < 0.9)]
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
+        if len(firing_times_cluster)>0:
+            for tt in [0,1]:
+                tt_processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
+                fig, ax = plt.subplots(1,1, figsize=(6,4))
+                stops_counts_p, stops_counts_p_sem, bin_centres = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="P", shuffle=False, track_length=track_length)
+                stops_counts_d, stops_counts_d_sem, bin_centres = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="D", shuffle=False, track_length=track_length)
+                stops_counts_s, stops_counts_s_sem, bin_centres = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme=None, shuffle=True, track_length=track_length)
+
+                # plot_the_baseline_shuffle stop histogram
+                ax.plot(bin_centres, stops_counts_s[0], color="black", linestyle="dashed")
+                ax.fill_between(bin_centres, stops_counts_s[0]-stops_counts_s_sem[0],
+                                stops_counts_s[0]+stops_counts_s_sem[0], color="black", alpha=0.3)
+
+                # plot position grid cell session stop histogram
+                ax.plot(bin_centres, stops_counts_p[0], color= Settings.allocentric_color)
+                ax.fill_between(bin_centres, stops_counts_p[0]-stops_counts_p_sem[0],
+                                stops_counts_p[0]+stops_counts_p_sem[0], color=Settings.allocentric_color, alpha=0.3)
+
+                # plot distance grid cell session stop histogram
+                ax.plot(bin_centres, stops_counts_d[0], color= Settings.egocentric_color)
+                ax.fill_between(bin_centres, stops_counts_d[0]-stops_counts_d_sem[0],
+                                stops_counts_d[0]+stops_counts_d_sem[0], color=Settings.egocentric_color, alpha=0.3)
 
                 if tt == 0:
                     style_track_plot(ax, 200)
@@ -4418,7 +4462,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="miss")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="try")
-                #plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
+                plot_avg_speed_in_rz_hist(processed_position_data, output_path, percentile_speed=percentile_speed)
                 #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
@@ -4432,7 +4476,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                plot_stop_histogram_between_coding_epochs(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
 
                 # ANALYSIS BY HMT OF NON BEACONED TRIALS
                 #plot_firing_rate_maps_per_trial_by_hmt_aligned(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), trial_types=[1])
@@ -4540,10 +4584,11 @@ def main():
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D23_2021-06-09_12-04-16",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52"]
-    vr_recording_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20",
-                            "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37"]
-    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
-    process_recordings(vr_recording_path_list, of_recording_path_list)
+    #vr_recording_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20",
+    #                        "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37"]
+    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
+    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    process_recordings(vr_recording_path_list, of_recording_path_list) 
     print("look now")
 
 
