@@ -2,7 +2,7 @@ import sys
 from PostSorting.theta_modulation import *
 from Edmond.ramp_cells_of import *
 import scipy
-from Elrond.Integrated_ramp_analysis.loc_ramp_analysis import remove_mouse
+from Ramp_analysis.Integrated_ramp_analysis.loc_ramp_analysis import remove_mouse
 warnings.filterwarnings('ignore')
 
 test_params = PostSorting.parameters.Parameters()

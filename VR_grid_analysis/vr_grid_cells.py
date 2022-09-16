@@ -1996,6 +1996,10 @@ def curate_stops_spike_data(spike_data, track_length):
     return spike_data
 
 def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None):
+    if shuffle:
+        iterations = 1000
+    else:
+        iterations = 1
     gauss_kernel = Gaussian1DKernel(1)
 
     stop_histograms=[]
@@ -2021,21 +2025,18 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
         else:
             tt_trial_numbers = trial_numbers[trial_type_mask]
 
-        if shuffle:
-            stops_location_cm = np.random.uniform(low=0, high=track_length, size=len(stops_location_cm))
-            iterations = 100
-        else:
-            iterations = 1
-
         number_of_bins = track_length
         number_of_trials = len(tt_trial_numbers)
 
         stop_counts = np.zeros((iterations, number_of_trials, number_of_bins)); stop_counts[:,:,:] = np.nan
 
         for j in np.arange(iterations):
+            if shuffle:
+                stops_location_cm = np.random.uniform(low=0, high=track_length, size=len(stops_location_cm))
+
             for i, tn in enumerate(tt_trial_numbers):
                 stop_locations_on_trial = stops_location_cm[stop_trial_numbers == tn]
-                stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=track_length, range=[0,track_length])
+                stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=number_of_bins, range=[0,track_length])
                 stop_counts[j,i,:] = stop_in_trial_bins
 
         stop_counts = np.nanmean(stop_counts, axis=0)
@@ -2053,7 +2054,7 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
         stop_histograms.append(average_stops)
         stop_histogram_sems.append(average_stops_se)
 
-        bin_centres = np.arange(0.5, track_length+0.5, 1)
+        bin_centres = np.arange(0.5, track_length+0.5, track_length/number_of_bins)
 
     return stop_histograms, stop_histogram_sems, bin_centres
 

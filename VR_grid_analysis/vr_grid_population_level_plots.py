@@ -1382,15 +1382,16 @@ def plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path
     d_p_hit = get_rolling_percent_encoding2(grid_cells, code="D", tt=2, hmt="hit")*100
     n_p_hit = get_rolling_percent_encoding2(grid_cells, code="N", tt=2, hmt="hit")*100
 
-    data = [p_b_hit[~np.isnan(p_b_hit)], p_nb_hit[~np.isnan(p_nb_hit)], d_b_hit[~np.isnan(d_b_hit)], d_nb_hit[~np.isnan(d_nb_hit)]]
-
     b_mask = ~np.isnan(p_b_hit) & ~np.isnan(d_b_hit)
     nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(d_nb_hit)
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], p_nb_hit[nb_mask], d_nb_hit[nb_mask]]
+
 
     print("comparing % hits between position and distance encoding trials for beaconed trials, df=",str(len(p_b_hit[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[0]))
     print("comparing % hits between position and distance encoding trials for non beaconed trials, df=",str(len(p_nb_hit[nb_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[0]))
 
-    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color]
 
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
@@ -1400,6 +1401,14 @@ def plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path
                      whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
     for patch, color in zip(box['boxes'], colors):
         patch.set_facecolor(color)
+
+    #for i in range(len(data[0])):
+    #    ax.scatter([1,2], [data[0][i],data[1][i]], marker="o", color="black")
+    #    ax.plot([1,2], [data[0][i],data[1][i]], color="black")
+    #for i in range(len(data[2])):
+    #    ax.scatter([4,5], [data[2][i],data[3][i]], marker="o", color="black")
+    #    ax.plot([4,5], [data[2][i],data[3][i]], color="black")
+
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -1408,7 +1417,7 @@ def plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path
     ax.tick_params(axis='both', which='both', labelsize=25)
     #ax.set_yticks([0,0.5,1])
     ax.set_xticks([1,2,4,5])
-    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xticklabels(["B", "B", "NB", "NB"])
     ax.set_xlim(left=0, right=6)
     #fig.tight_layout()
     #plt.subplots_adjust(left=0.25, bottom=0.2)
@@ -5171,9 +5180,8 @@ def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
 
     # plot and compare similarly to the peak amplitudes hits
     fig, ax = plt.subplots(1,1, figsize=(6,6))
-    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
-    data = [PG_tt_0_RZ_peak_amps, PG_tt_1_RZ_peak_amps,
-            DG_tt_0_RZ_peak_amps, DG_tt_1_RZ_peak_amps]
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color]
+    data = [PG_tt_0_RZ_peak_amps, DG_tt_0_RZ_peak_amps, PG_tt_1_RZ_peak_amps, DG_tt_1_RZ_peak_amps]
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
@@ -5184,12 +5192,12 @@ def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
         patch.set_facecolor(color)
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.set_xticks([1,2,4,5])
-    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xticklabels(["B", "B", "NB", "NB"])
     ax.set_yticks([0, 0.1, 0.2, 0.3])
-    ax.set_ylim([0, 0.35])
+    #ax.set_ylim([0, 0.35])
     #ax.set_ylim([0, 100])
     ax.set_xlim([0, 6])
-    ax.spines['top'].set_visible(False)  
+    ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
     ax.tick_params(axis='both', which='both', labelsize=25)
@@ -5203,9 +5211,8 @@ def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
 
     # plot and compare similarly to the peak amplitudes hits
     fig, ax = plt.subplots(1,1, figsize=(6,6))
-    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
-    data = [PG_tt_0_peak_locs, PG_tt_1_peak_locs,
-            DG_tt_0_peak_locs, DG_tt_1_peak_locs]
+    colors = [Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
+    data = [PG_tt_0_peak_locs, DG_tt_0_peak_locs, PG_tt_1_peak_locs, DG_tt_1_peak_locs]
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
@@ -5219,7 +5226,9 @@ def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
     ax.set_xticklabels(["B", "NB", "B", "NB"])
     #ax.set_yticks([-1, 0, 1])
     ax.axhspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
-    ax.axhspan(90, 110, facecolor='DarkGreen', alpha=.25, linewidth =0)
+    ax.axhspan(90, 110, xmin=0, xmax=0.5, facecolor='DarkGreen', alpha=.25, linewidth =0)
+    ax.axhline(y=90, xmin=0.5, xmax=1, color="black", linestyle="dotted", linewidth=1)
+    ax.axhline(y=110, xmin=0.5, xmax=1, color="black", linestyle="dotted", linewidth=1)
     ax.set_ylim([0, 130])
     ax.set_xlim([0, 6])
     ax.spines['top'].set_visible(False)
@@ -5270,11 +5279,14 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
     PG_tt_1_peak_amps, PG_tt_1_peak_locs, PG_tt_1_RZ_peak_amps = get_peak_amp_and_locs(remapped_position_grid_cells_stop_histogram_1, bin_centres)
     DG_tt_1_peak_amps, DG_tt_1_peak_locs, DG_tt_1_RZ_peak_amps = get_peak_amp_and_locs(remapped_distance_grid_cells_stop_histogram_1, bin_centres)
 
+    b_mask = ~np.isnan(PG_tt_0_RZ_peak_amps) & ~np.isnan(DG_tt_0_RZ_peak_amps)
+    nb_mask = ~np.isnan(PG_tt_1_RZ_peak_amps) & ~np.isnan(DG_tt_1_RZ_peak_amps)
+
     # plot and compare similarly to the peak amplitudes hits
     fig, ax = plt.subplots(1,1, figsize=(6,6))
-    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
-    data = [PG_tt_0_RZ_peak_amps[~np.isnan(PG_tt_0_RZ_peak_amps)], PG_tt_1_RZ_peak_amps[~np.isnan(PG_tt_1_RZ_peak_amps)],
-            DG_tt_0_RZ_peak_amps[~np.isnan(DG_tt_0_RZ_peak_amps)], DG_tt_1_RZ_peak_amps[~np.isnan(DG_tt_1_RZ_peak_amps)]]
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color]
+    data = [PG_tt_0_RZ_peak_amps[b_mask], DG_tt_0_RZ_peak_amps[b_mask],
+            PG_tt_1_RZ_peak_amps[nb_mask], DG_tt_1_RZ_peak_amps[nb_mask]]
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
@@ -5283,11 +5295,19 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
                      whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
     for patch, color in zip(box['boxes'], colors):
         patch.set_facecolor(color)
+    """
+    for i in range(len(data[0])):
+        ax.scatter([1,2], [data[0][i],data[1][i]], marker="o", color="black")
+        ax.plot([1,2], [data[0][i],data[1][i]], color="black")
+    for i in range(len(data[2])):
+        ax.scatter([1,2], [data[2][i],data[3][i]], marker="o", color="black")
+        ax.plot([1,2], [data[2][i],data[3][i]], color="black")
+    """
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.set_xticks([1,2,4,5])
-    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xticklabels(["B", "B", "NB", "NB"])
     ax.set_yticks([0, 0.1, 0.2, 0.3])
-    ax.set_ylim([0, 0.35])
+    #ax.set_ylim([0, 0.35])
     #ax.set_ylim([0, 100])
     ax.set_xlim([0, 6])
     ax.spines['top'].set_visible(False)
@@ -5296,17 +5316,18 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
     ax.tick_params(axis='both', which='both', labelsize=25)
     plt.savefig(save_path + '/peak_minus_baseline_for_remapped_grid_cells.png', dpi=300)
     plt.close()
-
-    b_mask = ~np.isnan(PG_tt_0_RZ_peak_amps) & ~np.isnan(DG_tt_0_RZ_peak_amps)
-    nb_mask = ~np.isnan(PG_tt_1_RZ_peak_amps) & ~np.isnan(DG_tt_1_RZ_peak_amps)
+    
     print("comparing peak_amps between postion and distance remapped encoding grid cells for beaconed trials, df=",str(len(PG_tt_0_RZ_peak_amps[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(PG_tt_0_RZ_peak_amps[b_mask],DG_tt_0_RZ_peak_amps[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(PG_tt_0_RZ_peak_amps[b_mask],DG_tt_0_RZ_peak_amps[b_mask])[0]))
     print("comparing peak_amps between postion and distance remapped encoding grid cells for non beaconed trials, df=",str(len(PG_tt_1_RZ_peak_amps[nb_mask])-1), ", p= ", str(scipy.stats.wilcoxon(PG_tt_1_RZ_peak_amps[nb_mask],DG_tt_1_RZ_peak_amps[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(PG_tt_1_RZ_peak_amps[nb_mask],DG_tt_1_RZ_peak_amps[nb_mask])[0]))
 
     # plot and compare similarly to the peak amplitudes hits
+    b_mask = ~np.isnan(PG_tt_0_peak_locs) & ~np.isnan(DG_tt_0_peak_locs)
+    nb_mask = ~np.isnan(PG_tt_1_peak_locs) & ~np.isnan(DG_tt_1_peak_locs)
+    
     fig, ax = plt.subplots(1,1, figsize=(6,6))
     colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
-    data = [PG_tt_0_peak_locs[~np.isnan(PG_tt_0_peak_locs)], PG_tt_1_peak_locs[~np.isnan(PG_tt_1_peak_locs)],
-            DG_tt_0_peak_locs[~np.isnan(DG_tt_0_peak_locs)], DG_tt_1_peak_locs[~np.isnan(DG_tt_1_peak_locs)]]
+    data = [PG_tt_0_peak_locs[b_mask], DG_tt_0_peak_locs[b_mask],
+            PG_tt_1_peak_locs[nb_mask], DG_tt_1_peak_locs[nb_mask]]
     boxprops = dict(linewidth=3, color='k')
     medianprops = dict(linewidth=3, color='k')
     capprops = dict(linewidth=3, color='k')
@@ -5315,12 +5336,22 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
                      whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
     for patch, color in zip(box['boxes'], colors):
         patch.set_facecolor(color)
+    """
+    for i in range(len(data[0])):
+        ax.scatter([1,2], [data[0][i],data[1][i]], marker="o", color="black")
+        ax.plot([1,2], [data[0][i],data[1][i]], color="black")
+    for i in range(len(data[2])):
+        ax.scatter([1,2], [data[2][i],data[3][i]], marker="o", color="black")
+        ax.plot([1,2], [data[2][i],data[3][i]], color="black")"""
+
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.set_xticks([1,2,4,5])
-    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xticklabels(["B", "B", "NB", "NB"])
     #ax.set_yticks([-1, 0, 1])
     ax.axhspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
-    ax.axhspan(90, 110, facecolor='DarkGreen', alpha=.25, linewidth =0)
+    ax.axhspan(90, 110, xmin=0, xmax=0.5, facecolor='DarkGreen', alpha=.25, linewidth =0)
+    ax.axhline(y=90, xmin=0.5, xmax=1, color="black", linestyle="dotted", linewidth=1)
+    ax.axhline(y=110, xmin=0.5, xmax=1, color="black", linestyle="dotted", linewidth=1)
     ax.set_ylim([0, 130])
     ax.set_xlim([0, 6])
     ax.spines['top'].set_visible(False)
@@ -5330,8 +5361,6 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
     plt.savefig(save_path + '/peak_location_for_remapped_grid_cells.png', dpi=300)
     plt.close()
 
-    b_mask = ~np.isnan(PG_tt_0_peak_locs) & ~np.isnan(DG_tt_0_peak_locs)
-    nb_mask = ~np.isnan(PG_tt_1_peak_locs) & ~np.isnan(DG_tt_1_peak_locs)
     print("comparing peak_locs between postion and distance remapped encoding grid cells for beaconed trials, df=",str(len(PG_tt_0_peak_locs[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(PG_tt_0_peak_locs[b_mask],DG_tt_0_peak_locs[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(PG_tt_0_peak_locs[b_mask],DG_tt_0_peak_locs[b_mask])[0]))
     print("comparing peak_locs between postion and distance remapped encoding grid cells for non beaconed trials, df=",str(len(PG_tt_1_peak_locs[nb_mask])-1), ", p= ", str(scipy.stats.wilcoxon(PG_tt_1_peak_locs[nb_mask],DG_tt_1_peak_locs[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(PG_tt_1_peak_locs[nb_mask],DG_tt_1_peak_locs[nb_mask])[0]))
     return
@@ -5519,10 +5548,10 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=0)
     non_beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=1)
 
-    colors = [Settings.allocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.egocentric_color]
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color]
 
-    data = [beaconed_percentage_hits_stable_position_grid_cells, non_beaconed_percentage_hits_stable_position_grid_cells,
-            beaconed_percentage_hits_stable_distance_grid_cells, non_beaconed_percentage_hits_stable_distance_grid_cells]
+    data = [beaconed_percentage_hits_stable_position_grid_cells, beaconed_percentage_hits_stable_distance_grid_cells,
+            non_beaconed_percentage_hits_stable_position_grid_cells, non_beaconed_percentage_hits_stable_distance_grid_cells]
 
     print("comping % hits between postion and distance encoding grid cells for beaconed trials, df=",str(len(beaconed_percentage_hits_stable_position_grid_cells)+len(beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[0]))
     print("comping % hits between postion and distance encoding grid cells for non beaconed trials, df=",str(len(non_beaconed_percentage_hits_stable_position_grid_cells)+len(non_beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[0]))
@@ -5538,7 +5567,7 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
         patch.set_facecolor(color)
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.set_xticks([1,2,4,5])
-    ax.set_xticklabels(["B", "NB", "B", "NB"])
+    ax.set_xticklabels(["B", "B", "NB", "NB"])
     #ax.set_yticks([-1, 0, 1])
     #ax.set_ylim([0, 100])
     ax.set_xlim([0, 6])
@@ -5984,7 +6013,7 @@ def main():
     # Figure 5 plots behaviours
     print("===================Figure 5==================")
     plot_ROC(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-
+ 
     plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 

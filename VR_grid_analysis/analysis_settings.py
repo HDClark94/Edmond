@@ -22,4 +22,4 @@ rate_map_gauss_kernel_std = 2
 
 
 # Hit Miss Try
-track_speed_threshold = 0
+track_speed_threshold = 20

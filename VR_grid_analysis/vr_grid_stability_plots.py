@@ -4475,7 +4475,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length=get_track_length(recording), suffix="")
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                #plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
 
                 # ANALYSIS BY HMT OF NON BEACONED TRIALS
@@ -4587,8 +4587,8 @@ def main():
     #vr_recording_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20",
     #                        "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37"]
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
-    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
-    process_recordings(vr_recording_path_list, of_recording_path_list) 
+    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    process_recordings(vr_recording_path_list, of_recording_path_list)
     print("look now")
 
 
