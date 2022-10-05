@@ -944,6 +944,27 @@ def plot_lomb_classifier_powers_vs_groups(concantenated_dataframe, suffix="", sa
 
     print("comping peak powers between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
 
+
+    # plot cumulative histogram
+    fig, ax = plt.subplots(figsize=(3,3))
+    _, _, patches1 = ax.hist(data[0], bins=500, color=Settings.allocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches2 = ax.hist(data[1], bins=500, color=Settings.egocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches3 = ax.hist(data[2], bins=500, color=Settings.null_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    patches2[0].set_xy(patches2[0].get_xy()[:-1])
+    patches3[0].set_xy(patches3[0].get_xy()[:-1])
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_yticks([0,1])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("peak power", fontsize=20)
+    ax.set_ylabel("Cumulative prob", fontsize=20)
+    plt.savefig(save_path + '/lomb_classifier_power_vs_groups_cumhist.png', dpi=300)
+    plt.close()
+
     return
 
 def plot_lomb_classifier_mfr_vs_groups_vs_open_field(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
@@ -967,9 +988,35 @@ def plot_lomb_classifier_mfr_vs_groups_vs_open_field(concantenated_dataframe, su
     ng_position_cells_of = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['mean_firing_rate_of'])
     ng_null_cells_of = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['mean_firing_rate_of'])
 
+    print("mean firing rate in the vr for position encoding grid cells is ", np.nanmean(g_position_cells), " +- ", np.nanstd(g_position_cells))
+    print("mean firing rate in the of for position encoding grid cells is ", np.nanmean(g_position_cells_of), " +- ", np.nanstd(g_position_cells_of))
+    print("mean firing rate in the vr for distance encoding grid cells is ", np.nanmean(g_distance_cells), " +- ", np.nanstd(g_distance_cells))
+    print("mean firing rate in the of for distance encoding grid cells is ", np.nanmean(g_distance_cells_of), " +- ", np.nanstd(g_distance_cells_of))
+    print("mean firing rate in the vr for null encoding grid cells is ", np.nanmean(g_null_cells), " +- ", np.nanstd(g_null_cells))
+    print("mean firing rate in the of for null encoding grid cells is ", np.nanmean(g_null_cells_of), " +- ", np.nanstd(g_null_cells_of))
+
     print("comping mean firing rates between postion vr and position of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_position_cells, y=g_position_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_position_cells, y=g_position_cells_of)[0]),", df = ",str(len(g_position_cells)-1))
     print("comping mean firing rates between distnace vr and distnace of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_distance_cells, y=g_distance_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_distance_cells, y=g_distance_cells_of)[0]),", df = ",str(len(g_distance_cells)-1))
     print("comping mean firing rates between null vr and null of encoding grid cells, p = ", str(scipy.stats.wilcoxon(x=g_null_cells, y=g_null_cells_of)[1]), ", t = ", str(scipy.stats.wilcoxon(x=g_null_cells, y=g_null_cells_of)[0]),", df = ",str(len(g_null_cells)-1))
+
+    # plot scatter plot
+    fig, ax = plt.subplots(figsize=(6,6))
+    ax.scatter(g_distance_cells, g_distance_cells_of, color=Settings.egocentric_color)
+    ax.scatter(g_position_cells, g_position_cells_of, color=Settings.allocentric_color)
+    ax.plot(np.arange(0,25), np.arange(0,25), color="black")
+    ax.scatter(g_null_cells, g_null_cells_of, color=Settings.null_color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0)
+    #ax.set_yticks([0,1])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("VR Mean Firing Rate (Hz)", fontsize=20)
+    ax.set_ylabel("OF Mean Firing Rate (Hz)", fontsize=20)
+    plt.savefig(save_path + '/mean_firing_rate_vs_mean_firing_rate_of_for_groups.png', dpi=300)
+    plt.close()
     return
 
 def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
@@ -1023,12 +1070,29 @@ def plot_lomb_classifier_mfr_vs_groups(concantenated_dataframe, suffix="", save_
     plt.savefig(save_path + '/lomb_classifier_mfr_vs_groups.png', dpi=300)
     plt.close()
 
-
-
     print("comping mean firing rates between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
     print("comping mean firing rates postion and null encoding grid cells, df=",str(len(data[0])+len(data[2])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[2])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[2])[0]))
     print("comping mean firing rates null and distance encoding grid cells, df=",str(len(data[2])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[2], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[2], data[1])[0]))
 
+    # plot cumulative histogram
+    fig, ax = plt.subplots(figsize=(3,3))
+    _, _, patches1 = ax.hist(data[0], bins=500, color=Settings.allocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches2 = ax.hist(data[1], bins=500, color=Settings.egocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches3 = ax.hist(data[2], bins=500, color=Settings.null_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    patches2[0].set_xy(patches2[0].get_xy()[:-1])
+    patches3[0].set_xy(patches3[0].get_xy()[:-1])
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_yticks([0,1])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("Mean Firing Rate (Hz)", fontsize=20)
+    ax.set_ylabel("Cumulative prob", fontsize=20)
+    plt.savefig(save_path + '/lomb_classifier_mfr_vs_groups_cumhist.png', dpi=300)
+    plt.close()
     return
 
 
@@ -1086,6 +1150,27 @@ def plot_lomb_classifier_peak_width_vs_groups(concantenated_dataframe, suffix=""
 
     print("comping peak widths between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
 
+
+
+    # plot cumulative histogram
+    fig, ax = plt.subplots(figsize=(3,3))
+    _, _, patches1 = ax.hist(data[0], bins=500, color=Settings.allocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches2 = ax.hist(data[1], bins=500, color=Settings.egocentric_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    _, _, patches3 = ax.hist(data[2], bins=500, color=Settings.null_color, histtype="step", density=True, cumulative=True, linewidth=2)
+    patches1[0].set_xy(patches1[0].get_xy()[:-1])
+    patches2[0].set_xy(patches2[0].get_xy()[:-1])
+    patches3[0].set_xy(patches3[0].get_xy()[:-1])
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_yticks([0,1])
+    fig.tight_layout()
+    plt.subplots_adjust(left=0.25, bottom=0.2)
+    ax.set_xlabel("peak width", fontsize=20)
+    ax.set_ylabel("Cumulative prob", fontsize=20)
+    plt.savefig(save_path + '/lomb_classifier_peakwidth_vs_groups_cumhist.png', dpi=300)
+    plt.close()
     return
 
 def plot_lomb_classifiers_proportions_by_probe_hmt(concantenated_dataframe, save_path=""):
@@ -5817,21 +5902,22 @@ def plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path):
     plt.savefig(save_path + '/block_length_encoding.png', dpi=300)
     plt.close()
 
-    fig, ax = plt.subplots(1,1, figsize=(6,6))
+    fig, ax = plt.subplots(1,1, figsize=(6,4))
     #ax.set_xticks([0,1])
-    #ax.set_yticks([-1, 0, 1])
+    ax.set_yticks([0,0.5, 1])
     #ax.set_ylim([-1, 1])
-    ax.set_xlim([0, 1])
-    _, _, patches0 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=10, range=(0,1), histtype="step", cumulative=True, alpha=0.5, color="r")
-    _, _, patches1 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder_shuffled"]), density=True, bins=10, histtype="step", cumulative=True, range=(0,1), alpha=0.5, color="grey")
+    ax.set_ylim([0, 1])
+    _, _, patches0 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder"]), density=True, bins=1000, range=(0,1), histtype="step", cumulative=True, alpha=1, color="r", linewidth=3)
+    _, _, patches1 = ax.hist(pandas_collumn_to_numpy_array(grid_cells["rolling:block_lengths_for_encoder_shuffled"]), density=True, bins=1000, histtype="step", cumulative=True, range=(0,1), alpha=1, color="grey", linewidth=3)
     patches0[0].set_xy(patches0[0].get_xy()[:-1])
     patches1[0].set_xy(patches1[0].get_xy()[:-1])
-    ax.set_xlabel("Block length (frac. session)", fontsize=20)
-    ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    #ax.set_xlabel("Block length (frac. session)", fontsize=20)
+    #ax.set_ylabel("Density", fontsize=20, labelpad=10)
+    ax.set_xscale('log')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.xaxis.set_tick_params(length=0)
-    ax.tick_params(axis='both', which='both', labelsize=20)
+    ax.tick_params(axis='both', which='both', labelsize=30)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/block_length_encoding_vs_shuffled.png', dpi=300)
     plt.close()
@@ -6002,8 +6088,8 @@ def main():
     plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
     plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
     plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
 
     # Figure 3 plots remapping
     plot_rolling_lomb_block_sizes(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")

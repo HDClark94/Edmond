@@ -3851,7 +3851,7 @@ def plot_trial_type_correct_vs_trial_type_expected_reward(meta_behaviour_data, s
             plt.title(mouse_id, fontsize=20)
             ax.plot(mouse_meta["session_number"], mouse_meta["percent_beaconed_trials_correct"], "-", color="black")
             ax.plot(mouse_meta["session_number"], mouse_meta["percent_nonbeaconed_trials_correct"], "-", color="blue")
-            cmap = matplotlib.cm.get_cmap('bwr')
+            cmap = matplotlib.cm.get_cmap('PuOr')
             for x, color in zip(mouse_meta["session_number"], mouse_meta["non_beaconed_expected_reward_session"]):
                 ax.scatter(x, 105, color=cmap(color/100), marker="s", s=50)
             ax.tick_params(axis='both', which='major', labelsize=15)
@@ -3864,6 +3864,29 @@ def plot_trial_type_correct_vs_trial_type_expected_reward(meta_behaviour_data, s
             ax.set_xlabel("Training day", fontsize=20)
             plt.subplots_adjust(left=0.2, bottom=0.2, right=0.8, top=0.8)
             plt.savefig(save_path+'/emp_'+str(cohort)+"_"+mouse_id+'.png', dpi=300)
+            plt.close()
+
+    for cohort in np.unique(meta_behaviour_data["cohort"]):
+        meta_cohort = meta_behaviour_data[meta_behaviour_data["cohort"] == cohort]
+        for mouse_id in np.unique(meta_cohort["mouse_id"]):
+            mouse_meta = meta_cohort[meta_cohort["mouse_id"] == mouse_id]
+            fig, ax = plt.subplots(figsize=(6,6))
+            plt.title(mouse_id, fontsize=20)
+            ax.plot(mouse_meta["session_number"], mouse_meta["n_beaconed_trials_correct"], "-", color="black")
+            ax.plot(mouse_meta["session_number"], mouse_meta["n_nonbeaconed_trials_correct"], "-", color="blue")
+            cmap = matplotlib.cm.get_cmap('PuOr')
+            for x, color in zip(mouse_meta["session_number"], mouse_meta["non_beaconed_expected_reward_session"]):
+                ax.scatter(x, 300, color=cmap(color/100), marker="s", s=50)
+            ax.tick_params(axis='both', which='major', labelsize=15)
+            fig.tight_layout()
+            #ax.set_ylim(bottom=0, top=100)
+            ax.set_xlim(left=0, right=30)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.set_ylabel("N Fast hit trials", fontsize=20)
+            ax.set_xlabel("Training day", fontsize=20)
+            plt.subplots_adjust(left=0.2, bottom=0.2, right=0.8, top=0.8)
+            plt.savefig(save_path+'/emp_n_trials_'+str(cohort)+"_"+mouse_id+'.png', dpi=300)
             plt.close()
     return
 
@@ -3900,7 +3923,7 @@ def plot_expected_reward_schematic(save_path, probe=False):
 
     fig, ax = plt.subplots(figsize=(6,6))
     X, Y = np.meshgrid(x, y)
-    pcm = ax.pcolormesh(X, Y, Z, shading="nearest", vmin=0, vmax=100, cmap='bwr',zorder=-1)
+    pcm = ax.pcolormesh(X, Y, Z, shading="nearest", vmin=0, vmax=100, cmap='PuOr',zorder=-1)
 
     # annotate cells
     for i in range(len(Z[0])):
@@ -3993,14 +4016,20 @@ def plot_performance_against_improvements(meta_behaviour_data, save_path):
             row[row_name] = [avg]
         averaged_df = pd.concat([averaged_df, row], ignore_index=True)
 
+    print("there are this many mice in this comparison")
+    print(len(averaged_df))
+
     x_pos = [0,1,2]
     x_labels = ["Default", "TTR", "TTR+R"]
     Default = averaged_df[(averaged_df["cohort"]>=2) & (averaged_df["cohort"]<=5)]
     TTR = averaged_df[(averaged_df["cohort"]==7)]
     TTR_R = averaged_df[averaged_df["cohort"]==8]
 
+    print("ER for nb, Default = ", str(np.mean(Default["non_beaconed_expected_reward_session"])))
+    print("ER for nb, TTR = ", str(np.mean(TTR["non_beaconed_expected_reward_session"])))
+    print("ER for nb, TTR_R = ", str(np.mean(TTR_R["non_beaconed_expected_reward_session"])))
     for column_str, color, ylim in zip(["percent_nonbeaconed_trials_correct", "percent_beaconed_trials_correct",
-                                  "n_beaconed_trials_correct", "n_nonbeaconed_trials_correct"], ["blue", "black", "black", "blue"],
+                                  "n_nonbeaconed_trials_correct", "n_beaconed_trials_correct"], ["blue", "black", "blue", "black"],
                                        [100, 100, None, None]):
 
         fig, ax = plt.subplots(figsize=(6,4))
@@ -4025,6 +4054,8 @@ def plot_performance_against_improvements(meta_behaviour_data, save_path):
         plt.close()
 
         print("comparing column "+column_str+" across expected_reward conditions Default vs TTR, df=",str(len(Default)+len(TTR)-2), ", p= ", str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[1]), ", t= ", str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[0]))
+        print("comparing column "+column_str+" across expected_reward conditions Default vs TTR_R, df=",str(len(Default)+len(TTR_R)-2), ", p= ", str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ", str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[0]))
+        print("comparing column "+column_str+" across expected_reward conditions TTR vs TTR_R, df=",str(len(TTR)+len(TTR_R)-2), ", p= ", str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ", str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[0]))
 
 
     return
@@ -4068,9 +4099,6 @@ def main():
 
     # plot trial_type correct ratio vs non_beaconed_expected_reward session
     plot_trial_type_correct_vs_trial_type_expected_reward(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
-
-    # plot thirds of expected reward from non beaconed trials vs non beaconed fast trial proportion
-    plot_expected_reward_on_nb_vs_non_beaconed_performance(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
 
     # plot expected reward schematic
     plot_expected_reward_schematic(save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis", probe=True)
