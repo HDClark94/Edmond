@@ -1164,8 +1164,11 @@ def remove_same_cell_comparisons(agreement_comparions_df):
 
 def plot_agreement_vs_shuffled_blocks(agreement_comparions_df, save_path):
     agreement_comparions_df = remove_same_cell_comparisons(agreement_comparions_df)
-    print(len(agreement_comparions_df))
-    _, p = stats.ttest_rel(agreement_comparions_df["agreement"], agreement_comparions_df["agreement_shuffled_blocks"])
+    print("n cells = ", len(agreement_comparions_df))
+    print("n sessions = ", len(np.unique(agreement_comparions_df["session_id_i"])))
+    print("comping samples for agreement plot, p = ", str(stats.wilcoxon(x=agreement_comparions_df["agreement"], y=agreement_comparions_df["agreement_shuffled_blocks"])[1]), ", t = ", str(stats.wilcoxon(x=agreement_comparions_df["agreement"], y=agreement_comparions_df["agreement_shuffled_blocks"])[0]),", df = ",str(len(agreement_comparions_df["agreement_shuffled_blocks"])-1))
+
+    _, p = stats.wilcoxon(agreement_comparions_df["agreement"], agreement_comparions_df["agreement_shuffled_blocks"])
     on_tetrode = agreement_comparions_df[agreement_comparions_df["tetrode_level"] == "same"]
     off_tetrode = agreement_comparions_df[agreement_comparions_df["tetrode_level"] == "different"]
     fig, ax = plt.subplots(figsize=(4,6))
