@@ -1173,41 +1173,6 @@ def plot_lomb_classifier_peak_width_vs_groups(concantenated_dataframe, suffix=""
     plt.close()
     return
 
-def plot_lomb_classifiers_proportions_by_probe_hmt(concantenated_dataframe, save_path=""):
-    print('plotting lomb classifers proportions...')
-    grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
-
-    fig, ax = plt.subplots(figsize=(4,6))
-    groups = ["Position", "Distance", "Null"]
-    colors_lm = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color, "black"]
-    suffixes = ["_all_probe", "_probe_hits", "_probe_tries", "_probe_misses"]
-    labels = ["all", "hits", "tries", "runs"]
-    x_pos = np.arange(len(suffixes))
-    for suffix, x in zip(suffixes, x_pos):
-        bottom=0
-        for color, group in zip(colors_lm, groups):
-            c_df = add_lomb_classifier(grid_cells, suffix=suffix)
-            c_df = c_df[c_df["Lomb_classifier_"+suffix] != "Unclassifed"]
-
-            count = len(c_df[(c_df["Lomb_classifier_"+suffix] == group)])
-            percent = (count/len(c_df))*100
-            ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
-            ax.text(x,bottom+0.5, str(count), color="k", fontsize=15, ha="center")
-            bottom = bottom+percent
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(labels, rotation=-45, ha="left", fontsize=25, rotation_mode='anchor')
-    plt.ylabel("Percent of neurons", fontsize=25)
-    plt.xlim((-0.5, len(labels)-0.5))
-    plt.ylim((0,100))
-    plt.xticks(rotation = -45)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    plt.subplots_adjust(left=0.4, bottom=0.2)
-    ax.tick_params(axis='both', which='major', labelsize=25)
-    plt.savefig(save_path + '/lomb_classifiers_proportions_probe.png', dpi=200)
-    plt.close()
-    return
-
 def get_rolling_percent_encoding(df, code="P", tt=1, hmt="hit"):
     if code == "P":
         result_column = "rolling:encoding_position_by_trial_category"
@@ -1237,7 +1202,7 @@ def get_rolling_percent_encoding(df, code="P", tt=1, hmt="hit"):
 
 def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     print('plotting lomb classifers proportions...')
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     # we only want to look at the remapped coding cells (<85% encoding)
@@ -1448,7 +1413,7 @@ def plot_ROC(concantenated_dataframe, save_path=""):
 
 def plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path=""):
     print('plotting lomb classifers proportions...')
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     # we only want to look at the remapped coding cells (<85% encoding)
@@ -1525,7 +1490,7 @@ def plot_lomb_classifiers_proportions_by_nonbeaconed_hmt(concantenated_dataframe
         bottom=0
         for color, group in zip(colors_lm, groups):
             c_df = add_lomb_classifier(grid_cells, suffix=suffix)
-            c_df = c_df[c_df["Lomb_classifier_"+suffix] != "Unclassifed"]
+            c_df = c_df[c_df["Lomb_classifier_"+suffix] != "Unclassified"]
 
             count = len(c_df[(c_df["Lomb_classifier_"+suffix] == group)])
             percent = (count/len(c_df))*100
@@ -1560,7 +1525,7 @@ def plot_lomb_classifiers_proportions_by_hits_tt(concantenated_dataframe, save_p
         bottom=0
         for color, group in zip(colors_lm, groups):
             c_df = add_lomb_classifier(grid_cells, suffix=suffix)
-            c_df = c_df[c_df["Lomb_classifier_"+suffix] != "Unclassifed"]
+            c_df = c_df[c_df["Lomb_classifier_"+suffix] != "Unclassified"]
 
             count = len(c_df[(c_df["Lomb_classifier_"+suffix] == group)])
             percent = (count/len(c_df))*100
@@ -1591,7 +1556,7 @@ def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_p
     non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
 
     fig, ax = plt.subplots(figsize=(4,6))
-    groups = ["Position", "Distance", "Null", "Unclassifed"]
+    groups = ["Position", "Distance", "Null", "Unclassified"]
     groups = ["Position", "Distance", "Null"]
     colors_lm = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color, "black"]
     objects = ["G", "NG"]
@@ -5212,7 +5177,7 @@ def get_peak_amp_and_locs(stop_histogram_2d_numpy_array, bin_centres):
     return np.array(peak_amps), np.array(peak_locs), np.array(RZ_peak_amps)
 
 def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
@@ -5329,7 +5294,7 @@ def plot_stop_peak_stop_location_and_height_stable(combined_df, save_path):
 
 
 def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     # trial type 0
@@ -5453,7 +5418,7 @@ def plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path):
 
 def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     #grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
@@ -5527,7 +5492,7 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path)
 
 def plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
@@ -5606,7 +5571,7 @@ def drop_duplicate_sessions(cells_df):
     return new_df
 
 def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
@@ -5669,7 +5634,7 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
 
 def plot_rolling_lomb_block_sizes(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
@@ -5806,7 +5771,7 @@ def add_max_block_lengths(df):
 
 def plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
     grid_cells = add_max_block_lengths(grid_cells)
 
@@ -5859,7 +5824,7 @@ def plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path):
 
 def plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassifed"]
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
