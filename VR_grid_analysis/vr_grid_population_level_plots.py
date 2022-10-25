@@ -1583,7 +1583,7 @@ def plot_lomb_classifiers_proportions_by_hits_tt(concantenated_dataframe, save_p
 
 def plot_lomb_classifiers_proportions(concantenated_dataframe, suffix="", save_path=""):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
-    concantenated_dataframe = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] != "Unclassifed"]
+    concantenated_dataframe = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] != "Unclassified"]
 
     print('plotting lomb classifers proportions...')
 
@@ -5973,6 +5973,20 @@ def plot_rolling_lomb_block_sizes_vs_shuffled(combined_df, save_path):
     ax.tick_params(axis='both', which='both', labelsize=30)
     plt.savefig(save_path + '/block_length_encoding_null.png', dpi=300)
     plt.close()
+
+    print("unstable cells: ", len(Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"]<0.85])+
+                              len(Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"]<0.85])+
+                              len(Null_grid_cells[Null_grid_cells["rolling:proportion_encoding_null"]<0.85]), ", ",
+                              (len(Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"]<0.85])/len(grid_cells))+
+                              (len(Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"]<0.85])/len(grid_cells))+
+                              (len(Null_grid_cells[Null_grid_cells["rolling:proportion_encoding_null"]<0.85])/len(grid_cells)), "%")
+
+    print("stable cells: ", len(Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"]>=0.85])+
+          len(Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"]>=0.85])+
+          len(Null_grid_cells[Null_grid_cells["rolling:proportion_encoding_null"]>=0.85]), ", ",
+          (len(Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"]>=0.85])/len(grid_cells))+
+          (len(Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"]>=0.85])/len(grid_cells))+
+          (len(Null_grid_cells[Null_grid_cells["rolling:proportion_encoding_null"]>=0.85])/len(grid_cells)), "%")
     return
 
 def get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05):
