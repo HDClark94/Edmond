@@ -749,7 +749,7 @@ def get_lomb_classifier(lomb_SNR, lomb_freq, lomb_SNR_thres, lomb_freq_thres, nu
             lomb_classifier = "Distance"
     else:
         if np.isnan(lomb_distance_from_int):
-            lomb_classifier = "Unclassifed"
+            lomb_classifier = "Unclassified"
         else:
             lomb_classifier = "Null"
 
@@ -2264,6 +2264,9 @@ def main():
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
 
     vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
+    vr_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24"]
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
     #vr_path_list = ['/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26','/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
