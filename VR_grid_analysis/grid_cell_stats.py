@@ -154,7 +154,7 @@ def main():
 
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
     combined_df = combined_df[combined_df["track_length"] == 200] # only look at default task
-
+    combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
 
     grid_cell_stats, grid_cells = summarise_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", save=True)
