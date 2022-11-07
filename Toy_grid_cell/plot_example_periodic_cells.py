@@ -311,6 +311,37 @@ def plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial):
     plt.savefig(save_path + '/'+cell_type+'_rate_map.png', dpi=300)
     plt.close()
 
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(6, 2, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    locations = np.arange(0, len(cluster_firing_maps[0]))
+    ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0), color="black", alpha=0.3)
+    ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black")
+    plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
+    plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+    plt.xlim(0, track_length)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    ax.set_xlim([0, track_length])
+    ax.set_ylim([0, max(np.nanmean(cluster_firing_maps, axis=0))+(0.1*max(np.nanmean(cluster_firing_maps, axis=0)))])
+    #ax.set_yticks([1, 50, 100])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    #cbar.set_ticks([0,vmax])
+    #cbar.set_ticklabels(["0", "Max"])
+    #cbar.outline.set_visible(False)
+    #cbar.ax.tick_params(labelsize=20)
+    plt.savefig(save_path + '/'+cell_type+'_avg_rate_map.png', dpi=300)
+    plt.close()
+
+
 def plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map, shuffled_save_path, plot_n_shuffles=10):
     for i in np.arange(plot_n_shuffles):
         n_trials = len(field_shuffled_rate_map[0])
@@ -596,15 +627,15 @@ def main():
     save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data"
     shuffled_save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/shuffled"
 
-    #plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
     plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
     plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
-    #plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
+    plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path)
 
     print("look now")
 
