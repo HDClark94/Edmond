@@ -866,6 +866,58 @@ def get_vmin_vmax(cluster_firing_maps, bin_cm=8):
         print("stop here")
     return vmin, vmax
 
+def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path, track_length):
+    print('plotting trial firing rate maps...')
+    save_path = output_path + '/Figures/firing_rate_maps'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
+        if len(firing_times_cluster)>1:
+            cluster_firing_maps = np.array(spike_data['fr_binned_in_space_smoothed'].iloc[cluster_index])
+            cluster_firing_maps[np.isnan(cluster_firing_maps)] = 0
+            cluster_firing_maps[np.isinf(cluster_firing_maps)] = 0
+            percentile_99th_display = np.nanpercentile(cluster_firing_maps, 99);
+            cluster_firing_maps = min_max_normalize(cluster_firing_maps)
+            percentile_99th = np.nanpercentile(cluster_firing_maps, 99); cluster_firing_maps = np.clip(cluster_firing_maps, a_min=0, a_max=percentile_99th)
+            vmin, vmax = get_vmin_vmax(cluster_firing_maps)
+
+            spikes_on_track = plt.figure()
+            spikes_on_track.set_size_inches(6, 2, forward=True)
+            ax = spikes_on_track.add_subplot(1, 1, 1)
+            locations = np.arange(0, len(cluster_firing_maps[0]))
+            ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0), color="black", alpha=0.3)
+            ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=3)
+            plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
+            plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+            plt.xlim(0, track_length)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            ax.set_xlim([0, track_length])
+            max_fr = max(np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0))
+            max_fr = max_fr+(0.1*(max_fr))
+            #ax.set_ylim([0, max_fr])
+            ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+            ax.set_ylim(bottom=0)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+            #ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+            #plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
+            #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+            #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+            #cbar.set_ticks([0,vmax])
+            #cbar.set_ticklabels(["0", "Max"])
+            #cbar.outline.set_visible(False)
+            #cbar.ax.tick_params(labelsize=20)
+            plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_maps_short_' + str(cluster_id) + '.png', dpi=300)
+            plt.close()
+    return
+
+
 
 def plot_firing_rate_maps_per_trial(spike_data, processed_position_data, output_path, track_length):
     print('plotting trial firing rate maps...')

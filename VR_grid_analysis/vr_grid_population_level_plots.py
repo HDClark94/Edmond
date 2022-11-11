@@ -757,6 +757,108 @@ def plot_lomb_classifiers_vs_shuffle(concantenated_dataframe, suffix="", save_pa
     plt.close()
     return
 
+
+def plot_lomb_classifiers_vs_shuffle_grid_cells(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = concantenated_dataframe[concantenated_dataframe["grid_cell"] == 1]
+
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers...')
+
+    distance_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Distance"]
+    position_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Position"]
+    null_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Null"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7,4), gridspec_kw={'width_ratios': [1, 0.3]})
+    ax1.set_ylabel("Peak power vs \n false alarm rate",color="black",fontsize=25, labelpad=10)
+    ax1.set_xlabel("Track frequency", color="black", fontsize=25, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax1.set_yticks([-0.1, 0, 0.1, 0.2, 0.3, 0.4])
+    ax2.set_xticks([0, 0.5])
+    ax2.set_xticklabels(["0", "0.5"])
+    ax2.set_yticks([])
+    plt.setp(ax1.get_xticklabels(), fontsize=20)
+    plt.setp(ax2.get_xticklabels(), fontsize=20)
+    plt.setp(ax1.get_yticklabels(), fontsize=20)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    for f in range(1,6):
+        ax1.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax1.scatter(x=null_cells["ML_Freqs"+suffix], y=null_cells["ML_SNRs"+suffix]-null_cells["power_threshold"], color=Settings.null_color, marker="o", alpha=0.3)
+    ax1.scatter(x=distance_cells["ML_Freqs"+suffix], y=distance_cells["ML_SNRs"+suffix]-distance_cells["power_threshold"], color=Settings.egocentric_color, marker="o", alpha=0.3)
+    ax1.scatter(x=position_cells["ML_Freqs"+suffix], y=position_cells["ML_SNRs"+suffix]-position_cells["power_threshold"], color=Settings.allocentric_color, marker="o", alpha=0.3)
+    ax1.axhline(y=0, color="red", linewidth=3,linestyle="dashed")
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['left'].set_visible(False)
+    ax1.set_xlim([0,5.02])
+    ax1.set_ylim([-0.1,0.4])
+    ax2.set_xlim([-0.05,0.55])
+    ax2.set_ylim([-0.1,0.4])
+    ax2.set_xlabel(r'$\Delta$ from Int', color="black", fontsize=25, labelpad=10)
+    ax2.scatter(x=distance_from_integer(null_cells["ML_Freqs"+suffix]), y=null_cells["ML_SNRs"+suffix]-null_cells["power_threshold"], color=Settings.null_color, marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(distance_cells["ML_Freqs"+suffix]), y=distance_cells["ML_SNRs"+suffix]-distance_cells["power_threshold"], color=Settings.egocentric_color, marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(position_cells["ML_Freqs"+suffix]), y=position_cells["ML_SNRs"+suffix]-position_cells["power_threshold"], color=Settings.allocentric_color, marker="o", alpha=0.3)
+    ax2.axhline(y=0, color="red", linewidth=3,linestyle="dashed")
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_vs_shuffle_PDN_'+suffix+'_grid_cell.png', dpi=200)
+    plt.close()
+    return
+
+
+def plot_lomb_classifiers_vs_shuffle_non_grid_cells(concantenated_dataframe, suffix="", save_path=""):
+    concantenated_dataframe = concantenated_dataframe[concantenated_dataframe["grid_cell"] == 0]
+
+    concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
+    print('plotting lomb classifers...')
+
+    distance_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Distance"]
+    position_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Position"]
+    null_cells = concantenated_dataframe[concantenated_dataframe["Lomb_classifier_"+suffix] == "Null"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7,4), gridspec_kw={'width_ratios': [1, 0.3]})
+    ax1.set_ylabel("Peak power vs \n false alarm rate",color="black",fontsize=25, labelpad=10)
+    ax1.set_xlabel("Track frequency", color="black", fontsize=25, labelpad=10)
+    ax1.set_xticks(np.arange(0, 11, 1.0))
+    ax1.set_yticks([-0.1, 0, 0.1, 0.2, 0.3, 0.4])
+    ax2.set_xticks([0, 0.5])
+    ax2.set_xticklabels(["0", "0.5"])
+    ax2.set_yticks([])
+    plt.setp(ax1.get_xticklabels(), fontsize=20)
+    plt.setp(ax2.get_xticklabels(), fontsize=20)
+    plt.setp(ax1.get_yticklabels(), fontsize=20)
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    for f in range(1,6):
+        ax1.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax1.scatter(x=null_cells["ML_Freqs"+suffix], y=null_cells["ML_SNRs"+suffix]-null_cells["power_threshold"], color=Settings.null_color, marker="o", alpha=0.3)
+    ax1.scatter(x=distance_cells["ML_Freqs"+suffix], y=distance_cells["ML_SNRs"+suffix]-distance_cells["power_threshold"], color=Settings.egocentric_color, marker="o", alpha=0.3)
+    ax1.scatter(x=position_cells["ML_Freqs"+suffix], y=position_cells["ML_SNRs"+suffix]-position_cells["power_threshold"], color=Settings.allocentric_color, marker="o", alpha=0.3)
+    ax1.axhline(y=0, color="red", linewidth=3,linestyle="dashed")
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['left'].set_visible(False)
+    ax1.set_xlim([0,5.02])
+    ax1.set_ylim([-0.1,0.4])
+    ax2.set_xlim([-0.05,0.55])
+    ax2.set_ylim([-0.1,0.4])
+    ax2.set_xlabel(r'$\Delta$ from Int', color="black", fontsize=25, labelpad=10)
+    ax2.scatter(x=distance_from_integer(null_cells["ML_Freqs"+suffix]), y=null_cells["ML_SNRs"+suffix]-null_cells["power_threshold"], color=Settings.null_color, marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(distance_cells["ML_Freqs"+suffix]), y=distance_cells["ML_SNRs"+suffix]-distance_cells["power_threshold"], color=Settings.egocentric_color, marker="o", alpha=0.3)
+    ax2.scatter(x=distance_from_integer(position_cells["ML_Freqs"+suffix]), y=position_cells["ML_SNRs"+suffix]-position_cells["power_threshold"], color=Settings.allocentric_color, marker="o", alpha=0.3)
+    ax2.axhline(y=0, color="red", linewidth=3,linestyle="dashed")
+    plt.tight_layout()
+    plt.savefig(save_path + '/lomb_classifiers_vs_shuffle_PDN_'+suffix+'_non_grid_cell.png', dpi=200)
+    plt.close()
+    return
+
 def plot_lomb_classifiers(concantenated_dataframe, suffix="", save_path=""):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
     print('plotting lomb classifers...')
@@ -1206,8 +1308,8 @@ def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     # we only want to look at the remapped coding cells (<85% encoding)
-    grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
-                            (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+    #grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+    #                        (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
 
 
     p_b_hit = get_rolling_percent_encoding(grid_cells, code="P", tt=0, hmt="hit")
@@ -1307,7 +1409,7 @@ def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed.png', dpi=300)
     plt.close()
 
-
+    print("=========for position encoding trials =========")
     # do stats test
     df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_hit[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
     df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(p_b_hit[b_mask])),'percentage_position_encoding': p_b_try[b_mask],'unique_id':np.arange(len(p_b_hit[b_mask]))})
@@ -1319,7 +1421,7 @@ def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     print("=========for beacoend trial outcomes =========")
     aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
     print(aov[['Source', 'DF', 'F', 'p-unc']])
-
+    print("degrees of freedom: ", str(len(p_b_hit[b_mask])-1))
 
     # do stats test
     df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_nb_hit[nb_mask])),'percentage_position_encoding': p_nb_hit[nb_mask],'unique_id':np.arange(len(p_nb_hit[nb_mask]))})
@@ -1332,8 +1434,8 @@ def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     print("=========for non_beaconed trial outcomes =========")
     aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
     print(aov[['Source', 'DF', 'F', 'p-unc']])
-
-
+    print("degrees of freedom: ", str(len(p_nb_hit[nb_mask])-1))
+ 
     # do stats test
     df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(p_p_hit[p_mask])),'percentage_position_encoding': p_p_hit[p_mask],'unique_id':np.arange(len(p_p_hit[p_mask]))})
     df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(p_p_hit[p_mask])),'percentage_position_encoding': p_p_try[p_mask],'unique_id':np.arange(len(p_p_hit[p_mask]))})
@@ -1345,6 +1447,88 @@ def plot_percentage_encoding_by_trial_category(combined_df, save_path=""):
     print("=========for probe trial outcomes =========")
     aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
     print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(p_p_hit[p_mask])-1))
+
+    print("=========for distance encoding trials =========")
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(d_b_hit[b_mask])),'percentage_distance_encoding': d_b_hit[b_mask],'unique_id':np.arange(len(d_b_hit[b_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(d_b_hit[b_mask])),'percentage_distance_encoding': d_b_try[b_mask],'unique_id':np.arange(len(d_b_hit[b_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(d_b_hit[b_mask])),'percentage_distance_encoding': d_b_miss[b_mask],'unique_id':np.arange(len(d_b_hit[b_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_b_hit[b_mask])-1))
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(d_nb_hit[nb_mask])),'percentage_distance_encoding': d_nb_hit[nb_mask],'unique_id':np.arange(len(d_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(d_nb_hit[nb_mask])),'percentage_distance_encoding': d_nb_try[nb_mask],'unique_id':np.arange(len(d_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(d_nb_hit[nb_mask])),'percentage_distance_encoding': d_nb_miss[nb_mask],'unique_id':np.arange(len(d_nb_hit[nb_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_nb_hit[nb_mask])-1))
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(d_p_hit[p_mask])),'percentage_distance_encoding': d_p_hit[p_mask],'unique_id':np.arange(len(d_p_hit[p_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(d_p_hit[p_mask])),'percentage_distance_encoding': d_p_try[p_mask],'unique_id':np.arange(len(d_p_hit[p_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(d_p_hit[p_mask])),'percentage_distance_encoding': d_p_miss[p_mask],'unique_id':np.arange(len(d_p_hit[p_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_p_hit[p_mask])-1))
+
+
+    print("=========for aperiodic encoding trials =========")
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(n_b_hit[b_mask])),'percentage_null_encoding': n_b_hit[b_mask],'unique_id':np.arange(len(n_b_hit[b_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(n_b_hit[b_mask])),'percentage_null_encoding': n_b_try[b_mask],'unique_id':np.arange(len(n_b_hit[b_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(n_b_hit[b_mask])),'percentage_null_encoding': n_b_miss[b_mask],'unique_id':np.arange(len(n_b_hit[b_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_b_hit[b_mask])-1))
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(n_nb_hit[nb_mask])),'percentage_null_encoding': n_nb_hit[nb_mask],'unique_id':np.arange(len(n_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(n_nb_hit[nb_mask])),'percentage_null_encoding': n_nb_try[nb_mask],'unique_id':np.arange(len(n_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(n_nb_hit[nb_mask])),'percentage_null_encoding': n_nb_miss[nb_mask],'unique_id':np.arange(len(n_nb_hit[nb_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_nb_hit[nb_mask])-1))
+
+    # do stats test
+    df_hit = pd.DataFrame({'trial_outcome': np.tile(0,  len(n_p_hit[p_mask])),'percentage_null_encoding': n_p_hit[p_mask],'unique_id':np.arange(len(n_p_hit[p_mask]))})
+    df_try = pd.DataFrame({'trial_outcome': np.tile(1,  len(n_p_hit[p_mask])),'percentage_null_encoding': n_p_try[p_mask],'unique_id':np.arange(len(n_p_hit[p_mask]))})
+    df_miss = pd.DataFrame({'trial_outcome': np.tile(2,  len(n_p_hit[p_mask])),'percentage_null_encoding': n_p_miss[p_mask],'unique_id':np.arange(len(n_p_hit[p_mask]))})
+    df =pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True); df = pd.concat([df, df_try], ignore_index=True); df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df, detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_p_hit[p_mask])-1))
 
     return
 
@@ -6060,11 +6244,18 @@ def main():
     combined_df = add_peak_width(combined_df)
 
     #read_df(combined_df)
+    
+
+    # supplemental for figure 5
+    plot_percentage_encoding_by_trial_category(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     # Figure 2 population level plots
-    fig_size = (3.5,6)
+    fig_size = (3.5,6) 
     plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_vs_shuffle_non_grid_cells(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_vs_shuffle_grid_cells(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+
     plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
     plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
     plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
@@ -6088,8 +6279,6 @@ def main():
     plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
     plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
-    # supplemental for figure 5
-    plot_percentage_encoding_by_trial_category(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     """
     plot_firing_rates_PDN(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/firing_rate_analysis")

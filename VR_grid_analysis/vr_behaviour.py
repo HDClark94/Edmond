@@ -2802,7 +2802,7 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
     Edmond.plot_utility2.style_vr_plot(ax)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/percentage_first_stops_vs_training_day_fs_all_tt.png', dpi=200)
-    plt.close()
+    plt.close() 
 
 def plot_trial_ratio_vs_percentage_correct_across_time(meta_df, save_path):
 
@@ -4089,6 +4089,8 @@ def main():
     # load dataframe
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
 
+
+    '''
     meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
 
     # plot performance by default, improvement (trial type ratio), improvement (trial type ratio and reward)
@@ -4179,8 +4181,8 @@ def main():
     population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
 
-
-
+    '''
+    population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
 
     print("look now")
 
