@@ -11,9 +11,11 @@ import PostSorting.theta_modulation
 import PostSorting.vr_spatial_data
 from matplotlib.markers import TICKDOWN
 from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
+from Edmond.VR_grid_analysis.vr_grid_cells import shuffle_blocks
 from Edmond.VR_grid_analysis.vr_grid_stability_plots import add_hit_miss_try3, add_avg_track_speed, get_avg_correlation, \
     get_reconstructed_trial_signal, plot_firing_rate_maps_per_trial_by_hmt_aligned, plot_firing_rate_maps_per_trial_by_hmt_aligned_other_neuron, plot_firing_rate_maps_per_trial_aligned_other_neuron, get_shifts
 from scipy import stats
+from Edmond.Concatenate_from_server import add_peaks_to_troughs
 from scipy import signal
 from scipy.interpolate import interp1d
 from astropy.convolution import convolve, Gaussian1DKernel, Gaussian2DKernel
@@ -1061,13 +1063,16 @@ def plot_jitter_correlations(matched_recording_df, output_path):
         plt.close()
 
 
-def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df):
+def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df, n_shuffles=100):
     print('plotting agreement matrices...')
     save_path = output_path + '/Figures/agreement_matrices'
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
+    spike_data = add_peaks_to_troughs(spike_data)
     spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell"]], on="cluster_id")
+    #spike_data = spike_data[spike_data["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
+
     spike_data = spike_data[spike_data["grid_cell"] == True]
     cluster_ids = np.array(spike_data["cluster_id"])
 
@@ -1080,8 +1085,16 @@ def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comp
             cluster_i_df = spike_data[spike_data["cluster_id"] == cluster_ids[i]]
             rolling_classifier_i = np.array(cluster_i_df["rolling:rolling_lomb_classifiers"].iloc[0])
             rolling_classifier_j = np.array(cluster_j_df["rolling:rolling_lomb_classifiers"].iloc[0])
-            rolling_classifier_i_shuffled = np.array(cluster_i_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
-            rolling_classifier_j_shuffled = np.array(cluster_j_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
+
+            shuffle_agreements=[]
+            for n in range(n_shuffles):
+                shuffled_rolling_classifier_j = shuffle_blocks(rolling_classifier_j) # only shuffling j
+                agreement_shuffled_blocks = np.sum(rolling_classifier_i==shuffled_rolling_classifier_j)/len(rolling_classifier_i)
+                shuffle_agreements.append(agreement_shuffled_blocks)
+            shuffle_agreements = np.array(shuffle_agreements)
+
+            #rolling_classifier_i_shuffled = np.array(cluster_i_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
+            #rolling_classifier_j_shuffled = np.array(cluster_j_df["rolling:rolling_lomb_classifiers_shuffled_blocks"].iloc[0])
 
             encoding_p_j = cluster_j_df["rolling:proportion_encoding_position"].iloc[0]
             encoding_d_j = cluster_j_df["rolling:proportion_encoding_distance"].iloc[0]
@@ -1091,7 +1104,7 @@ def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comp
             encoding_n_i = cluster_i_df["rolling:proportion_encoding_null"].iloc[0]
 
             agreement = np.sum(rolling_classifier_i==rolling_classifier_j)/len(rolling_classifier_i)
-            agreement_shuffled_blocks = np.sum(rolling_classifier_i_shuffled==rolling_classifier_j_shuffled)/len(rolling_classifier_i_shuffled)
+            agreement_shuffled_blocks = np.nanmean(shuffle_agreements)
 
             agreement_matrix[i, j] = agreement
             agreement_matrix_shuffled[i, j] = agreement_shuffled_blocks
@@ -1099,8 +1112,6 @@ def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comp
             if ((((encoding_p_j > 0.15) and  (encoding_p_j < 0.85)) and ((encoding_p_i > 0.15) and  (encoding_p_i < 0.85))) or
                 (((encoding_d_j > 0.15) and  (encoding_d_j < 0.85)) and ((encoding_d_i > 0.15) and  (encoding_d_i < 0.85))) or
                 (((encoding_n_j > 0.15) and  (encoding_n_j < 0.85)) and ((encoding_n_i > 0.15) and  (encoding_n_i < 0.85)))):
-
-
 
                 # determine if the pair were on the same tetrode
                 if cluster_i_df.tetrode.iloc[0] == cluster_j_df.tetrode.iloc[0]:
@@ -1294,7 +1305,7 @@ def main():
                     "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
                     "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
                     "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
-                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",]
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24"]
     #vr_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36"]
     process_recordings(vr_path_list, of_path_list)
 

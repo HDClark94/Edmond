@@ -179,6 +179,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'spatial_information_score': ('spatial_information_score_vr')})
                     spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_vr')})

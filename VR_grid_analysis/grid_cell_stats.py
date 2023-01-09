@@ -41,7 +41,7 @@ def summarise_grid_cells(combined_df, save_path, save=True):
 
     combined_df = combined_df[["session_id_vr", "session_id_of", "full_session_id_of", "full_session_id_vr", "cluster_id", "mouse", "classifier", "Lomb_classifier_", "ML_Freqs", "grid_score", "grid_spacing",
                                "hd_score", "border_score", "ThetaIndex", "mean_firing_rate_of", "rate_map_correlation_first_vs_second_half", "spatial_information_score",
-                               "rolling:proportion_encoding_position", "rolling:proportion_encoding_distance",  "rolling:proportion_encoding_null"]]
+                               "snippet_peak_to_trough", "rolling:proportion_encoding_position", "rolling:proportion_encoding_distance",  "rolling:proportion_encoding_null"]]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
     if save:
@@ -152,7 +152,7 @@ def main():
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
     #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
 
-    combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
+    #combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
     combined_df = combined_df[combined_df["track_length"] == 200] # only look at default task
     combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
