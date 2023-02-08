@@ -39,8 +39,8 @@ def summarise_grid_cells(combined_df, save_path, save=True):
     if save:
         stats.to_csv(save_path+"grid_stats.csv")
 
-    combined_df = combined_df[["session_id_vr", "session_id_of", "full_session_id_of", "full_session_id_vr", "cluster_id", "mouse", "classifier", "Lomb_classifier_", "ML_Freqs", "grid_score", "grid_spacing",
-                               "hd_score", "border_score", "ThetaIndex", "mean_firing_rate_of", "rate_map_correlation_first_vs_second_half", "spatial_information_score",
+    combined_df = combined_df[["session_id_vr", "session_id_of", "full_session_id_of", "full_session_id_vr", "cluster_id", "mouse", "n_trials", "grid_spacing", "field_size", "classifier", "Lomb_classifier_", "ML_Freqs", "grid_score", "grid_spacing",
+                               "hd_score", "border_score", "ThetaIndex", "mean_firing_rate_of", "rate_map_correlation_first_vs_second_half", "spatial_information_score", "spatial_information_score_vr",
                                "snippet_peak_to_trough", "rolling:proportion_encoding_position", "rolling:proportion_encoding_distance",  "rolling:proportion_encoding_null"]]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
 
@@ -152,12 +152,17 @@ def main():
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
     #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")], ignore_index=True)
 
-    #combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
+    combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
     combined_df = combined_df[combined_df["track_length"] == 200] # only look at default task
     combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
 
     grid_cell_stats, grid_cells = summarise_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/", save=True)
+
+    print("number of sessions = ", len(np.unique(grid_cells["session_id_vr"])))
+    print("number of grid cells  = ", len(grid_cells))
+    print("avg trial number  = ", np.nanmean(grid_cells["n_trials"]))
+    print("std trial number  = ", np.nanstd(grid_cells["n_trials"]))
 
     plot_of_rate_maps_PDN(grid_cells, save_path="/mnt/datastore/Harry/Vr_grid_cells/open_field_comparison/")
     plot_of_metrics_PDN(grid_cells, save_path="/mnt/datastore/Harry/Vr_grid_cells/open_field_comparison/")

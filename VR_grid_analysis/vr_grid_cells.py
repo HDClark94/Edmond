@@ -41,6 +41,51 @@ from scipy.stats.stats import pearsonr
 from scipy.stats import shapiro
 plt.rc('axes', linewidth=3)
 
+
+def compute_peak(firing_rate_map_by_trial):
+    fr=firing_rate_map_by_trial.flatten()
+    track_length = len(firing_rate_map_by_trial[0])
+    n_trials = len(firing_rate_map_by_trial)
+    elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
+    elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
+    # construct the lomb-scargle periodogram
+    frequency = Settings.frequency
+    sliding_window_size=track_length*Settings.window_length_in_laps
+    powers = []
+    centre_distances = []
+    indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+    for m in indices_to_test:
+        ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
+        power = ls.power(frequency)
+        powers.append(power.tolist())
+        centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
+    powers = np.array(powers)
+    avg_power = np.nanmean(powers, axis=0)
+    max_peak_power, max_peak_freq = get_max_SNR(frequency, avg_power)
+    return max_peak_power, max_peak_freq
+
+def generate_spatial_periodogram(firing_rate_map_by_trial):
+    fr=firing_rate_map_by_trial.flatten()
+    track_length = len(firing_rate_map_by_trial[0])
+    n_trials = len(firing_rate_map_by_trial)
+    elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
+    elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
+    # construct the lomb-scargle periodogram
+    frequency = Settings.frequency
+    sliding_window_size=track_length*Settings.window_length_in_laps
+    powers = []
+    centre_distances = []
+    indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
+    for m in indices_to_test:
+        ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
+        power = ls.power(frequency)
+        powers.append(power.tolist())
+        centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
+    powers = np.array(powers)
+    centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
+    return powers, centre_trials, track_length
+
+
 def add_avg_trial_speed(processed_position_data):
     avg_trial_speeds = []
     for trial_number in np.unique(processed_position_data["trial_number"]):
@@ -328,6 +373,7 @@ def calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_dat
     elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
     elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
 
+    shuffled_rate_maps = []
     freqs = []
     SNRs = []
     avg_powers = []
@@ -365,18 +411,22 @@ def calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_dat
             avg_powers.append(avg_power)
             all_powers.append(powers)
             all_centre_trials.append(centre_trials)
+            shuffled_rate_maps.append(firing_rates)
         else:
             freqs.append(np.nan)
             SNRs.append(np.nan)
             avg_powers.append(np.nan)
             all_powers.append(np.nan)
             all_centre_trials.append(np.nan)
+            shuffled_rate_maps.append(np.nan)
 
     spike_data["MOVING_LOMB_freqs"+suffix] = freqs
     spike_data["MOVING_LOMB_avg_power"+suffix] = avg_powers
     spike_data["MOVING_LOMB_SNR"+suffix] = SNRs
     spike_data["MOVING_LOMB_all_powers"+suffix] = all_powers
     spike_data["MOVING_LOMB_all_centre_trials"+suffix] = all_centre_trials
+    if shuffled_trials:
+        spike_data["rate_maps"+suffix] = shuffled_rate_maps
     return spike_data
 
 
@@ -925,8 +975,8 @@ def plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, proce
                 subset_powers[subset_mask == False] = np.nan
                 avg_subset_powers = np.nanmean(subset_powers, axis=0)
                 sem_subset_powers = stats.sem(subset_powers, axis=0, nan_policy="omit")
-                ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3)
-                ax.plot(frequency, avg_subset_powers, color="black", linewidth=3)
+                ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3, zorder=-1)
+                ax.plot(frequency, avg_subset_powers, color="black", linewidth=3, zorder=-1)
                 #allocentric_peak_freq, allocentric_peak_power, allo_i = get_allocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
                 #egocentric_peak_freq, egocentric_peak_power, ego_i = get_egocentric_peak(frequency, avg_subset_powers, tolerance=0.05)
                 #ax.scatter(allocentric_peak_freq, allocentric_peak_power, color=Settings.allocentric_color, marker="v", s=200, zorder=10)
@@ -949,13 +999,14 @@ def plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, proce
             plt.close()
     return
 
-def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data, output_path, track_length):
+def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data, position_data, output_path, track_length):
     print('plotting trial firing rate maps...')
     save_path = output_path + '/Figures/firing_rate_maps'
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
         firing_times_cluster = spike_data.firing_times.iloc[cluster_index]
         if len(firing_times_cluster)>1:
             cluster_firing_maps = np.array(spike_data['fr_binned_in_space_smoothed'].iloc[cluster_index])
@@ -995,6 +1046,17 @@ def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, process
                 code_cluster_firing_maps = cluster_firing_maps[trial_numbers-1]
                 ax.fill_between(locations, np.nanmean(code_cluster_firing_maps, axis=0)-stats.sem(code_cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(code_cluster_firing_maps, axis=0)+stats.sem(code_cluster_firing_maps, axis=0, nan_policy="omit"), color=code_color, alpha=0.3)
                 ax.plot(locations, np.nanmean(code_cluster_firing_maps, axis=0), color=code_color, linewidth=3)
+
+                if len(trial_numbers)>0:
+                    SI = get_spatial_information_score_for_trials(track_length, position_data, cluster_df, trial_numbers)
+                    print("for cluster ", cluster_id)
+                    print("using code ", code)
+                    print("SI = ", str(SI))
+
+            SI = cluster_df.spatial_information_score.iloc[0]
+            print("for all trials")
+            print("SI = ", str(SI))
+
             plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
             plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
             plt.xlim(0, track_length)
@@ -1011,6 +1073,44 @@ def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, process
             plt.savefig(save_path + '/' + spike_data.session_id.iloc[cluster_index] + '_firing_rate_maps_short_with_rolling_classifications_' + str(cluster_id) + '.png', dpi=300)
             plt.close()
     return
+
+
+def get_spatial_information_score_for_trials(track_length, position_data, cluster_df, trial_ids):
+    spikes_locations = np.array(cluster_df["x_position_cm"].iloc[0])
+    spike_trial_numbers = np.array(cluster_df["trial_number"].iloc[0])
+
+    spikes_locations = spikes_locations[np.isin(spike_trial_numbers, trial_ids)]
+    spike_trial_numbers = spike_trial_numbers[np.isin(spike_trial_numbers, trial_ids)]
+
+    number_of_spikes = len(spikes_locations)
+
+    if number_of_spikes == 0:
+        return np.nan
+
+    position_data = position_data[position_data["trial_number"].isin(spike_trial_numbers)]
+
+    position_heatmap = np.zeros(track_length)
+    for x in np.arange(track_length):
+        bin_occupancy = len(position_data[(position_data["x_position_cm"] > x) &
+                                          (position_data["x_position_cm"] <= x+1)])
+        position_heatmap[x] = bin_occupancy
+    position_heatmap = position_heatmap*np.diff(position_data["time_seconds"])[-1] # convert to real time in seconds
+    occupancy_probability_map = position_heatmap/np.sum(position_heatmap) # Pj
+
+    vr_bin_size_cm = settings.vr_bin_size_cm
+    gauss_kernel = Gaussian1DKernel(settings.guassian_std_for_smoothing_in_space_cm/vr_bin_size_cm)
+
+    mean_firing_rate = number_of_spikes/np.sum(len(position_data)*np.diff(position_data["time_seconds"])[-1]) # λ
+    spikes, _ = np.histogram(spikes_locations, bins=track_length, range=(0,track_length))
+    rates = spikes/position_heatmap
+    #rates = convolve(rates, gauss_kernel)
+    mrate = mean_firing_rate
+    index = rates>0
+    Ispike = np.sum(occupancy_probability_map[index] * (rates[index]/mrate) * np.log2(rates[index]/mrate))
+    if Ispike < 0:
+        print("something went wrong, information score should never be negative")
+
+    return Ispike
 
 def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path, track_length):
     print('plotting trial firing rate maps...')
@@ -1359,9 +1459,9 @@ def plot_firing_rate_maps(spike_data, processed_position_data, output_path, trac
 
 def get_trial_color(trial_type):
     if trial_type == 0:
-        return "blue"
+        return "tab:blue"
     elif trial_type == 1:
-        return "red"
+        return "tab:red"
     elif trial_type == 2:
         return "deepskyblue"
     else:
@@ -1450,56 +1550,6 @@ def plot_stop_histogram(processed_position_data, output_path, track_length=200):
     Edmond.plot_utility2.style_vr_plot(ax)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(output_path + '/Figures/behaviour/stop_histogram' + '.png', dpi=200)
-    plt.close()
-
-def plot_allo_vs_ego_firing(vr_recording_path_list, of_recording_path_list, save_path):
-
-    ego_scores = []
-    allo_scores = []
-    for recording in vr_recording_path_list:
-        print("processing ", recording)
-        paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
-        if os.path.isfile(recording+"/MountainSort/DataFrames/spatial_firing.pkl"):
-            spike_data_vr = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-
-            if found_paired_recording:
-                if os.path.isfile(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl"):
-                    spike_data_of =  pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-                    for cluster_index, cluster_id in enumerate(spike_data_vr.cluster_id):
-                        cluster_spike_data_vr = spike_data_vr[spike_data_vr["cluster_id"] == cluster_id]
-                        cluster_spike_data_of = spike_data_of[spike_data_of["cluster_id"] == cluster_id]
-
-                        if len(cluster_spike_data_of) == 1:
-                            grid_score = cluster_spike_data_of["grid_score"].iloc[0]
-                            rate_map_corr = cluster_spike_data_of["rate_map_correlation_first_vs_second_half"].iloc[0]
-                            if (grid_score > 0.5) and (rate_map_corr > 0):
-                                ego_score = cluster_spike_data_vr["egocentric_avg_correlation"].iloc[0]
-                                allo_score = cluster_spike_data_vr["allocentric_avg_correlation"].iloc[0]
-                                ego_scores.append(ego_score)
-                                allo_scores.append(allo_score)
-                        else:
-                            print("there is no matching of cell")
-
-    allo_scores = np.array(allo_scores)
-    ego_scores = np.array(ego_scores)
-    nan_mask = np.logical_or(np.isnan(allo_scores), np.isnan(ego_scores))
-    allo_scores = allo_scores[~nan_mask]
-    ego_scores = ego_scores[~nan_mask]
-
-    fig = plt.figure(figsize=(4,4))
-    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-    ax.bar([0.6, 1.4], [np.mean(allo_scores), np.mean(ego_scores)], edgecolor="black", align="edge", color="white", alpha=0)
-    ax.errorbar([0.6, 1.4], [np.mean(allo_scores), np.mean(ego_scores)], yerr=[stats.sem(allo_scores), stats.sem(ego_scores)], fmt='o')
-    for i in range(len(allo_scores)):
-        ax.plot([0.7, 1.3], [allo_scores[i], ego_scores[i]], marker="o", alpha=0.3, color="black")
-    plt.ylabel('Lap to lap pearson', fontsize=12, labelpad = 10)
-    plt.xticks(ticks=[0.6 ,1.4], labels=["allocentric", "egocentric"], fontsize=12)
-    ax.yaxis.set_ticks_position('left')
-    ax.xaxis.set_ticks_position('bottom')
-    plt.xlim([0, 2])
-    plt.ylim([-0.5, -0.5])
-    Edmond.plot_utility2.style_vr_plot(ax, x_max=1)
-    plt.savefig(save_path + '/allo_vs_ego_grid_cells.png', dpi=200)
     plt.close()
 
 
@@ -1792,9 +1842,45 @@ def add_displayed_peak_firing(spike_data):
     spike_data["vr_peak_firing"] = peak_firing
     return spike_data
 
+def get_rolling_lomb_classifier_for_centre_trial2(centre_trials, powers, power_threshold, power_step, track_length, n_window_size=Settings.rolling_window_size_for_lomb_classifier, lomb_frequency_threshold=Settings.lomb_frequency_threshold):
 
-def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold, power_step, track_length, n_window_size=Settings.rolling_window_size_for_lomb_classifier):
+    frequency = Settings.frequency
 
+    trial_points = []
+    peak_frequencies = []
+    rolling_lomb_classifier = []
+    rolling_lomb_classifier_numeric = []
+    rolling_lomb_classifier_colors = []
+
+    for tn in np.unique(centre_trials):
+        trial_powers = powers[centre_trials==tn, :]
+        avg_power = np.nanmean(trial_powers, axis=0)
+        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+
+        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, lomb_frequency_threshold, numeric=False)
+        peak_frequencies.append(max_SNR_freq)
+        trial_points.append(tn)
+        if lomb_classifier == "Position":
+            rolling_lomb_classifier.append("P")
+            rolling_lomb_classifier_numeric.append(0.5)
+            rolling_lomb_classifier_colors.append(Settings.allocentric_color)
+        elif lomb_classifier == "Distance":
+            rolling_lomb_classifier.append("D")
+            rolling_lomb_classifier_numeric.append(1.5)
+            rolling_lomb_classifier_colors.append(Settings.egocentric_color)
+        elif lomb_classifier == "Null":
+            rolling_lomb_classifier.append("N")
+            rolling_lomb_classifier_numeric.append(2.5)
+            rolling_lomb_classifier_colors.append(Settings.null_color)
+        else:
+            rolling_lomb_classifier.append("U")
+            rolling_lomb_classifier_numeric.append(3.5)
+            rolling_lomb_classifier_colors.append("black")
+    return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_numeric), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
+
+
+def get_rolling_lomb_classifier_for_centre_trial_frequentist(centre_trials, powers, power_threshold, power_step, track_length, n_window_size=Settings.rolling_window_size_for_lomb_classifier, lomb_frequency_threshold=Settings.lomb_frequency_threshold):
+    gauss_kernel = Gaussian1DKernel(stddev=3)
     frequency = Settings.frequency
 
     trial_points = []
@@ -1805,17 +1891,25 @@ def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_th
     for i in range(len(centre_trials)):
         centre_trial = centre_trials[i]
 
-        if i<int(n_window_size/2):
-            power_window = powers[:i+int(n_window_size/2), :]
-        elif i+int(n_window_size/2)>len(centre_trials):
-            power_window = powers[i-int(n_window_size/2):, :]
+        if n_window_size>1:
+            if i<int(n_window_size/2):
+                power_window = powers[:i+int(n_window_size/2), :]
+            elif i+int(n_window_size/2)>len(centre_trials):
+                power_window = powers[i-int(n_window_size/2):, :]
+            else:
+                power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
+
+            freq_peaks = frequency[np.nanargmax(power_window, axis=1)]
         else:
-            power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
+            freq_peaks = frequency[np.nanargmax(powers[i, :], axis=0)]
 
-        avg_power = np.nanmean(power_window, axis=0)
-        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+        hist, bin_edges = np.histogram(freq_peaks, bins=len(frequency)+1, range=[min(frequency), max(frequency)], density=True)
+        bin_centres = 0.5*(bin_edges[1:]+bin_edges[:-1])
+        smoothened_hist = convolve(hist, gauss_kernel)
 
-        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, 0.05, numeric=False)
+        max_SNR, max_SNR_freq = get_max_SNR(bin_centres, smoothened_hist)
+
+        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, lomb_frequency_threshold, numeric=False)
         peak_frequencies.append(max_SNR_freq)
         trial_points.append(centre_trial)
         if lomb_classifier == "Position":
@@ -1834,8 +1928,54 @@ def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_th
             rolling_lomb_classifier.append("U")
             rolling_lomb_classifier_numeric.append(3.5)
             rolling_lomb_classifier_colors.append("black")
+    return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_numeric), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
 
 
+def get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, power_threshold, power_step, track_length, n_window_size=Settings.rolling_window_size_for_lomb_classifier, lomb_frequency_threshold=Settings.lomb_frequency_threshold):
+
+    frequency = Settings.frequency
+
+    trial_points = []
+    peak_frequencies = []
+    rolling_lomb_classifier = []
+    rolling_lomb_classifier_numeric = []
+    rolling_lomb_classifier_colors = []
+    for i in range(len(centre_trials)):
+        centre_trial = centre_trials[i]
+
+        if n_window_size>1:
+            if i<int(n_window_size/2):
+                power_window = powers[:i+int(n_window_size/2), :]
+            elif i+int(n_window_size/2)>len(centre_trials):
+                power_window = powers[i-int(n_window_size/2):, :]
+            else:
+                power_window = powers[i-int(n_window_size/2):i+int(n_window_size/2), :]
+
+            avg_power = np.nanmean(power_window, axis=0)
+        else:
+            avg_power = powers[i, :]
+
+        max_SNR, max_SNR_freq = get_max_SNR(frequency, avg_power)
+
+        lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, power_threshold, lomb_frequency_threshold, numeric=False)
+        peak_frequencies.append(max_SNR_freq)
+        trial_points.append(centre_trial)
+        if lomb_classifier == "Position":
+            rolling_lomb_classifier.append("P")
+            rolling_lomb_classifier_numeric.append(0.5)
+            rolling_lomb_classifier_colors.append(Settings.allocentric_color)
+        elif lomb_classifier == "Distance":
+            rolling_lomb_classifier.append("D")
+            rolling_lomb_classifier_numeric.append(1.5)
+            rolling_lomb_classifier_colors.append(Settings.egocentric_color)
+        elif lomb_classifier == "Null":
+            rolling_lomb_classifier.append("N")
+            rolling_lomb_classifier_numeric.append(2.5)
+            rolling_lomb_classifier_colors.append(Settings.null_color)
+        else:
+            rolling_lomb_classifier.append("U")
+            rolling_lomb_classifier_numeric.append(3.5)
+            rolling_lomb_classifier_colors.append("black")
     return np.array(rolling_lomb_classifier), np.array(rolling_lomb_classifier_numeric), np.array(rolling_lomb_classifier_colors), np.array(peak_frequencies), np.array(trial_points)
 
 def get_modal_class_char(modal_class):
@@ -1909,34 +2049,55 @@ def shuffle_blocks(rolling_lomb_classifier):
         i+=len(block_ids[block_ids == id])
     return rolling_lomb_classifier_shuffled_by_blocks
 
-def add_rolling_stats_shuffled_blocks(spike_data, track_length):
-    power_step = Settings.power_estimate_step
+def compare_block_length_stats_vs_shuffled(spike_data, processed_position_data, track_length, n_shuffles=50):
 
-    rolling_lomb_classifiers=[]
-    rolling_lomb_classifiers_shuffled_blocks=[]
+    avg_block_length_percentile_in_shuffle=[]
+    median_block_length_percentile_in_shuffle=[]
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
         rolling_power_threshold =  cluster_spike_data["rolling_threshold"].iloc[0]
 
         if len(firing_times_cluster)>1:
-            powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
+            rolling_lomb_classifier = cluster_spike_data["rolling:rolling_classifiers"].iloc[0]
+            actual_block_lengths = get_block_lengths_any_code(rolling_lomb_classifier)
+            avg_actual_block_length = np.nanmean(actual_block_lengths)
+            median_actual_block_length = np.nanmedian(actual_block_lengths)
+
             centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
             centre_trials = np.round(centre_trials).astype(np.int64)
 
-            powers[np.isnan(powers)] = 0
-            rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length)
-            rolling_lomb_classifier_shuffled_by_blocks = shuffle_blocks(rolling_lomb_classifier)
+            shuffle_avg_block_lengths=[]
+            shuffle_median_block_lengths=[]
+            for i in range(n_shuffles):
+                cluster_spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=track_length, shuffled_trials=True)
+                powers_shuffled =  np.array(cluster_spike_data["MOVING_LOMB_all_powers_shuffled_trials"].iloc[0])
+
+                rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
+                    get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_shuffled, power_threshold=rolling_power_threshold,
+                                                                 power_step=Settings.power_estimate_step, track_length=track_length,
+                                                                 n_window_size=200, lomb_frequency_threshold=0.05)
+
+                block_lengths = np.array(get_block_lengths_any_code(rolling_lomb_classifier))
+                shuffle_avg_block_lengths.append(np.nanmean(block_lengths))
+                shuffle_median_block_lengths.append(np.nanmedian(block_lengths))
+            shuffle_avg_block_lengths = np.array(shuffle_avg_block_lengths)
+            shuffle_median_block_lengths = np.array(shuffle_median_block_lengths)
+
+            percentile_avg_block_length = stats.percentileofscore(shuffle_avg_block_lengths, avg_actual_block_length, kind='rank')
+            percentile_median_block_length = stats.percentileofscore(shuffle_median_block_lengths, median_actual_block_length, kind='rank')
+
+            avg_block_length_percentile_in_shuffle.append(percentile_avg_block_length)
+            median_block_length_percentile_in_shuffle.append(percentile_median_block_length)
         else:
-            rolling_lomb_classifier = np.array([])
-            rolling_lomb_classifier_shuffled_by_blocks=np.array([])
+            avg_block_length_percentile_in_shuffle.append(np.nan)
+            median_block_length_percentile_in_shuffle.append(np.nan)
 
-        rolling_lomb_classifiers.append(rolling_lomb_classifier)
-        rolling_lomb_classifiers_shuffled_blocks.append(rolling_lomb_classifier_shuffled_by_blocks)
-
-    spike_data["rolling:rolling_lomb_classifiers"] = rolling_lomb_classifiers
-    spike_data["rolling:rolling_lomb_classifiers_shuffled_blocks"] = rolling_lomb_classifiers_shuffled_blocks
+    spike_data["rolling:avg_block_length_percentile_in_shuffle"] = avg_block_length_percentile_in_shuffle
+    spike_data["rolling:median_block_length_percentile_in_shuffle"] = median_block_length_percentile_in_shuffle
     return spike_data
+
+
 
 def add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length):
     spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=track_length, shuffled_trials=True)
@@ -1945,6 +2106,8 @@ def add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_l
 
     block_lengths_for_encoder=[]
     block_lengths_for_encoder_shuffled=[]
+    block_lengths_for_encoder_small_window=[]
+    block_lengths_for_encoder_shuffled_small_window=[]
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
@@ -1959,20 +2122,31 @@ def add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_l
             centre_trials = np.round(centre_trials).astype(np.int64)
 
             powers[np.isnan(powers)] = 0; powers_shuffled[np.isnan(powers_shuffled)] = 0
+            # calculate with default window size
             rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length)
             rolling_lomb_classifier_shuffled, rolling_lomb_classifier_numeric_shuffled, rolling_lomb_classifier_colors_shuffled, rolling_frequencies_shuffled, rolling_points_shuffled = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_shuffled, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length)
-
             block_lengths = get_block_lengths_any_code(rolling_lomb_classifier)
             block_lengths_shuffled=get_block_lengths_any_code(rolling_lomb_classifier_shuffled)
+
+            rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length, n_window_size=1)
+            rolling_lomb_classifier_shuffled, rolling_lomb_classifier_numeric_shuffled, rolling_lomb_classifier_colors_shuffled, rolling_frequencies_shuffled, rolling_points_shuffled = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_shuffled, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length, n_window_size=1)
+            block_lengths_small_window = get_block_lengths_any_code(rolling_lomb_classifier)
+            block_lengths_shuffled_small_window =get_block_lengths_any_code(rolling_lomb_classifier_shuffled)
         else:
             block_lengths=[]
             block_lengths_shuffled=[]
+            block_lengths_small_window=[]
+            block_lengths_shuffled_small_window=[]
 
         block_lengths_for_encoder.append(block_lengths)
         block_lengths_for_encoder_shuffled.append(block_lengths_shuffled)
+        block_lengths_for_encoder_small_window.append(block_lengths_small_window)
+        block_lengths_for_encoder_shuffled_small_window.append(block_lengths_shuffled_small_window)
 
     spike_data["rolling:block_lengths"] = block_lengths_for_encoder
     spike_data["rolling:block_lengths_shuffled"] = block_lengths_for_encoder_shuffled
+    spike_data["rolling:block_lengths_small_window"] = block_lengths_for_encoder_small_window
+    spike_data["rolling:block_lengths_shuffled_small_window"] = block_lengths_for_encoder_shuffled_small_window
 
     # delete unwanted rows relating to the shuffled of the trials
     del spike_data["MOVING_LOMB_freqs_shuffled_trials"]
@@ -1985,13 +2159,25 @@ def add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_l
 def compress_rolling_stats(rolling_centre_trials, rolling_classifiers):
     rolling_trials = np.unique(rolling_centre_trials)
     rolling_modes = []
+    rolling_modes_numeric = []
     for tn in rolling_trials:
         rolling_class = rolling_classifiers[rolling_centre_trials == tn]
         mode = stats.mode(rolling_class, axis=None)[0][0]
         rolling_modes.append(mode)
+
+        if mode == "P":
+            rolling_modes_numeric.append(0.5)
+        elif mode == "D":
+            rolling_modes_numeric.append(1.5)
+        elif mode == "Null":
+            rolling_modes_numeric.append(2.5)
+        else:
+            rolling_modes_numeric.append(3.5)
+
     rolling_classifiers = np.array(rolling_modes)
+    rolling_modes_numeric=np.array(rolling_modes_numeric)
     rolling_centre_trials = rolling_trials
-    return rolling_centre_trials, rolling_classifiers
+    return rolling_centre_trials, rolling_classifiers, rolling_modes_numeric
 
 def add_rolling_stats_percentage_hits(spike_data, processed_position_data):
     encoding_position = []
@@ -2004,7 +2190,7 @@ def add_rolling_stats_percentage_hits(spike_data, processed_position_data):
         rolling_centre_trials = cluster_spike_data["rolling:rolling_centre_trials"].iloc[0]
         rolling_classifiers = cluster_spike_data["rolling:rolling_classifiers"].iloc[0]
 
-        rolling_centre_trials, rolling_classifiers = compress_rolling_stats(rolling_centre_trials, rolling_classifiers)
+        rolling_centre_trials, rolling_classifiers,_ = compress_rolling_stats(rolling_centre_trials, rolling_classifiers)
 
         # make empty array for trial types and trial outcomes
         P = [[np.nan,np.nan,np.nan],[np.nan,np.nan,np.nan],[np.nan,np.nan,np.nan]]
@@ -2051,7 +2237,7 @@ def add_coding_by_trial_number(spike_data, processed_position_data, remove_first
             rolling_centre_trials = cluster_spike_data["rolling:rolling_centre_trials"].iloc[0]
             rolling_classifiers = cluster_spike_data["rolling:rolling_classifiers"].iloc[0]
 
-            rolling_centre_trials, rolling_classifiers = compress_rolling_stats(rolling_centre_trials, rolling_classifiers)
+            rolling_centre_trials, rolling_classifiers,_ = compress_rolling_stats(rolling_centre_trials, rolling_classifiers)
 
             rolling_classifier_by_trial_number=[]
             for index, row in processed_position_data.iterrows():
@@ -2224,9 +2410,9 @@ def curate_stops_spike_data(spike_data, track_length):
     spike_data["stop_trial_numbers"] = stop_trials_clusters
     return spike_data
 
-def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None, remove_last_and_first_from_streak=True):
+def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None, remove_last_and_first_from_streak=True, use_first_stops=False):
     if shuffle:
-        iterations = 1000
+        iterations = 100
     else:
         iterations = 1
     gauss_kernel = Gaussian1DKernel(1)
@@ -2240,6 +2426,10 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
 
         stops_location_cm = np.array(cluster_df["stop_locations"].iloc[0])
         stop_trial_numbers = np.array(cluster_df["stop_trial_numbers"].iloc[0])
+
+        if use_first_stops:
+            stops_location_cm = stops_location_cm[np.unique(stop_trial_numbers, return_index=True)[1]]
+            stop_trial_numbers = stop_trial_numbers[np.unique(stop_trial_numbers, return_index=True)[1]]
 
         trial_numbers = np.array(cluster_df["behaviour_trial_numbers"].iloc[0])
         trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
@@ -2435,6 +2625,43 @@ def add_trials(spike_data, processed_position_data):
     spike_data["behaviour_trial_types"] = cluster_trial_types
     return spike_data
 
+def calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length):
+
+    for tt in [0,1,2]:
+        tt_processed_position_data = processed_position_data[processed_position_data["trial_type"] ==tt]
+
+        hit_trial_numbers = np.array(tt_processed_position_data[tt_processed_position_data["hit_miss_try"] == "hit"]["trial_number"])
+        try_trial_numbers = np.array(tt_processed_position_data[tt_processed_position_data["hit_miss_try"] == "try"]["trial_number"])
+        miss_trial_numbers = np.array(tt_processed_position_data[tt_processed_position_data["hit_miss_try"] == "miss"]["trial_number"])
+
+        lowest_n_number = min([len(hit_trial_numbers), len(try_trial_numbers), len(miss_trial_numbers)])
+        # Subset trials using the lowest n number
+        np.random.shuffle(hit_trial_numbers)
+        np.random.shuffle(try_trial_numbers)
+        np.random.shuffle(miss_trial_numbers)
+
+        hit_spatial_information_scores = []
+        try_spatial_information_scores = []
+        miss_spatial_information_scores = []
+        for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+            cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+
+            if lowest_n_number>0:
+                hit_score = get_spatial_information_score_for_trials(track_length, position_data, cluster_df, hit_trial_numbers[:lowest_n_number])
+                try_score = get_spatial_information_score_for_trials(track_length, position_data, cluster_df, try_trial_numbers[:lowest_n_number])
+                miss_score = get_spatial_information_score_for_trials(track_length, position_data, cluster_df, miss_trial_numbers[:lowest_n_number])
+                hit_spatial_information_scores.append(hit_score)
+                try_spatial_information_scores.append(try_score)
+                miss_spatial_information_scores.append(miss_score)
+            else:
+                hit_spatial_information_scores.append(np.nan)
+                try_spatial_information_scores.append(np.nan)
+                miss_spatial_information_scores.append(np.nan)
+
+        spike_data["hit_spatial_information_score_tt"+str(tt)] = hit_spatial_information_scores
+        spike_data["try_spatial_information_score_tt"+str(tt)] = try_spatial_information_scores
+        spike_data["miss_spatial_information_score_tt"+str(tt)] = miss_spatial_information_scores
+    return spike_data
 
 def calculate_spatial_information(spatial_firing, position_data, track_length):
 
@@ -2480,7 +2707,7 @@ def calculate_spatial_information(spatial_firing, position_data, track_length):
         mean_firing_rate = cluster_df.iloc[0]["number_of_spikes"]/np.sum(len(position_data)*np.diff(position_data["time_seconds"])[-1]) # λ
         spikes, _ = np.histogram(np.array(cluster_df['x_position_cm'].iloc[0]), bins=track_length, range=(0,track_length))
         rates = spikes/position_heatmap
-        rates = convolve(rates, gauss_kernel)
+        #rates = convolve(rates, gauss_kernel)
         mrate = mean_firing_rate
         index = rates>0
         Ispike = np.sum(occupancy_probability_map[index] * (rates[index]/mrate) * np.log2(rates[index]/mrate))
@@ -2493,10 +2720,94 @@ def calculate_spatial_information(spatial_firing, position_data, track_length):
 
     return spatial_firing
 
+def add_open_field_classifier(spike_data, paired_spike_data):
+    classifications = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        if ("classifier" in list(paired_spike_data)) and (cluster_id in list(paired_spike_data["cluster_id"])):
+            paired_cluster_df = paired_spike_data[(paired_spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+            classifications.append(paired_cluster_df["classifier"].iloc[0])
+        else:
+            classifications.append("")
+    spike_data["paired_cell_type_classification"] = classifications
+    return spike_data
+
+def calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt):
+    processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
+    hit_trial_numbers = np.array(processed_position_data[processed_position_data["hit_miss_try"]=="hit"]["trial_number"])
+    try_trial_numbers = np.array(processed_position_data[processed_position_data["hit_miss_try"]=="try"]["trial_number"])
+    miss_trial_numbers = np.array(processed_position_data[processed_position_data["hit_miss_try"]=="miss"]["trial_number"])
+
+    hit_spatial_periodograms = []
+    try_spatial_periodograms = []
+    miss_spatial_periodograms = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+        firing_rates = np.array(cluster_df["fr_binned_in_space_smoothed"].iloc[0])
+        firing_times_cluster = np.array(cluster_df["firing_times"].iloc[0])
+
+        if len(firing_times_cluster)>0:
+            hit_firing_rates = firing_rates[hit_trial_numbers-1]
+            try_firing_rates = firing_rates[try_trial_numbers-1]
+            miss_firing_rates = firing_rates[miss_trial_numbers-1]
+
+            if len(hit_firing_rates)>0:
+                hit_spatial_periodogram, _, _ = generate_spatial_periodogram(hit_firing_rates)
+            else:
+                hit_spatial_periodogram = None
+            if len(try_firing_rates)>0:
+                try_spatial_periodogram, _, _ = generate_spatial_periodogram(try_firing_rates)
+            else:
+                try_spatial_periodogram = None
+            if len(miss_firing_rates)>0:
+                miss_spatial_periodogram, _, _ = generate_spatial_periodogram(miss_firing_rates)
+            else:
+                miss_spatial_periodogram = None
+
+        else:
+            hit_spatial_periodograms = None
+            try_spatial_periodograms = None
+            miss_spatial_periodograms = None
+
+        hit_spatial_periodograms.append(hit_spatial_periodogram)
+        try_spatial_periodograms.append(try_spatial_periodogram)
+        miss_spatial_periodograms.append(miss_spatial_periodogram)
+
+    spike_data["hit_spatial_periodogram_tt"+str(tt)] = hit_spatial_periodograms
+    spike_data["try_spatial_periodogram_tt"+str(tt)] = try_spatial_periodograms
+    spike_data["miss_spatial_periodogram_tt"+str(tt)] = miss_spatial_periodograms
+    return spike_data
+
+
+def add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length):
+    position_spatial_information_scores = []
+    distance_spatial_information_scores = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+        rolling_centre_trials = np.array(spike_data["rolling:rolling_centre_trials"].iloc[cluster_index])
+        rolling_classifiers = np.array(spike_data["rolling:rolling_classifiers"].iloc[cluster_index])
+
+        P_trial_numbers = rolling_centre_trials[rolling_classifiers=="P"]
+        D_trial_numbers = rolling_centre_trials[rolling_classifiers=="D"]
+
+        lowest_n_number = min([len(P_trial_numbers), len(D_trial_numbers)])
+        # Subset trials using the lowest n number
+        np.random.shuffle(P_trial_numbers)
+        np.random.shuffle(D_trial_numbers)
+
+        if lowest_n_number>0:
+            position_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, P_trial_numbers))
+            distance_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, D_trial_numbers))
+        else:
+            position_spatial_information_scores.append(np.nan)
+            distance_spatial_information_scores.append(np.nan)
+
+    spike_data["rolling:position_spatial_information_scores"] = position_spatial_information_scores
+    spike_data["rolling:distance_spatial_information_scores"] = distance_spatial_information_scores
+    return spike_data
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
-    #vr_recording_path_list = vr_recording_path_list[::-1]
+    #vr_recording_path_list=vr_recording_path_list[283:]
     for recording in vr_recording_path_list:
         print("processing ", recording)
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
@@ -2507,6 +2818,10 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 
             if len(spike_data) != 0:
+                if paired_recording is not None:
+                    paired_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                    spike_data = add_open_field_classifier(spike_data, paired_spike_data)
+
                 spike_data = delete_unused_columns(spike_data)
                 # remake the spike locations and firing rate maps
                 #raw_position_data, position_data = syncronise_position_data(recording, get_track_length(recording))
@@ -2518,8 +2833,6 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=True)
                 #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=False)
                 #spike_data = add_displayed_peak_firing(spike_data)
-
-                #
                 #spike_data = calculate_spatial_information(spike_data, position_data, track_length=get_track_length(recording))
 
                 # BEHAVIOURAL
@@ -2529,20 +2842,25 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 spike_data = add_n_PI_trial(spike_data, processed_position_data)
                 spike_data = add_stops(spike_data, processed_position_data, track_length=get_track_length(recording))
                 spike_data = add_trials(spike_data, processed_position_data)
+                spike_data = calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
 
                 # MOVING LOMB PERIODOGRAMS
-                spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
                 #spike_data = add_lomb_classifier(spike_data)
 
                 # Rolling classifications
-                #spike_data = add_rolling_stats_shuffled_blocks(spike_data, track_length=get_track_length(recording))
                 #spike_data = add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = add_rolling_stats_encoding_x(spike_data, track_length=get_track_length(recording))
-                spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
-                #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats
-                spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
-                spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                #spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
+                #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
+                #spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
+                #spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=0)
+                #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=1)
+                #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=2)
+                #spike_data = compare_block_length_stats_vs_shuffled(spike_data, processed_position_data, track_length=get_track_length(recording))
 
                 # Joint activity analysis
                 #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
@@ -2580,7 +2898,7 @@ def main():
     #vr_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
     #                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
     #                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24"]
-    vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_path_list = ['/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21']
     #vr_path_list = ['/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26','/mnt/datastore/Harry/cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15',
     #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41',

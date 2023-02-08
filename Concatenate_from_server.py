@@ -172,9 +172,35 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("rolling:block_lengths_shuffled")
                     if "rolling:block_lengths" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:block_lengths")
+                    if "rolling:block_lengths_small_window" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths_small_window")
+                    if "rolling:block_lengths_shuffled_small_window" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:block_lengths_shuffled_small_window")
                     if "rolling:classifier_by_trial_number" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:classifier_by_trial_number")
+                    #if "MOVING_LOMB_all_powers" in list(spatial_firing):
+                    #    collumn_names_to_keep.append("MOVING_LOMB_all_powers")
+                    #if "MOVING_LOMB_all_centre_trials" in list(spatial_firing):
+                    #    collumn_names_to_keep.append("MOVING_LOMB_all_centre_trials")
 
+                    if "hit_spatial_periodogram_tt0" in list(spatial_firing):
+                        collumn_names_to_keep.append("hit_spatial_periodogram_tt0")
+                    if "hit_spatial_periodogram_tt1" in list(spatial_firing):
+                        collumn_names_to_keep.append("hit_spatial_periodogram_tt1")
+                    if "hit_spatial_periodogram_tt2" in list(spatial_firing):
+                        collumn_names_to_keep.append("hit_spatial_periodogram_tt2")
+                    if "try_spatial_periodogram_tt0" in list(spatial_firing):
+                        collumn_names_to_keep.append("try_spatial_periodogram_tt0")
+                    if "try_spatial_periodogram_tt1" in list(spatial_firing):
+                        collumn_names_to_keep.append("try_spatial_periodogram_tt1")
+                    if "try_spatial_periodogram_tt2" in list(spatial_firing):
+                        collumn_names_to_keep.append("try_spatial_periodogram_tt2")
+                    if "miss_spatial_periodogram_tt0" in list(spatial_firing):
+                        collumn_names_to_keep.append("miss_spatial_periodogram_tt0")
+                    if "miss_spatial_periodogram_tt1" in list(spatial_firing):
+                        collumn_names_to_keep.append("miss_spatial_periodogram_tt1")
+                    if "miss_spatial_periodogram_tt2" in list(spatial_firing):
+                        collumn_names_to_keep.append("miss_spatial_periodogram_tt2")
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
