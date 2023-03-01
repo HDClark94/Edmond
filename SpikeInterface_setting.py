@@ -14,7 +14,7 @@ downtime_lists_path = basefolder+'/to_sort/sort_downtime/'
 ##########
 # Recording setting
 sampling_rate = 30000
-num_tetrodes = 4
+num_tetrodes = 4 # if tetrodes are indeed used
 movement_ch = '100_ADC2.continuous' #channel that contains the movement data
 opto_ch = '100_ADC3.continuous'
 data_file_prefix = '100_CH' #prefix of data files
