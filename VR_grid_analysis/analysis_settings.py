@@ -14,7 +14,7 @@ frequency_step = 0.02
 frequency = np.arange(0.1, 5+frequency_step, frequency_step)
 window_length_in_laps = 3
 rolling_window_size_for_lomb_classifier = 200
-lomb_frequency_threshold = 0.1
+lomb_frequency_threshold = 0.05
 lomb_rolling_threshold = 0.09424140650100384 # calculated as the average grid cell rolling threshold for use with the simulated data
 power_estimate_step = 10
 minimum_peak_distance = 20
@@ -22,7 +22,7 @@ rate_map_extra_smooth_gauss_kernel_std = 4
 rate_map_gauss_kernel_std = 2
 
 # Hit Miss Try
-track_speed_threshold = 0
+track_speed_threshold = 10
 
 # Default simulated data parameters
 sim_cmps = 10
