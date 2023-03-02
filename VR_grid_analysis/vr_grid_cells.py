@@ -914,8 +914,6 @@ def get_vmin_vmax(cluster_firing_maps, bin_cm=8):
     cluster_firing_maps_reduced = np.array(cluster_firing_maps_reduced)
     vmin= 0
     vmax= np.max(cluster_firing_maps_reduced)
-    if vmax==0:
-        print("stop here")
     return vmin, vmax
 
 
@@ -1596,6 +1594,7 @@ def get_max_SNR(spatial_frequency, powers):
     return max_SNR, max_SNR_freq
 
 def add_percentage_hits(spike_data, processed_position_data):
+    processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] != "rejected"]
     b_processed_position_data = processed_position_data[processed_position_data["trial_type"] == 0]
     nb_processed_position_data = processed_position_data[processed_position_data["trial_type"] == 1]
     p_processed_position_data = processed_position_data[processed_position_data["trial_type"] == 2]
@@ -2302,6 +2301,9 @@ def add_rolling_stats(spike_data, track_length):
     rolling_centre_trials=[]
     rolling_peak_frequencies=[]
     rolling_classifiers=[]
+    proportion_encoding_position=[]
+    proportion_encoding_distance=[]
+    proportion_encoding_null=[]
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])#
@@ -2313,15 +2315,29 @@ def add_rolling_stats(spike_data, track_length):
             centre_trials = np.round(centre_trials).astype(np.int64)
             powers[np.isnan(powers)] = 0
             rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials, powers, rolling_power_threshold, power_step, track_length)
+
+            proportion_encoding_P = len(rolling_lomb_classifier[rolling_lomb_classifier=="P"])/len(rolling_lomb_classifier)
+            proportion_encoding_D = len(rolling_lomb_classifier[rolling_lomb_classifier=="D"])/len(rolling_lomb_classifier)
+            proportion_encoding_N = len(rolling_lomb_classifier[rolling_lomb_classifier=="N"])/len(rolling_lomb_classifier)
+
         else:
             rolling_lomb_classifier = np.array([])
             rolling_frequencies = np.array([])
-            rolling_points = np.array([])
+            rolling_points = np.array([])#
+            proportion_encoding_P = np.nan
+            proportion_encoding_D = np.nan
+            proportion_encoding_N = np.nan
 
         rolling_centre_trials.append(rolling_points)
         rolling_peak_frequencies.append(rolling_frequencies)
         rolling_classifiers.append(rolling_lomb_classifier)
+        proportion_encoding_position.append(proportion_encoding_P)
+        proportion_encoding_distance.append(proportion_encoding_D)
+        proportion_encoding_null.append(proportion_encoding_N)
 
+    spike_data["rolling:proportion_encoding_position"] = proportion_encoding_position
+    spike_data["rolling:proportion_encoding_distance"] = proportion_encoding_distance
+    spike_data["rolling:proportion_encoding_null"] = proportion_encoding_null
     spike_data["rolling:rolling_peak_frequencies"] = rolling_peak_frequencies
     spike_data["rolling:rolling_centre_trials"] = rolling_centre_trials
     spike_data["rolling:rolling_classifiers"] = rolling_classifiers
@@ -2412,7 +2428,7 @@ def curate_stops_spike_data(spike_data, track_length):
 
 def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None, remove_last_and_first_from_streak=True, use_first_stops=False):
     if shuffle:
-        iterations = 100
+        iterations = 1000
     else:
         iterations = 1
     gauss_kernel = Gaussian1DKernel(1)
@@ -2807,7 +2823,6 @@ def add_spatial_information_during_position_and_distance_trials(spike_data, posi
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
-    #vr_recording_path_list=vr_recording_path_list[283:]
     for recording in vr_recording_path_list:
         print("processing ", recording)
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
@@ -2842,21 +2857,21 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 spike_data = add_n_PI_trial(spike_data, processed_position_data)
                 spike_data = add_stops(spike_data, processed_position_data, track_length=get_track_length(recording))
                 spike_data = add_trials(spike_data, processed_position_data)
-                spike_data = calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
 
                 # MOVING LOMB PERIODOGRAMS
-                #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
+                spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
                 #spike_data = add_lomb_classifier(spike_data)
 
                 # Rolling classifications
                 #spike_data = add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = add_rolling_stats_encoding_x(spike_data, track_length=get_track_length(recording))
-                #spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
-                #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
-                #spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
-                #spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
-                spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
+                spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
+                spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
+                spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                #spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=0)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=1)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=2)

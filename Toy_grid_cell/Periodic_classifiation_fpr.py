@@ -84,7 +84,7 @@ def perfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     position_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="stable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="stable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         position_peak_frequencies.append(max_peak_freq)
 
@@ -92,7 +92,7 @@ def perfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     distance_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="stable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="stable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         distance_peak_frequencies.append(max_peak_freq)
 
@@ -105,7 +105,7 @@ def imperfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     position_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="unstable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="unstable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         position_peak_frequencies.append(max_peak_freq)
 
@@ -113,7 +113,7 @@ def imperfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     distance_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="unstable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="unstable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         distance_peak_frequencies.append(max_peak_freq)
 
@@ -429,15 +429,16 @@ def main():
     n_cells = 50
     grid_spacing_low = 40
     grid_spacing_high = 200
-    field_noise_std = 0
+    field_noise_std = 10
     swtich_coding = "block" # enter "block" or "by_trial"
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
     plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+swtich_coding
-    run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    #run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    run_whole_cell_analysis(grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells,field_noise_std=field_noise_std, plot_suffix=plot_suffix)
 
     swtich_coding = "by_trial" # enter "block" or "by_trial"
     plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+swtich_coding
-    run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    #run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
     run_whole_cell_analysis(grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells,field_noise_std=field_noise_std, plot_suffix=plot_suffix)
 
     # rerun for larger grid cell periods
@@ -446,11 +447,12 @@ def main():
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
     swtich_coding = "block" # enter "block" or "by_trial"
     plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+swtich_coding
-    run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    #run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    run_whole_cell_analysis(grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells,field_noise_std=field_noise_std, plot_suffix=plot_suffix)
 
     swtich_coding = "by_trial" # enter "block" or "by_trial"
     plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+swtich_coding
-    run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
+    #run_switch_coding_analysis2(switch_coding_mode=swtich_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, plot_suffix=plot_suffix)
     run_whole_cell_analysis(grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells,field_noise_std=field_noise_std, plot_suffix=plot_suffix)
     print("look now")
 

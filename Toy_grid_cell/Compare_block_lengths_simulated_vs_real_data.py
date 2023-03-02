@@ -104,7 +104,7 @@ def perfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     position_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="stable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="stable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         position_peak_frequencies.append(max_peak_freq)
 
@@ -112,7 +112,7 @@ def perfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     distance_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="stable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="stable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         distance_peak_frequencies.append(max_peak_freq)
 
@@ -125,7 +125,7 @@ def imperfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     position_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="unstable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="unstable_allocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         position_peak_frequencies.append(max_peak_freq)
 
@@ -133,7 +133,7 @@ def imperfect_grid_cells(grid_spacings, n_cells, field_noise_std):
     distance_peak_frequencies = []
     for i in range(n_cells):
         grid_spacing = grid_spacings[i]
-        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed = get_cluster_firing(cell_type_str="unstable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
+        spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed,_ = get_cluster_firing(cell_type_str="unstable_egocentric_grid_cell", field_spacing=grid_spacing, field_noise_std=field_noise_std)
         max_peak_power, max_peak_freq = compute_peak(firing_rate_map_by_trial_smoothed)
         distance_peak_frequencies.append(max_peak_freq)
 

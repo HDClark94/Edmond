@@ -5534,7 +5534,9 @@ def get_percentage_hit_column(df, tt):
         cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
         percentage = cluster_df["percentage_hits"].iloc[0][tt]
         percentage_hits.append(percentage)
-    return np.array(percentage_hits)
+
+    percentage_hits = np.array(percentage_hits)
+    return percentage_hits[~np.isnan(percentage_hits)]
 
 
 def get_percentage_from_rolling_classification2(df, code, tt, hmt):
@@ -5546,6 +5548,7 @@ def get_percentage_from_rolling_classification2(df, code, tt, hmt):
         behaviours = np.array(cluster_df["behaviour_hit_try_miss"].iloc[0])
         trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
         rolling_classifiers = np.array(cluster_df["rolling:classifier_by_trial_number"].iloc[0])
+
 
         # remove first and last classification in streak
         last_classifier=""
@@ -6022,14 +6025,16 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path,
         ax.axhline(y=0, linestyle="dashed", linewidth=2, color="black")
         remapped_position_grid_cells_stop_histogram_tt, _, bin_centres, _ = get_stop_histogram(grid_cells, tt=tt, coding_scheme="P", shuffle=False)
         remapped_distance_grid_cells_stop_histogram_tt, _, bin_centres, _ = get_stop_histogram(grid_cells, tt=tt, coding_scheme="D", shuffle=False)
+        remapped_aperiodic_grid_cells_stop_histogram_tt, _, bin_centres, _ = get_stop_histogram(grid_cells, tt=tt, coding_scheme="N", shuffle=False)
         remapped_grid_cells_shuffled_histogram_tt, _, bin_centres, _ = get_stop_histogram(grid_cells, tt=tt, coding_scheme=None, shuffle=True)
         remapped_position_grid_cells_stop_histogram_tt = np.array(remapped_position_grid_cells_stop_histogram_tt)
         remapped_distance_grid_cells_stop_histogram_tt = np.array(remapped_distance_grid_cells_stop_histogram_tt)
+        remapped_aperiodic_grid_cells_stop_histogram_tt = np.array(remapped_aperiodic_grid_cells_stop_histogram_tt)
         remapped_grid_cells_shuffled_histogram_tt = np.array(remapped_grid_cells_shuffled_histogram_tt)
 
         # remove stop profiles where there isn't a stop profile for both postion and distance encoding trials
-        nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_tt) & ~np.isnan(remapped_distance_grid_cells_stop_histogram_tt)
-        nan_mask = nan_mask[:,0]
+        #nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_tt) & ~np.isnan(remapped_distance_grid_cells_stop_histogram_tt)
+        #nan_mask = nan_mask[:,0]
         #remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt[nan_mask,:]
         #remapped_distance_grid_cells_stop_histogram_tt = remapped_distance_grid_cells_stop_histogram_tt[nan_mask,:]
         #remapped_grid_cells_shuffled_histogram_tt = remapped_grid_cells_shuffled_histogram_tt[nan_mask,:]
@@ -6037,9 +6042,15 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path,
         # normalise to baseline
         remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt-remapped_grid_cells_shuffled_histogram_tt
         remapped_distance_grid_cells_stop_histogram_tt = remapped_distance_grid_cells_stop_histogram_tt-remapped_grid_cells_shuffled_histogram_tt
+        remapped_aperiodic_grid_cells_stop_histogram_tt = remapped_aperiodic_grid_cells_stop_histogram_tt-remapped_grid_cells_shuffled_histogram_tt
 
         # normalisation / equal weighting each stop histogram
         #remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt/remapped_position_grid_cells_stop_histogram_tt[np.argmax(remapped_position_grid_cells_stop_histogram_tt, axis=1)]
+
+        # plot_aperiodic stop histogram
+        ax.plot(bin_centres, np.nanmean(remapped_aperiodic_grid_cells_stop_histogram_tt, axis=0), color=Settings.null_color, linewidth=3)
+        ax.fill_between(bin_centres, np.nanmean(remapped_aperiodic_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_aperiodic_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                        np.nanmean(remapped_aperiodic_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_aperiodic_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.null_color, alpha=0.3)
 
         # plot position grid cell session stop histogram
         ax.plot(bin_centres, np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color, linewidth=3)
@@ -6047,14 +6058,9 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path,
                         np.nanmean(remapped_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
 
         # plot distance grid cell session stop histogram
-        ax.plot(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color, linewidth=3)
-        ax.fill_between(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
-                        np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
-
-        # plot_the_baseline_shuffle stop histogram
-        #ax.plot(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
-        #ax.fill_between(bin_centres, np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
-        #                np.nanmean(remapped_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(remapped_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+        #ax.plot(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color, linewidth=3)
+        #ax.fill_between(bin_centres, np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+        #                np.nanmean(remapped_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
 
         if tt == 0:
             style_track_plot(ax, 200)
@@ -6674,7 +6680,7 @@ def plot_spatial_information_on_position_and_distance_trials(combined_df, save_p
     position_scores = position_scores[nan_mask]
     distance_scores = distance_scores[nan_mask]
 
-    print("comping samples for agreement plot,"+
+    print("comping _spatial_information_on_position_and_distance_trials,"+
           " p = ", str(stats.wilcoxon(x=position_scores, y=distance_scores)[1]),
           " t = ", str(stats.wilcoxon(x=position_scores, y=distance_scores)[0]),
           ", df = ",str(len(position_scores)-1))
@@ -6739,65 +6745,64 @@ def main():
     combined_df = add_lomb_classifier(combined_df,suffix="")
     combined_df = add_peak_width(combined_df)
 
-    '''
+    save_path = "/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/fast_hit_analysis"
     #read_df(combined_df)
     # Figure 2 population level plots
     fig_size = (3.5,6)
-    plot_lomb_classifiers_proportions_hmt(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_spatial_information_on_hmt_trials(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_spatial_information_on_position_and_distance_trials(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifiers_proportions_hmt(combined_df, save_path=save_path)
+    plot_spatial_information_on_hmt_trials(combined_df, save_path=save_path, fig_size=fig_size)
+    plot_spatial_information_on_position_and_distance_trials(combined_df, save_path=save_path, fig_size=fig_size)
 
-    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_vs_shuffle_non_grid_cells(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_lomb_classifiers_vs_shuffle_grid_cells(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path=save_path)
+    plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path=save_path)
+    plot_lomb_classifiers_vs_shuffle_non_grid_cells(combined_df, suffix="", save_path=save_path)
+    plot_lomb_classifiers_vs_shuffle_grid_cells(combined_df, suffix="", save_path=save_path)
 
-    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_lomb_classifier_spatinfo_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
-    plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", fig_size=fig_size)
+    plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
+    plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
+    plot_lomb_classifier_spatinfo_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
+    plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
+    plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
 
     # Figure 3 plots remapping
-    plot_rolling_lomb_block_sizes(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    p
+    plot_rolling_lomb_block_sizes(combined_df, save_path=save_path)
+    plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path=save_path)
 
     # supplemental for figure 4
-    plot_percentage_encoding_by_trial_category(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_percentage_encoding_by_trial_category(combined_df, save_path=save_path)
 
     # Figure 4 plots behaviours
     print("===================Figure 4==================")
     #plot_ROC(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
 
     # stable cell analysis
-    plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_stop_peak_stop_location_and_height_stable(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_percentage_hits_for_remapped_encoding_grid_cells_probe(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
+    plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_stop_peak_stop_location_and_height_stable(combined_df, save_path=save_path)
+    plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_percentage_hits_for_remapped_encoding_grid_cells_probe(combined_df, save_path=save_path)
 
     # remap analysis
-    plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    plot_stop_peak_stop_location_and_height_remapped_probe(combined_df, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers")
-    '''
+    plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path=save_path)
+    plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_stop_peak_stop_location_and_height_remapped_probe(combined_df, save_path=save_path)
+
     for mouse_id in np.unique(combined_df["mouse"]):
         print("analysing by mouse ", mouse_id)
         try:
-            plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df[combined_df["mouse"]==mouse_id], save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", suffix="_"+mouse_id)
+            plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df[combined_df["mouse"]==mouse_id], save_path=save_path, suffix="_"+mouse_id)
         except Exception as ex:
             print('This is what Python says happened:'); print(ex)
         try:
-            plot_stop_peak_stop_location_and_height_remapped(combined_df[combined_df["mouse"]==mouse_id], save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", suffix="_"+mouse_id)
+            plot_stop_peak_stop_location_and_height_remapped(combined_df[combined_df["mouse"]==mouse_id], save_path=save_path, suffix="_"+mouse_id)
         except Exception as ex:
             print('This is what Python says happened:'); print(ex)
         try:
-            plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df[combined_df["mouse"]==mouse_id], save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", suffix="_"+mouse_id)
+            plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df[combined_df["mouse"]==mouse_id], save_path=save_path, suffix="_"+mouse_id)
         except Exception as ex:
             print('This is what Python says happened:'); print(ex)
         try:
-            plot_stop_peak_stop_location_and_height_remapped_probe(combined_df[combined_df["mouse"]==mouse_id], save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers", suffix="_"+mouse_id)
+            plot_stop_peak_stop_location_and_height_remapped_probe(combined_df[combined_df["mouse"]==mouse_id], save_path=save_path, suffix="_"+mouse_id)
         except Exception as ex:
             print('This is what Python says happened:'); print(ex)
 

@@ -420,7 +420,7 @@ def getNoisyFieldCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_sc
 
 def getShuffledPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step):
     _, _, firing_rate_map_by_trial, _ = getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step)
-    _, _, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold=0.99, n_shuffles=1)
+    _, _,_,_, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gamma=None, p_threshold=0.99, n_shuffles=1)
     field_shuffled_rate_map_smoothed = field_shuffled_rate_map_smoothed[0]
     field_shuffled_rate_map = field_shuffled_rate_map[0]
 
@@ -603,6 +603,9 @@ def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_t
         autocorrelogram.append(corr)
     autocorrelogram= np.array(autocorrelogram)
 
+    peaks_i = find_peaks(autocorrelogram, distance=5)[0]
+    gamma=lags[peaks_i[0]]
+
     fig = plt.figure(figsize=(6,6)); ax = fig.add_subplot(1, 1, 1)
     for f in range(1,6):
         ax.axvline(x=track_length*f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
@@ -628,6 +631,7 @@ def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_t
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/' + cell_type + '_spatial_autocorrelogram'+plot_suffix+'.png', dpi=200)
     plt.close()
+    return gamma
 
 def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial, far, plot_suffix):
     fr=firing_rate_map_by_trial.flatten()
@@ -684,49 +688,86 @@ def get_numeric_classifation(classifications):
             numeric_classifications.append(2.5)
     return np.array(numeric_classifications)
 
-def plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial, true_classifications, rolling_far=None, rolling_window_size_for_lomb_classifier=200, plot_suffix=""):
-    fr=firing_rate_map_by_trial.flatten()
+def get_classifications_using_alt_method(firing_rate_map_by_trial, window_size_in_trials, rolling_far_pos, rolling_far_dis, gamma):
     track_length = len(firing_rate_map_by_trial[0])
     n_trials = len(firing_rate_map_by_trial)
-    elapsed_distance_bins = np.arange(0, (track_length*n_trials)+1, 1)
-    elapsed_distance = 0.5*(elapsed_distance_bins[1:]+elapsed_distance_bins[:-1])/track_length
-    # construct the lomb-scargle periodogram
-    frequency = Settings.frequency
-    sliding_window_size=track_length*Settings.window_length_in_laps
-    powers = []
-    centre_distances = []
-    indices_to_test = np.arange(0, len(fr)-sliding_window_size, 1, dtype=np.int64)[::10]
-    for m in indices_to_test:
-        ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr[m:m+sliding_window_size])
-        power = ls.power(frequency)
-        powers.append(power.tolist())
-        centre_distances.append(np.nanmean(elapsed_distance[m:m+sliding_window_size]))
-    powers = np.array(powers)
-    centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
+
+    classifications = []
+    classifications_numeric = []
+    for tn in range(len(firing_rate_map_by_trial)):
+        if tn<int(window_size_in_trials/2):
+            fr_window = firing_rate_map_by_trial[:tn+int(window_size_in_trials/2),:]
+        elif tn+int(window_size_in_trials/2)>len(firing_rate_map_by_trial):
+            fr_window = firing_rate_map_by_trial[tn-int(window_size_in_trials/2):, :]
+        else:
+            fr_window = firing_rate_map_by_trial[tn-int(window_size_in_trials/2):tn+int(window_size_in_trials/2), :]
+
+        fr=fr_window.flatten()
+        gauss_kernel_extra = Gaussian1DKernel(stddev=Settings.rate_map_extra_smooth_gauss_kernel_std)
+        gauss_kernel = Gaussian1DKernel(stddev=Settings.rate_map_gauss_kernel_std)
+        fr_extra_smoothed = convolve(fr, gauss_kernel_extra)
+        fr_smoothed = convolve(fr, gauss_kernel)
+
+        peaks_i = find_peaks(fr_extra_smoothed, distance=Settings.minimum_peak_distance)[0]
+
+        pos_scores = []
+        dis_scores = []
+        for i in peaks_i:
+            if((i+track_length+gamma < len(fr_smoothed)-1) and (i+gamma+gamma < len(fr_smoothed)-1)):
+                pos_scores.append(stats.pearsonr(x=fr_smoothed[i:i+gamma], y=fr_smoothed[i+track_length:i+track_length+gamma])[0])
+                dis_scores.append(stats.pearsonr(x=fr_smoothed[i:i+gamma], y=fr_smoothed[i+gamma:i+gamma+gamma])[0])
+        pos_score = np.nanmean(pos_scores)
+        dis_score = np.nanmean(dis_scores)
+
+        if pos_score > dis_score:
+            if pos_score > rolling_far_pos:
+                trial_classification = "P"
+                trial_classification_numeric = 0.5
+            else:
+                trial_classification = "N"
+                trial_classification_numeric = 2.5
+        elif dis_score > pos_score:
+            if dis_score > rolling_far_dis:
+                trial_classification = "D"
+                trial_classification_numeric = 1.5
+            else:
+                trial_classification = "N"
+                trial_classification_numeric = 2.5
+        else:
+            trial_classification = "U"
+            trial_classification_numeric = 3.5
+
+        classifications.append(trial_classification)
+        classifications_numeric.append(trial_classification_numeric)
+
+    return classifications, classifications_numeric
+
+def plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial, gamma, true_classifications, rolling_far_pos=None, rolling_far_dis=None, plot_suffix=""):
+    window_size_in_trials = 10
+    classifications, classifications_numeric = get_classifications_using_alt_method(firing_rate_map_by_trial=firing_rate_map_by_trial, window_size_in_trials=window_size_in_trials,
+                                                           rolling_far_pos=rolling_far_pos, rolling_far_dis=rolling_far_dis, gamma=gamma)
 
     fig = plt.figure(figsize=(2,6))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
     x_pos = 0.3
-    if rolling_far is not None:
-        legend_freq = np.linspace(x_pos, x_pos+0.2, 5)
-        rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers, power_threshold=rolling_far, power_step=Settings.power_estimate_step, track_length=track_length, n_window_size=rolling_window_size_for_lomb_classifier)
-        rolling_lomb_classifier_tiled = np.tile(rolling_lomb_classifier_numeric,(len(legend_freq),1))
-        cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
-        boundaries = [0, 1, 2, 3, 4]
-        norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
-        Y, X = np.meshgrid(centre_trials, legend_freq)
-        ax.pcolormesh(X, Y, rolling_lomb_classifier_tiled, cmap=cmap, norm=norm, shading="flat", zorder=2)
+    legend_freq = np.linspace(x_pos, x_pos+0.2, 5)
+    rolling_classifications_tiled = np.tile(classifications_numeric,(len(legend_freq),1))
+    cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
+    boundaries = [0, 1, 2, 3, 4]
+    norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
+    Y, X = np.meshgrid(np.arange(1,len(firing_rate_map_by_trial)+1), legend_freq)
+    ax.pcolormesh(X, Y, rolling_classifications_tiled, cmap=cmap, norm=norm, shading="flat", zorder=2)
 
     x_pos = 0
     legend_freq = np.linspace(x_pos, x_pos+0.2, 5)
     if len(true_classifications)==1:
-        true_classifications = np.repeat(true_classifications[0], n_trials)
+        true_classifications = np.repeat(true_classifications[0], len(firing_rate_map_by_trial))
     true_classifications_numeric = get_numeric_classifation(true_classifications)
     true_classifications_tiled = np.tile(true_classifications_numeric, (len(legend_freq),1))
     cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
     boundaries = [0, 1, 2, 3, 4]
     norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
-    Y, X = np.meshgrid(np.arange(1,n_trials+1), legend_freq)
+    Y, X = np.meshgrid(np.arange(1,len(firing_rate_map_by_trial)+1), legend_freq)
     ax.pcolormesh(X, Y, true_classifications_tiled, cmap=cmap, norm=norm, shading="flat", zorder=2)
 
     ax.spines['top'].set_visible(False)
@@ -771,7 +812,7 @@ def plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial
     Y, X = np.meshgrid(centre_trials, frequency)
     cmap = plt.cm.get_cmap("inferno")
     c = ax.pcolormesh(X, Y, powers.T, cmap=cmap, shading="flat")
-    for f in range(1,5):
+    for f in range(1,6):
         ax.axvline(x=f, color="white", linewidth=2,linestyle="dotted")
     plt.xlabel('Track Frequency', fontsize=25, labelpad = 10)
     plt.ylabel('Centre Trial', fontsize=25, labelpad = 10)
@@ -808,7 +849,7 @@ def smoothen_rate_map(firing_rate_map_by_trial, n_trials, track_length, gauss_ke
     return firing_rate_map_by_trial_smoothened
 
 
-def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold, n_shuffles=1000,
+def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gamma, p_threshold, n_shuffles=1000,
                                            gauss_kernel_std=Settings.rate_map_gauss_kernel_std,
                                            extra_smooth_gauss_kernel_std=Settings.rate_map_extra_smooth_gauss_kernel_std,
                                            peak_min_distance=Settings.minimum_peak_distance,
@@ -832,46 +873,48 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold
     peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
     field_array = make_field_array(firing_rate_map_by_trial_flattened, peaks_indices)
 
-    shuffle_peaks = []
-    shuffled_peaks_first_window = []
+    shuffle_pos_scores = []
+    shuffle_dis_scores = []
+    shuffle_pos_scores_first_window = []
+    shuffle_dis_scores_first_window = []
     shuffle_rate_maps = []
     shuffle_rate_maps_smoothed = []
-    for i in np.arange(n_shuffles):
+    for j in np.arange(n_shuffles):
         peak_fill_order = np.arange(1, len(peaks_i)+1)
         np.random.shuffle(peak_fill_order) # randomise fill order
 
         fr = fill_rate_map(firing_rate_map_by_trial, peaks_i, field_array, peak_fill_order)
         fr_smoothed = convolve(fr, gauss_kernel)
 
-        powers = []
-        for m in indices_to_test:
-            ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
-            power = ls.power(frequency)
-            powers.append(power.tolist())
-        powers = np.array(powers)
+        if gamma is not None:
+            pos_scores = []
+            dis_scores = []
+            pos_scores_first_window = []
+            dis_scores_first_window = []
+            for i in peaks_i:
+                if((i+track_length+gamma < len(fr_smoothed)-1) and (i+gamma+gamma < len(fr_smoothed)-1)):
+                    pos_scores.append(stats.pearsonr(x=fr_smoothed[i:i+gamma], y=fr_smoothed[i+track_length:i+track_length+gamma])[0])
+                    dis_scores.append(stats.pearsonr(x=fr_smoothed[i:i+gamma], y=fr_smoothed[i+gamma:i+gamma+gamma])[0])
 
-        # for single window calculation for rolling classification
-        indices_to_test = indices_to_test[:rolling_window_size] # for single window calculation
-        powers_first_window = []
-        for m in indices_to_test:
-            ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
-            power_first_window = ls.power(frequency)
-            powers_first_window.append(power_first_window.tolist())
-        powers_first_window = np.array(powers_first_window)
-        avg_powers_first_window = np.nanmean(powers_first_window, axis=0)
-        shuffle_peak_power_first_window = np.nanmax(avg_powers_first_window)
-        shuffled_peaks_first_window.append(shuffle_peak_power_first_window)
+                    if ((i+track_length+gamma < ((track_length*10)-1)) or (i+gamma+gamma < ((track_length*10)-1))):
+                        pos_scores_first_window.append(pos_scores)
+                        dis_scores_first_window.append(dis_scores)
 
-        avg_powers = np.nanmean(powers, axis=0)
-        shuffle_peak = np.nanmax(avg_powers)
-        shuffle_peaks.append(shuffle_peak)
+            shuffle_pos_scores.append(np.nanmean(pos_scores))
+            shuffle_dis_scores.append(np.nanmean(dis_scores))
+            shuffle_pos_scores_first_window.append(np.nanmean(pos_scores_first_window))
+            shuffle_dis_scores_first_window.append(np.nanmean(dis_scores_first_window))
+
         shuffle_rate_maps.append(np.reshape(fr, (n_trials, track_length)))
         shuffle_rate_maps_smoothed.append(np.reshape(fr_smoothed, (n_trials, track_length)))
 
-    shuffled_peaks_first_window = np.array(shuffled_peaks_first_window)
-    shuffle_peaks = np.array(shuffle_peaks)
+    shuffle_pos_scores = np.array(shuffle_pos_scores)
+    shuffle_dis_scores = np.array(shuffle_dis_scores)
+    shuffle_pos_scores_first_window = np.array(shuffle_pos_scores_first_window)
+    shuffle_dis_scores_first_window = np.array(shuffle_dis_scores_first_window)
 
-    return np.nanpercentile(shuffle_peaks, p_threshold*100), np.nanpercentile(shuffled_peaks_first_window, p_threshold*100), \
+    return np.nanpercentile(shuffle_pos_scores, p_threshold*100), np.nanpercentile(shuffle_dis_scores, p_threshold*100), \
+           np.nanpercentile(shuffle_pos_scores_first_window, p_threshold*100), np.nanpercentile(shuffle_dis_scores_first_window, p_threshold*100),\
            shuffle_rate_maps_smoothed, shuffle_rate_maps
 
 def get_switch_cluster_firing(switch_coding_mode, grid_stability, n_trials=Settings.sim_n_trials, bin_size_cm=Settings.sim_bin_size_cm, sampling_rate=Settings.sim_sampling_rate, avg_speed_cmps=Settings.sim_avg_speed_cmps,
@@ -924,19 +967,20 @@ def plot_cell(cell_type, save_path, shuffled_save_path, n_trials=100, track_leng
     spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed, true_classifications = get_cluster_firing(cell_type_str=cell_type, n_trials=n_trials,track_length=track_length,
                                                                                                                                                   gauss_kernel_std=2,field_spacing=field_spacing, field_noise_std=field_noise_std,switch_code_prob=switch_code_prob)
 
-    # plots require a field shuffle
-    far, rolling_far, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, p_threshold=0.99, n_shuffles=100)
-    plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, far, plot_suffix=plot_suffix)
-    plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map_smoothed, shuffled_save_path, plot_n_shuffles=10, plot_suffix=plot_suffix)
-
     # default plots
     plot_cell_spikes(cell_type, save_path, spikes_locations, spike_trial_numbers, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
     plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
-    plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
+    gamma = plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
     plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, rolling_far=None,
                                   rolling_window_size_for_lomb_classifier=rolling_window_size_for_lomb_classifier, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
-    plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial_smoothed, true_classifications=true_classifications,
-                                                       rolling_far=rolling_far, rolling_window_size_for_lomb_classifier=rolling_window_size_for_lomb_classifier, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
+
+    # plots require a field shuffle
+    far_pos, far_dis, rolling_far_pos, rolling_far_dis, field_shuffled_rate_map_smoothed, field_shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gamma, p_threshold=0.99, n_shuffles=100)
+    #plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, far, plot_suffix=plot_suffix)
+    #plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map_smoothed, shuffled_save_path, plot_n_shuffles=10, plot_suffix=plot_suffix)
+
+    plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial, gamma, true_classifications=true_classifications,
+                                                       rolling_far_pos=rolling_far_pos, rolling_far_dis=rolling_far_dis, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
     print("plotted ", cell_type)
 
 def main():
@@ -945,32 +989,8 @@ def main():
     np.random.seed(0)
     lomb_window_size_rolling = 200
 
-    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data"
-    shuffled_save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/shuffled"
-    #
-    #plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=20, plot_suffix="_field_noise=5_rolling_window=20");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=20, switch_code_prob=0.05, plot_suffix="_field_noise=5_rolling_window=20");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=100, plot_suffix="_field_noise=5_rolling_window=100");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=100, switch_code_prob=0.05, plot_suffix="_field_noise=5_rolling_window=100");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=200, plot_suffix="_field_noise=5_rolling_window=200");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=200, switch_code_prob=0.05,  plot_suffix="_field_noise=5_rolling_window=200");np.random.seed(0)
-    #plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    # plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=5")
-    #plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    # plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=20, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=20")
-    #plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    # plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=5")
-    #plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    # plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=20, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=20")
-    # plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=5")
-    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10")
-    # plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=20, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=20")
-    # plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=5, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=5")
-    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10")
-    # plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=20, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=20")
-    #plot_cell(cell_type="stable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/alt"
+    shuffled_save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/alt/shuffled"
 
     # supp
     np.random.seed(0)

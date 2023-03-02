@@ -92,6 +92,36 @@ def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells
 
     return powers_all_cells, powers_all_cells_shuffled, centre_trials, track_length, true_classifications_all_cells, rate_maps_all_cells
 
+def generate_stable_grid_cells(field_noise, save_path, grid_spacings, n_cells):
+    # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
+    simulated_data_set = pd.DataFrame()
+    for i in range(len(field_noise)):
+        # calculate the stats for the most random simulated cell
+        grid_stability="imperfect"
+        switch_coding = "block"
+        # generate_cells
+        powers_all_cells, _, centre_trials, track_length, true_classifications_all_cells, rate_maps = \
+            switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells, trial_switch_probability=0, field_noise_std=field_noise[i], return_shuffled=False)
+
+        for n in range(n_cells):
+            avg_power = np.nanmean(powers_all_cells[n], axis=0)
+            max_SNR, max_SNR_freq = get_max_SNR(Settings.frequency, avg_power)
+            lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, 0, 0.05, numeric=False)
+
+            cell_row = pd.DataFrame()
+            cell_row["rate_maps_smoothened"] = [rate_maps[n]]
+            cell_row["spatial_periodogram"] = [powers_all_cells[n]]
+            cell_row["centre_trials"] = [centre_trials[n]]
+            cell_row["track_length"] = [track_length]
+            cell_row["field_noise_sigma"] = [field_noise[i]]
+            cell_row["grid_spacing"] = [grid_spacings[n]]
+            cell_row["lomb_classification"] = [lomb_classifier]
+            cell_row["true_classification"] = [true_classifications_all_cells[n][0]]
+            simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
+            print("added_cell_to_dataframe")
+
+    simulated_data_set.to_pickle(save_path+"simulated_grid_cells.pkl")
+    return
 
 def generate_switch_grid_cells(field_noise, trial_switch_probability, save_path, grid_spacings, n_cells):
     # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
@@ -164,13 +194,15 @@ def main():
 
 
     np.random.seed(0)
-    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/switch_grid_data/"
-    n_cells = 100
+    save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/grid_data/"
+    n_cells = 1000
     grid_spacing_low = 40
-    grid_spacing_high = 200
+    grid_spacing_high = 400
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
-    generate_switch_grid_cells(field_noise=[0,5,10], trial_switch_probability=[0.5, 0.1, 0.05, 0.01],
-                               save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
+    #generate_switch_grid_cells(field_noise=[0,5,10], trial_switch_probability=[0.5, 0.1, 0.05, 0.01],
+    #                           save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
+
+    generate_stable_grid_cells(field_noise=[0,5,10],save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
 
 if __name__ == '__main__':
     main()
