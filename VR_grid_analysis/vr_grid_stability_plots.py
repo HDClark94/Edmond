@@ -4727,8 +4727,8 @@ def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_da
         os.makedirs(save_path)
 
     # only interested in the remappable cells
-    spike_data = spike_data[(spike_data["rolling:proportion_encoding_position"] < 0.9) &
-                            (spike_data["rolling:proportion_encoding_distance"] < 0.9)]
+    #spike_data = spike_data[(spike_data["rolling:proportion_encoding_position"] < 0.9) &
+    #                        (spike_data["rolling:proportion_encoding_distance"] < 0.9)]
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
@@ -4737,10 +4737,10 @@ def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_da
             for tt in [0,1]:
                 tt_processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
                 fig, ax = plt.subplots(1,1, figsize=(6,4))
-                stops_counts_p, stops_counts_p_sem, bin_centres, n_trials_P = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="P", shuffle=False, track_length=track_length)
-                stops_counts_d, stops_counts_d_sem, bin_centres, n_trials_D = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="D", shuffle=False, track_length=track_length)
-                stops_counts_s, stops_counts_s_sem, bin_centres, n_trials = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme=None, shuffle=True, track_length=track_length)
-                stops_counts_n, stops_counts_n_sem, bin_centres, n_trials_N = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="N", shuffle=False, track_length=track_length)
+                stops_counts_p, stops_counts_p_sem, bin_centres, n_trials_P, _, _ = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="P", shuffle=False, track_length=track_length)
+                stops_counts_d, stops_counts_d_sem, bin_centres, n_trials_D, _, _ = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="D", shuffle=False, track_length=track_length)
+                stops_counts_s, stops_counts_s_sem, bin_centres, n_trials, _, _ = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme=None, shuffle=True, track_length=track_length)
+                stops_counts_n, stops_counts_n_sem, bin_centres, n_trials_N, _, _ = get_stop_histogram(cluster_spike_data, tt=tt, coding_scheme="N", shuffle=False, track_length=track_length)
 
                 # plot_the_baseline_shuffle stop histogram
                 #ax.plot(bin_centres, stops_counts_s[0], color="black", linestyle="dashed", linewidth=3)
@@ -4748,17 +4748,17 @@ def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_da
                 #                stops_counts_s[0]+stops_counts_s_sem[0], color="black", alpha=0.3)
 
                 # plot_the_baseline_shuffle stop histogram
-                ax.plot(bin_centres, stops_counts_n[0], color=Settings.null_color, linewidth=3)
+                #ax.plot(bin_centres, stops_counts_n[0], color=Settings.null_color, linewidth=3)
                 #ax.fill_between(bin_centres, stops_counts_n[0]-stops_counts_n_sem[0],
                 #                stops_counts_n[0]+stops_counts_n_sem[0], color=Settings.null_color, alpha=0.3)
 
                 # plot position grid cell session stop histogram
-                ax.plot(bin_centres, stops_counts_p[0], color= Settings.allocentric_color, linewidth=3)
+                ax.plot(bin_centres, stops_counts_p[0], color= Settings.allocentric_color, linewidth=3, clip_on=False, zorder=100)
                 #ax.fill_between(bin_centres, stops_counts_p[0]-stops_counts_p_sem[0],
                 #                stops_counts_p[0]+stops_counts_p_sem[0], color=Settings.allocentric_color, alpha=0.3)
 
                 # plot distance grid cell session stop histogram
-                ax.plot(bin_centres, stops_counts_d[0], color= Settings.egocentric_color, linewidth=3)
+                ax.plot(bin_centres, stops_counts_d[0], color= Settings.egocentric_color, linewidth=3, clip_on=False, zorder=100)
                 #ax.fill_between(bin_centres, stops_counts_d[0]-stops_counts_d_sem[0],
                 #                stops_counts_d[0]+stops_counts_d_sem[0], color=Settings.egocentric_color, alpha=0.3)
 
@@ -4768,17 +4768,18 @@ def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_da
                     style_track_plot_no_RZ(ax, 200)
                 #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
                 #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
-                ax.text(x=0.7, y=0.7, s="P:"+str(n_trials_P), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
-                ax.text(x=0.7, y=0.9, s="D:"+str(n_trials_D), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
-                ax.text(x=0.7, y=0.8, s="D:"+str(n_trials_N), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
+                ax.text(x=0.7, y=0.7, s="P:"+str(n_trials_P[0]), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
+                ax.text(x=0.7, y=0.9, s="D:"+str(n_trials_D[0]), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
+                ax.text(x=0.7, y=0.8, s="N:"+str(n_trials_N[0]), horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
                 plt.xlim(0, 200)
                 tick_spacing = 100
                 ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
                 ax.yaxis.set_ticks_position('left')
                 ax.xaxis.set_ticks_position('bottom')
                 Edmond.plot_utility2.style_vr_plot(ax)
-                ax.set_ylim([0,0.2])
-                ax.set_yticks([0, 0.1, 0.2])
+                #ax.set_ylim([0,0.2])
+                ax.set_ylim(bottom=0, top=None)
+                #ax.set_yticks([0, 0.1, 0.2])
                 plt.locator_params(axis = 'y', nbins  = 3)
                 plt.xticks(fontsize=25)
                 plt.yticks(fontsize=25)
@@ -4932,7 +4933,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="hit")
                 plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="miss")
                 plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="try")
-                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
+                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=2, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=0, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="hit")
@@ -4942,7 +4943,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_trial_types(processed_position_data, output_path)
-                #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+                plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_streak_vs_trial_types(processed_position_data, output_path)
                 #plot_streak_vs_trial_types_with_rolling_classification(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
@@ -4952,9 +4953,9 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_rolling_lomb_codes_across_cells3(spike_data, paired_recording, output_path)
                 #plot_snr(spike_data, processed_position_data, output_path, track_length =get_track_length(recording))
                 #plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length=get_track_length(recording), suffix="")
-                #plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
+                plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
                 #plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
-                #plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+                plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=True, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=False, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
@@ -5089,18 +5090,20 @@ def main():
     #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
     #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10"]
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10"]
-    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
-                              "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D26_2020-12-03_14-51-03",
-                               "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
-                               "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
-                               "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
-                               "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M6_D23_2020-11-28_17-01-43",
+    #                          "/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+    #                          "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D26_2020-12-03_14-51-03",
+    #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
+    #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
+    #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
+    #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
 
-    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39"]
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
     process_recordings(vr_recording_path_list, of_recording_path_list)
     print("look now")
 

@@ -158,6 +158,22 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
+
+    # silicon probe mice
+    base_path = "/mnt/datastore/Harry/Cohort9_february2023"
+    vr_paths = get_recording_paths([], base_path+"/vr")
+    of_paths = get_recording_paths([], base_path+"/of")
+    #print_track_lengths_from_param(vr_paths)
+    parameter_helper = pd.read_csv(base_path+"/parameter_helper.csv")
+    dead_channel_helper = pd.read_csv(base_path+"/dead_channel_helper.csv")
+    write_param_file(vr_paths, of_paths, recording_type="vr", parameter_helper=parameter_helper)
+    write_param_file(of_paths, vr_paths, recording_type="openfield", parameter_helper=parameter_helper)
+    write_dead_channel_file(vr_paths, dead_channel_helper=dead_channel_helper)
+    write_dead_channel_file(of_paths,dead_channel_helper=dead_channel_helper)
+    write_recording_list_file(vr_paths, save_path=base_path+"/vr/full_list.txt")
+    write_recording_list_file(of_paths, save_path=base_path+"/of/full_list.txt")
+
+
     # junjis mice
     base_path = "/mnt/datastore/Harry/Cohort9_Junji"
     vr_paths = get_recording_paths([], base_path+"/vr")

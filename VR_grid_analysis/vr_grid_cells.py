@@ -1131,8 +1131,12 @@ def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path
             spikes_on_track.set_size_inches(5, 5/3, forward=True)
             ax = spikes_on_track.add_subplot(1, 1, 1)
             locations = np.arange(0, len(cluster_firing_maps[0]))
-            ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), color="black", alpha=0.3)
-            ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=3)
+            #ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+            #ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=1)
+
+            ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), color="black", alpha=0.2)
+            ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=1)
+
             plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
             plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
             plt.xlim(0, track_length)
@@ -1143,6 +1147,8 @@ def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path
             #ax.set_ylim([0, max_fr])
             ax.set_yticks([0, np.round(ax.get_ylim()[1], 1)])
             ax.set_ylim(bottom=0)
+            #Edmond.plot_utility2.style_track_plot(ax, track_length, alpha=0.25)
+            Edmond.plot_utility2.style_track_plot(ax, track_length, alpha=0.15)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
             ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
@@ -1461,7 +1467,7 @@ def get_trial_color(trial_type):
     elif trial_type == 1:
         return "tab:red"
     elif trial_type == 2:
-        return "deepskyblue"
+        return "lightcoral"
     else:
         print("invalid trial-type passed to get_trial_color()")
 
@@ -2426,15 +2432,18 @@ def curate_stops_spike_data(spike_data, track_length):
     spike_data["stop_trial_numbers"] = stop_trials_clusters
     return spike_data
 
-def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None, remove_last_and_first_from_streak=True, use_first_stops=False):
+def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None, remove_last_and_first_from_streak=False, use_first_stops=False, account_for="", drop_bb_stops=False):
     if shuffle:
-        iterations = 1000
+        iterations = 100
     else:
         iterations = 1
     gauss_kernel = Gaussian1DKernel(1)
 
     stop_histograms=[]
     stop_histogram_sems=[]
+    number_of_trials_cells=[]
+    number_of_stops_cells=[]
+    stop_variability_cells=[]
     for index, cluster_df in cells_df.iterrows():
         cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
         if track_length is None:
@@ -2443,10 +2452,15 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
         stops_location_cm = np.array(cluster_df["stop_locations"].iloc[0])
         stop_trial_numbers = np.array(cluster_df["stop_trial_numbers"].iloc[0])
 
+        if drop_bb_stops:
+            stop_trial_numbers = stop_trial_numbers[(stops_location_cm >= 30) & (stops_location_cm <= 170)]
+            stops_location_cm = stops_location_cm[(stops_location_cm >= 30) & (stops_location_cm <= 170)]
+
         if use_first_stops:
             stops_location_cm = stops_location_cm[np.unique(stop_trial_numbers, return_index=True)[1]]
             stop_trial_numbers = stop_trial_numbers[np.unique(stop_trial_numbers, return_index=True)[1]]
 
+        hit_miss_try = np.array(cluster_df["behaviour_hit_try_miss"].iloc[0])
         trial_numbers = np.array(cluster_df["behaviour_trial_numbers"].iloc[0])
         trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
         rolling_classifiers = np.array(cluster_df["rolling:classifier_by_trial_number"].iloc[0])
@@ -2474,14 +2488,17 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
         # mask out only the trial numbers based on the trial type
         # and the coding scheme if that argument is given
         trial_type_mask = np.isin(trial_types, tt)
+        hit_miss_try_mask = hit_miss_try!="rejected"
         if coding_scheme is not None:
             classifier_mask = np.isin(rolling_classifiers, coding_scheme)
-            tt_trial_numbers = trial_numbers[trial_type_mask & classifier_mask]
+            tt_trial_numbers = trial_numbers[trial_type_mask & classifier_mask & hit_miss_try_mask]
         else:
             tt_trial_numbers = trial_numbers[trial_type_mask]
 
         number_of_bins = track_length
         number_of_trials = len(tt_trial_numbers)
+        all_stop_locations = stops_location_cm[np.isin(stop_trial_numbers, tt_trial_numbers)]
+        stop_variability = np.nanstd(all_stop_locations)
 
         stop_counts = np.zeros((iterations, number_of_trials, number_of_bins)); stop_counts[:,:,:] = np.nan
 
@@ -2494,6 +2511,7 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
                 stop_in_trial_bins, bin_edges = np.histogram(stop_locations_on_trial, bins=number_of_bins, range=[0,track_length])
                 stop_counts[j,i,:] = stop_in_trial_bins
 
+        number_of_stops = np.sum(stop_counts)
         stop_counts = np.nanmean(stop_counts, axis=0)
         average_stops = np.nanmean(stop_counts, axis=0)
         average_stops_se = stats.sem(stop_counts, axis=0, nan_policy="omit")
@@ -2508,10 +2526,94 @@ def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_le
 
         stop_histograms.append(average_stops)
         stop_histogram_sems.append(average_stops_se)
+        number_of_trials_cells.append(number_of_trials)
+        number_of_stops_cells.append(number_of_stops)
+        stop_variability_cells.append(stop_variability)
 
         bin_centres = np.arange(0.5, track_length+0.5, track_length/number_of_bins)
+    if account_for == "cells":
+        stop_histograms, stop_histogram_sems, number_of_trials_cells, number_of_stops_cells, stop_variability_cells = account_for_multiple_cells_in_session(cells_df, stop_histograms, stop_histogram_sems, number_of_trials_cells, number_of_stops_cells, stop_variability_cells)
+    elif account_for == "animal":
+        stop_histograms, stop_histogram_sems, number_of_trials_cells, number_of_stops_cells, stop_variability_cells = account_for_multiple_cells_in_animal(cells_df, stop_histograms, stop_histogram_sems, number_of_trials_cells, number_of_stops_cells, stop_variability_cells)
 
-    return stop_histograms, stop_histogram_sems, bin_centres, number_of_trials
+    return stop_histograms, stop_histogram_sems, bin_centres, number_of_trials_cells, number_of_stops_cells, stop_variability_cells
+
+def account_for_multiple_cells_in_animal(cells_df, stop_histograms, stop_histogram_sems,
+                                                                   number_of_trials_cells, number_of_stops_cells, stop_variability_cells):
+    mouse_ids = np.unique(cells_df["mouse"])
+    stop_histograms_adjusted = []
+    stop_histogram_sems_adjusted = []
+    number_of_trials_cells_adjusted = []
+    number_of_stops_cells_adjusted = []
+    stop_variability_cells_adjusted = []
+    for mouse_id in mouse_ids:
+        stop_histograms_compiled = []
+        stop_histogram_sems_compiled = []
+        number_of_trials_cells_compiled = []
+        number_of_stops_cells_compiled = []
+        stop_variability_cells_compiled = []
+        #collect all samples from a single session
+        for i in range(len(cells_df)):
+            if cells_df["mouse"].iloc[i] == mouse_id:
+                stop_histograms_compiled.append(stop_histograms[i])
+                stop_histogram_sems_compiled.append(stop_histogram_sems[i])
+                number_of_trials_cells_compiled.append(number_of_trials_cells[i])
+                number_of_stops_cells_compiled.append(number_of_stops_cells[i])
+                stop_variability_cells_compiled.append(stop_variability_cells[i])
+        #average over variables
+        stop_histograms_compiled = np.nanmean(np.array(stop_histograms_compiled), axis=0)
+        stop_histogram_sems_compiled = np.nanmean(np.array(stop_histogram_sems_compiled), axis=0)
+        number_of_trials_cells_compiled = np.nanmean(np.array(number_of_trials_cells_compiled), axis=0)
+        number_of_stops_cells_compiled = np.nanmean(np.array(number_of_stops_cells_compiled), axis=0)
+        stop_variability_cells_compiled = np.nanmean(np.array(stop_variability_cells_compiled), axis=0)
+
+        stop_histograms_adjusted.append(stop_histograms_compiled)
+        stop_histogram_sems_adjusted.append(stop_histogram_sems_compiled)
+        number_of_trials_cells_adjusted.append(number_of_trials_cells_compiled)
+        number_of_stops_cells_adjusted.append(number_of_stops_cells_compiled)
+        stop_variability_cells_adjusted.append(stop_variability_cells_compiled)
+
+    return stop_histograms_adjusted, stop_histogram_sems_adjusted, number_of_trials_cells_adjusted, number_of_stops_cells_adjusted, stop_variability_cells_adjusted
+
+
+def account_for_multiple_cells_in_session(cells_df, stop_histograms, stop_histogram_sems,
+                                                                   number_of_trials_cells, number_of_stops_cells, stop_variability_cells):
+    sessions_ids = np.unique(cells_df["session_id_vr"])
+    stop_histograms_adjusted = []
+    stop_histogram_sems_adjusted = []
+    number_of_trials_cells_adjusted = []
+    number_of_stops_cells_adjusted = []
+    stop_variability_cells_adjusted = []
+    for session_id in sessions_ids:
+        stop_histograms_compiled = []
+        stop_histogram_sems_compiled = []
+        number_of_trials_cells_compiled = []
+        number_of_stops_cells_compiled = []
+        stop_variability_cells_compiled = []
+        #collect all samples from a single session
+        for i in range(len(cells_df)):
+            if cells_df["session_id_vr"].iloc[i] == session_id:
+                stop_histograms_compiled.append(stop_histograms[i])
+                stop_histogram_sems_compiled.append(stop_histogram_sems[i])
+                number_of_trials_cells_compiled.append(number_of_trials_cells[i])
+                number_of_stops_cells_compiled.append(number_of_stops_cells[i])
+                stop_variability_cells_compiled.append(stop_variability_cells[i])
+        #average over variables
+        stop_histograms_compiled = np.nanmean(np.array(stop_histograms_compiled), axis=0)
+        stop_histogram_sems_compiled = np.nanmean(np.array(stop_histogram_sems_compiled), axis=0)
+        number_of_trials_cells_compiled = np.nanmean(np.array(number_of_trials_cells_compiled), axis=0)
+        number_of_stops_cells_compiled = np.nanmean(np.array(number_of_stops_cells_compiled), axis=0)
+        stop_variability_cells_compiled = np.nanmean(np.array(stop_variability_cells_compiled), axis=0)
+
+        stop_histograms_adjusted.append(stop_histograms_compiled)
+        stop_histogram_sems_adjusted.append(stop_histogram_sems_compiled)
+        number_of_trials_cells_adjusted.append(number_of_trials_cells_compiled)
+        number_of_stops_cells_adjusted.append(number_of_stops_cells_compiled)
+        stop_variability_cells_adjusted.append(stop_variability_cells_compiled)
+
+    return stop_histograms_adjusted, stop_histogram_sems_adjusted, number_of_trials_cells_adjusted, number_of_stops_cells_adjusted, stop_variability_cells_adjusted
+
+
 
 
 def get_stop_histogram_cluster(cluster_df, tt, coding_scheme=None, shuffle=False, track_length=None):
@@ -2821,6 +2923,45 @@ def add_spatial_information_during_position_and_distance_trials(spike_data, posi
     spike_data["rolling:distance_spatial_information_scores"] = distance_spatial_information_scores
     return spike_data
 
+
+def add_mean_firing_rate_during_position_and_distance_trials(spike_data, position_data, track_length):
+    position_mean_firing_rates = []
+    distance_mean_firing_rates = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+
+        cluster_trial_numbers = np.asarray(cluster_df["trial_number"].iloc[0])
+        cluster_firing = np.asarray(cluster_df["firing_times"].iloc[0])
+        if len(cluster_firing)>0:
+            rolling_centre_trials = np.array(spike_data["rolling:rolling_centre_trials"].iloc[cluster_index])
+            rolling_classifiers = np.array(spike_data["rolling:rolling_classifiers"].iloc[cluster_index])
+
+            P_trial_numbers = rolling_centre_trials[rolling_classifiers=="P"]
+            D_trial_numbers = rolling_centre_trials[rolling_classifiers=="D"]
+
+            P_firing = cluster_firing[np.isin(cluster_trial_numbers, P_trial_numbers)]
+            D_firing = cluster_firing[np.isin(cluster_trial_numbers, D_trial_numbers)]
+
+            P_position_data = position_data[np.isin(position_data["trial_number"], P_trial_numbers)]
+            D_position_data = position_data[np.isin(position_data["trial_number"], D_trial_numbers)]
+            P_mfr = len(P_firing) / np.sum(P_position_data["time_spent_in_bin"])
+            D_mfr = len(D_firing) / np.sum(D_position_data["time_spent_in_bin"])
+
+            position_mean_firing_rates.append(P_mfr)
+            distance_mean_firing_rates.append(D_mfr)
+        else:
+            position_mean_firing_rates.append(np.nan)
+            distance_mean_firing_rates.append(np.nan)
+
+    spike_data["rolling:position_mean_firing_rate"] = position_mean_firing_rates
+    spike_data["rolling:distance_mean_firing_rate"] = distance_mean_firing_rates
+    return spike_data
+
+def add_bin_time(position_data):
+    time_spent_in_bin = np.diff(position_data["time_seconds"])[0]
+    position_data["time_spent_in_bin"] = time_spent_in_bin
+    return position_data
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
     for recording in vr_recording_path_list:
@@ -2857,20 +2998,22 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 spike_data = add_n_PI_trial(spike_data, processed_position_data)
                 spike_data = add_stops(spike_data, processed_position_data, track_length=get_track_length(recording))
                 spike_data = add_trials(spike_data, processed_position_data)
+                position_data = add_bin_time(position_data)
                 #spike_data = calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
 
                 # MOVING LOMB PERIODOGRAMS
-                spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_moving_lomb_scargle_periodogram(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = analyse_lomb_powers(spike_data, processed_position_data)
                 #spike_data = add_lomb_classifier(spike_data)
 
                 # Rolling classifications
                 #spike_data = add_rolling_stats_shuffled_test(spike_data, processed_position_data, track_length=get_track_length(recording))
                 #spike_data = add_rolling_stats_encoding_x(spike_data, track_length=get_track_length(recording))
-                spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
-                spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
-                spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
-                spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                #spike_data = add_rolling_stats(spike_data, track_length=get_track_length(recording))
+                #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
+                #spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
+                #spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
+                spike_data = add_mean_firing_rate_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=0)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=1)

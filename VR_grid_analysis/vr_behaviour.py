@@ -904,7 +904,7 @@ def plot_n_trial_per_session_by_mouse(processed_position_data, save_path):
     stop_histogram = plt.figure(figsize=(6,4))
     ax = stop_histogram.add_subplot(1, 1, 1)
     nan_mask = ~np.isnan(np.nanmean(mouse_array, axis=0))
-    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(mouse_array, axis=0)+stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], color="black", alpha=0.3)
+    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-np.nanstd(mouse_array, axis=0))[nan_mask], (np.nanmean(mouse_array, axis=0)+np.nanstd(mouse_array, axis=0))[nan_mask], color="black", alpha=0.3)
     ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(mouse_array, axis=0)[nan_mask], color="black")
     plt.ylabel('Number of trials', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2288,7 +2288,7 @@ def population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_t
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('n first stops in RZ', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2313,7 +2313,7 @@ def population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_t
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
     for session in np.arange(1,max_session+1)-1:
@@ -2396,7 +2396,7 @@ def plot_track_speeds_by_mouse(processed_position_data, save_path):
     stop_histogram = plt.figure(figsize=(6,4))
     ax = stop_histogram.add_subplot(1, 1, 1)
     nan_mask = ~np.isnan(np.nanmean(mouse_array, axis=0))
-    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(mouse_array, axis=0)+stats.sem(mouse_array, axis=0, nan_policy="omit"))[nan_mask], color="black", alpha=0.3)
+    ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(mouse_array, axis=0)-np.nanstd(mouse_array, axis=0))[nan_mask], (np.nanmean(mouse_array, axis=0)+np.nanstd(mouse_array, axis=0))[nan_mask], color="black", alpha=0.3)
     ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(mouse_array, axis=0)[nan_mask], color="black")
     plt.ylabel('Avg trial speed', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2612,7 +2612,7 @@ def plot_percentage_hits_by_mouse(all_behaviour200cm_tracks, save_path, percenti
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('% hits', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2637,7 +2637,7 @@ def plot_percentage_hits_by_mouse(all_behaviour200cm_tracks, save_path, percenti
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
     for session in np.arange(1,max_session+1)-1:
@@ -2754,7 +2754,7 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('% first stops in RZ', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2779,7 +2779,7 @@ def population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200c
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
     for session in np.arange(1,max_session+1)-1:
@@ -2970,7 +2970,7 @@ def population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path,
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('First stop peak / trial\n vs shuffle', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -2995,7 +2995,7 @@ def population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path,
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
     plt.ylabel('First stop peak / trial\n vs shuffle', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3100,7 +3100,7 @@ def population_shuffled_vs_training_day_numbers_stops(all_behaviour200cm_tracks,
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('n stops in RZ', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3125,7 +3125,7 @@ def population_shuffled_vs_training_day_numbers_stops(all_behaviour200cm_tracks,
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
 
@@ -3237,7 +3237,7 @@ def population_shuffled_vs_training_day_numbers_stops_all_track(all_behaviour200
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('stops / trial', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3262,7 +3262,7 @@ def population_shuffled_vs_training_day_numbers_stops_all_track(all_behaviour200
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
     plt.ylabel('stops / trial', fontsize=25, labelpad = 10)
     plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3373,7 +3373,7 @@ def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_trac
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('% stops in RZ', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3398,7 +3398,7 @@ def population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_trac
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
     for session in np.arange(1,max_session+1)-1:
@@ -3576,7 +3576,7 @@ def population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path, pe
         stop_histogram = plt.figure(figsize=(6,4))
         ax = stop_histogram.add_subplot(1, 1, 1)
         nan_mask = ~np.isnan(np.nanmean(mouse_array[tt], axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
         plt.ylabel('Peak stops / trial\n vs shuffle', fontsize=25, labelpad = 10)
         plt.xlabel('Session number', fontsize=25, labelpad = 10)
@@ -3601,7 +3601,7 @@ def population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path, pe
     for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
         tt_mouse_array = mouse_array[tt]
         nan_mask = ~np.isnan(np.nanmean(tt_mouse_array, axis=0))
-        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+stats.sem(tt_mouse_array, axis=0, nan_policy="omit"))[nan_mask], color=tt_color, alpha=0.3)
+        ax.fill_between(np.arange(1,max_session+1)[nan_mask], (np.nanmean(tt_mouse_array, axis=0)-np.nanstd(tt_mouse_array, axis=0))[nan_mask], (np.nanmean(tt_mouse_array, axis=0)+np.nanstd(tt_mouse_array, axis=0))[nan_mask], color=tt_color, alpha=0.3)
         ax.plot(np.arange(1,max_session+1)[nan_mask], np.nanmean(tt_mouse_array, axis=0)[nan_mask], color=tt_color)
 
 
@@ -3794,6 +3794,12 @@ def generate_metadata(behaviour_df):
                 session_meta["cohort_mouse"] = [cohort_mouse]
 
                 meta = pd.concat([meta, session_meta], ignore_index=True)
+
+    for track_length in np.unique(meta["track_length"]):
+        track_length_meta = meta[meta["track_length"] == track_length]
+        print("for track length", str(track_length))
+        print("N mice = ", str(len(np.unique(track_length_meta["cohort_mouse"]))))
+        print("N sessions = ", str(len(track_length_meta)))
     return meta
 
 def plot_percentage_fast_hit_differential_for_more_frequent_beaconed_trials(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis"):
@@ -4060,6 +4066,110 @@ def plot_performance_against_improvements(meta_behaviour_data, save_path):
 
     return
 
+def plot_histogram_all_track_lengths(behaviour_df,save_path, first_stops=False):
+    if first_stops:
+        suffix="fs"
+    else:
+        suffix=""
+    gauss_kernel = Gaussian1DKernel(settings.guassian_std_for_smoothing_in_space_cm/1)
+
+    for track_length in np.unique(behaviour_df["track_length"]):
+        track_length_behaviour_df = behaviour_df[behaviour_df["track_length"]==track_length]
+
+        if track_length == 200:
+            track_length_behaviour_df = track_length_behaviour_df[track_length_behaviour_df["session_number"] <= 30]
+            track_length_behaviour_df = track_length_behaviour_df[track_length_behaviour_df["session_number"] >= 25]
+
+        bin_size = 1
+        track_length_behaviour_df = curate_stops(track_length_behaviour_df, 200)  # filter stops
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+            tt_df = track_length_behaviour_df[track_length_behaviour_df["trial_type"]==tt]
+            if first_stops:
+                tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df['first_stop_location_cm'])
+            else:
+                tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df["stop_location_cm"])
+            tt_hist, bin_edges = np.histogram(tt_stops,range=(0,track_length), bins=int(track_length/bin_size))
+            bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+            tt_hist = convolve(tt_hist, gauss_kernel)
+
+            ax.plot(bin_centres, tt_hist/np.sum(tt_hist), color=tt_color)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        style_track_plot(ax, track_length)
+        ax.set_ylim(bottom=0)
+        ax.axvline(x=93, color="red", linestyle="solid", linewidth=3)
+        ax.set_xlim(left=0, right=track_length)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_ylabel("Stop density", fontsize=25, labelpad=10)
+        ax.set_xlabel("Location (cm)", fontsize=25, labelpad=10)
+        plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/trained_stop_hist_'+suffix+"_tracklength_"+str(track_length)+'.png', dpi=300)
+        plt.close()
+    return
+
+
+def plot_histogram_first_and_last_5_days_stops(behaviour_df,save_path, first_stops=False):
+    if first_stops:
+        suffix="fs"
+    else:
+        suffix=""
+
+    max_session = 30
+    behaviour_df = behaviour_df[behaviour_df["session_number"] <= max_session]
+    bin_size = 1
+    behaviour_df = curate_stops(behaviour_df, 200)  # filter stops
+    first_five_days_df = behaviour_df[behaviour_df["session_number"] <= 5]
+    last_five_days_df = behaviour_df[behaviour_df["session_number"] >= max_session-5]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_df = first_five_days_df[first_five_days_df["trial_type"]==tt]
+        if first_stops:
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df['first_stop_location_cm'])
+        else:
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df["stop_location_cm"])
+        tt_hist, bin_edges = np.histogram(tt_stops,range=(0,200), bins=int(200/bin_size))
+        bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+        ax.plot(bin_centres, tt_hist/np.sum(tt_hist), color=tt_color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    style_track_plot(ax, 200)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0, right=200)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylabel("Stop density", fontsize=25, labelpad=10)
+    ax.set_xlabel("Location (cm)", fontsize=25, labelpad=10)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/first_five_days_stop_hist_'+suffix+'.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for tt, tt_color in zip([0,1,2], ["Black", "Blue", "deepskyblue"]):
+        tt_df = last_five_days_df[last_five_days_df["trial_type"]==tt]
+        if first_stops:
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df['first_stop_location_cm'])
+        else:
+            tt_stops = Edmond.plot_utility2.pandas_collumn_to_numpy_array(tt_df["stop_location_cm"])
+        tt_hist, bin_edges = np.histogram(tt_stops,range=(0,200), bins=int(200/bin_size))
+        bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+        ax.plot(bin_centres, tt_hist/np.sum(tt_hist), color=tt_color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    style_track_plot(ax, 200)
+    ax.set_ylim(bottom=0)
+    ax.set_xlim(left=0, right=200)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylabel("Stop density", fontsize=25, labelpad=10)
+    ax.set_xlabel("Location (cm)", fontsize=25, labelpad=10)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/last_five_days_stop_hist_'+suffix+'.png', dpi=300)
+    plt.close()
+    return
+
+
+
 def main():
     print('-------------------------------------------------------------')
 
@@ -4080,18 +4190,21 @@ def main():
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=7)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=8)
-
+        
     # save dataframes
     all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
-    all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl")
+    all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl") 
     '''
 
     # load dataframe
+    all_behaviour_all_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl")
+    _ = generate_metadata(all_behaviour_all_tracks)
+
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
-
-
-    '''
     meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
+
+    plot_histogram_all_track_lengths(all_behaviour_all_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=True)
+    plot_histogram_all_track_lengths(all_behaviour_all_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=False)
 
     # plot performance by default, improvement (trial type ratio), improvement (trial type ratio and reward)
     plot_performance_against_improvements(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
@@ -4118,8 +4231,14 @@ def main():
     # Example plots for spatial learning. Using M11.
     example_mouse = all_behaviour200cm_tracks[all_behaviour200cm_tracks["mouse_id"] == "M11"]
     example_mouse = example_mouse.sort_values(by=['session_number', 'trial_number'])
+    #remove probe trials before day 20
+    all_behaviour200cm_tracks = all_behaviour200cm_tracks.drop(all_behaviour200cm_tracks[(all_behaviour200cm_tracks.trial_type == 2) & (all_behaviour200cm_tracks.session_number < 20)].index)
 
-    # speeds \
+    plot_histogram_first_and_last_5_days_stops(all_behaviour200cm_tracks,save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=True)
+    plot_histogram_first_and_last_5_days_stops(all_behaviour200cm_tracks,save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=False)
+
+    """
+    # speeds 
     plot_speed_heat_map(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_speed_heat_map(example_mouse, session_number=24, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_speed_profile(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
@@ -4148,40 +4267,38 @@ def main():
     # hits
     plot_percentage_hits(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_n_trials(example_mouse, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
+    """
 
     # population level statistics
-    print_population_stats(all_behaviour200cm_tracks)
+    #print_population_stats(all_behaviour200cm_tracks)
 
-    plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_percentage_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_percentage_trial_per_session_by_mouse_short_plot(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_percentage_trial_per_session_all_mice_b_vs_nb(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_percentage_trial_per_session_all_mice_h_vs_t_vs_m(all_behaviour200cm_tracks, tt=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_percentage_trial_per_session_all_mice(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_trial_speeds_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_percentage_trial_per_session_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_percentage_trial_per_session_by_mouse_short_plot(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_percentage_trial_per_session_all_mice_b_vs_nb(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_percentage_trial_per_session_all_mice_h_vs_t_vs_m(all_behaviour200cm_tracks, tt=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_percentage_trial_per_session_all_mice(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
 
-    plot_hit_avg_speeds_by_block(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
-    plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_hit_avg_speeds_by_block(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="hit", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="try", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(all_behaviour200cm_tracks, hmt="miss", save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
 
-    plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
+    #plot_trial_speeds(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour")
     #plot_average_hit_try_run_profile(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    #plot_percentage_hits_by_mouse_individual_plots(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_n_trial_per_session_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_track_speeds_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     plot_percentage_hits_by_mouse(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    #population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     population_shuffled_vs_training_day_numbers_stops_all_track(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     population_shuffled_vs_training_day_numbers_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     population_shuffled_vs_training_day_percentage_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    #population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
+    population_shuffled_vs_training_day_fs(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
     population_shuffled_vs_training_day_numbers_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-    population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
-
-    '''
     population_shuffled_vs_training_day_percentage_first_stops(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population")
 
     print("look now")

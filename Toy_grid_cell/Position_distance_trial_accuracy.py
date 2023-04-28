@@ -61,7 +61,7 @@ def generate_spatial_periodogram(firing_rate_map_by_trial):
     centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
     return powers, centre_trials, track_length
 
-def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability, field_noise_std):
+def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability, field_noise_std, p_scalar=Settings.sim_p_scalar):
     # generate n switch grid cells
     # generated n positional grid cells
     powers_all_cells = []
@@ -72,7 +72,8 @@ def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells
                                                                                                      grid_stability=grid_stability,
                                                                                                      field_spacing=grid_spacing,
                                                                                                      trial_switch_probability=trial_switch_probability,
-                                                                                                     field_noise_std=field_noise_std)
+                                                                                                     field_noise_std=field_noise_std,
+                                                                                                     p_scalar=p_scalar)
 
         powers, centre_trials, track_length = generate_spatial_periodogram(firing_rate_map_by_trial_smoothed)
         powers_all_cells.append(powers)
@@ -438,196 +439,107 @@ def run_bias_assay_frequentist_classifier(switch_coding_mode, grid_stability, sa
     plt.close()
     return
 
-def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_low, grid_spacing_high, grid_spacings_v_high, n_cells, trial_switch_probability, field_noise_std=5, freq_thres=0.05, plot_suffix=""):
+def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_low, grid_spacing_high, n_cells, trial_switch_probability, freq_thres=0.05, plot_suffix=""):
+    grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
+    rolling_window_sizes = np.array([1, 50, 75, 100, 150, 200, 300, 400, 500, 600, 800, 1000])
 
-    grid_spacings_1 = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
-    grid_spacings_2 = np.random.uniform(low=grid_spacing_high, high=grid_spacings_v_high, size=n_cells);
+    field_noise_stds = [0, 10, 20]
+    p_scalars=[0.01, 0.1, 1]
 
-    # first lets generate n cells
-    powers_all_cells, centre_trials, track_length, true_classifications = \
-        switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings_1, n_cells, trial_switch_probability, field_noise_std)
+    Biases_in_coding = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
+    overall_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
+    position_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
+    distance_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
 
-    # next lets assay the spatial frequency threshold and the rolling window size
-    rolling_window_sizes = np.array([1, 50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
 
+            # first lets generate n cells
+            powers_all_cells, centre_trials, track_length, true_classifications = \
+                switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability,
+                                  field_noise_std=noise, p_scalar=p_scalar)
 
-    Biases_in_coding = np.zeros((len(rolling_window_sizes), n_cells))
-    position_coding_accuracy = np.zeros((len(rolling_window_sizes), n_cells))
-    distance_coding_accuracy = np.zeros((len(rolling_window_sizes), n_cells))
-    position_coding_accuracy2 = np.zeros((len(rolling_window_sizes), n_cells))
-    distance_coding_accuracy2 = np.zeros((len(rolling_window_sizes), n_cells))
+            for m in range(len(rolling_window_sizes)):
+                for i in range(n_cells):
+                    rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
+                        get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_all_cells[i], power_threshold=0.05,
+                                                                 power_step=Settings.power_estimate_step, track_length=track_length,
+                                                                 n_window_size=rolling_window_sizes[m], lomb_frequency_threshold=freq_thres)
+                    rolling_centre_trials, rolling_classifiers, _ = compress_rolling_stats(centre_trials, rolling_lomb_classifier)
 
-    for m in range(len(rolling_window_sizes)):
-        for i in range(n_cells):
-            rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
-                get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_all_cells[i], power_threshold=0.05,
-                                                         power_step=Settings.power_estimate_step, track_length=track_length,
-                                                         n_window_size=rolling_window_sizes[m], lomb_frequency_threshold=freq_thres)
-            rolling_centre_trials, rolling_classifiers, _ = compress_rolling_stats(centre_trials, rolling_lomb_classifier)
+                    # compare the true classifications to the estimated classifications
+                    cell_true_classifications = true_classifications[i]
+                    #cell_true_classifications = ignore_end_trials_in_block(cell_true_classifications)
+                    cell_true_classifications = cell_true_classifications[1:len(rolling_classifiers)+1]
+                    predicted_classifications = rolling_classifiers
 
-            # compare the true classifications to the estimated classifications
-            cell_true_classifications = true_classifications[i]
-            #cell_true_classifications = ignore_end_trials_in_block(cell_true_classifications)
-            cell_true_classifications = cell_true_classifications[1:len(rolling_classifiers)+1]
-            predicted_classifications = rolling_classifiers
+                    total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
+                    total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
 
-            total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
-            total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
+                    total_number_of_predicted_position_trials = len(predicted_classifications[predicted_classifications=="P"])
+                    total_number_of_predicted_distance_trials = len(predicted_classifications[predicted_classifications=="D"])
 
-            total_number_of_predicted_position_trials = len(predicted_classifications[predicted_classifications=="P"])
-            total_number_of_predicted_distance_trials = len(predicted_classifications[predicted_classifications=="D"])
+                    actual_difference_of_position_and_distance_trials = total_number_of_position_trials-total_number_of_distance_trials
+                    predicted_difference_of_position_and_distance_trials = total_number_of_predicted_position_trials-total_number_of_predicted_distance_trials
 
-            actual_difference_of_position_and_distance_trials = total_number_of_position_trials-total_number_of_distance_trials
-            predicted_difference_of_position_and_distance_trials = total_number_of_predicted_position_trials-total_number_of_predicted_distance_trials
+                    bias = (actual_difference_of_position_and_distance_trials-predicted_difference_of_position_and_distance_trials)
+                    position_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_position_trials)
+                    distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
+                    accuracy_trial = 100*(np.sum(predicted_classifications == cell_true_classifications)/len(cell_true_classifications))
 
-            bias = (actual_difference_of_position_and_distance_trials-predicted_difference_of_position_and_distance_trials)
-            position_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_position_trials)
-            distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
-            position_trial_accuracy2 = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_predicted_position_trials)
-            distance_trial_accuracy2 = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_predicted_distance_trials)
+                    Biases_in_coding[j,n,m,i] = bias
+                    overall_coding_accuracy[j,n,m,i] = accuracy_trial
+                    position_coding_accuracy[j,n,m,i] = position_trial_accuracy
+                    distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
 
-            Biases_in_coding[m,i] = bias
-            position_coding_accuracy[m,i] = position_trial_accuracy
-            distance_coding_accuracy[m,i] = distance_trial_accuracy
-            position_coding_accuracy2[m,i] = position_trial_accuracy2
-            distance_coding_accuracy2[m,i] = distance_trial_accuracy2
-
-
-    # first lets generate n cells
-    powers_all_cells, centre_trials, track_length, true_classifications = \
-        switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings_2, n_cells, trial_switch_probability, field_noise_std)
-
-    Biases_in_coding_big_grids = np.zeros((len(rolling_window_sizes), n_cells))
-    position_coding_accuracy_big_grids = np.zeros((len(rolling_window_sizes), n_cells))
-    distance_coding_accuracy_big_grids = np.zeros((len(rolling_window_sizes), n_cells))
-    position_coding_accuracy2_big_grids = np.zeros((len(rolling_window_sizes), n_cells))
-    distance_coding_accuracy2_big_grids = np.zeros((len(rolling_window_sizes), n_cells))
-
-    for m in range(len(rolling_window_sizes)):
-        for i in range(n_cells):
-            rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
-                get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_all_cells[i], power_threshold=0.05,
-                                                             power_step=Settings.power_estimate_step, track_length=track_length,
-                                                             n_window_size=rolling_window_sizes[m], lomb_frequency_threshold=freq_thres)
-            rolling_centre_trials, rolling_classifiers, _ = compress_rolling_stats(centre_trials, rolling_lomb_classifier)
-
-            # compare the true classifications to the estimated classifications
-            cell_true_classifications = true_classifications[i]
-            #cell_true_classifications = ignore_end_trials_in_block(cell_true_classifications)
-            cell_true_classifications = cell_true_classifications[1:len(rolling_classifiers)+1]
-            predicted_classifications = rolling_classifiers
-
-            total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
-            total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
-
-            total_number_of_predicted_position_trials = len(predicted_classifications[predicted_classifications=="P"])
-            total_number_of_predicted_distance_trials = len(predicted_classifications[predicted_classifications=="D"])
-
-            actual_difference_of_position_and_distance_trials = total_number_of_position_trials-total_number_of_distance_trials
-            predicted_difference_of_position_and_distance_trials = total_number_of_predicted_position_trials-total_number_of_predicted_distance_trials
-
-            bias = (actual_difference_of_position_and_distance_trials-predicted_difference_of_position_and_distance_trials)
-            position_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_position_trials)
-            distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
-            position_trial_accuracy2 = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_predicted_position_trials)
-            distance_trial_accuracy2 = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_predicted_distance_trials)
-
-            Biases_in_coding_big_grids[m,i] = bias
-            position_coding_accuracy_big_grids[m,i] = position_trial_accuracy
-            distance_coding_accuracy_big_grids[m,i] = distance_trial_accuracy
-            position_coding_accuracy2_big_grids[m,i] = position_trial_accuracy2
-            distance_coding_accuracy2_big_grids[m,i] = distance_trial_accuracy2
-
-    # Finally lets use the frequency peaks to determine an optimal threshold
     fig = plt.figure()
     fig.set_size_inches(5, 5, forward=True)
     ax = fig.add_subplot(1, 1, 1)
-    avg_Biases_in_coding = np.nanmean(Biases_in_coding, axis=1)
-    sem_Biases_in_coding = scipy.stats.sem(Biases_in_coding, axis=1, nan_policy="omit")
-    avg_Biases_in_coding_big_grids = np.nanmean(Biases_in_coding_big_grids, axis=1)
-    sem_Biases_in_coding_big_grids = scipy.stats.sem(Biases_in_coding_big_grids, axis=1, nan_policy="omit")
-    ax.axhline(y=0, linewidth=3, linestyle="dashed", color="black")
-    ax.plot(rolling_window_sizes, avg_Biases_in_coding, linewidth=3, color="black", marker="^")
-    ax.fill_between(rolling_window_sizes, avg_Biases_in_coding-sem_Biases_in_coding, avg_Biases_in_coding+sem_Biases_in_coding, color="black", alpha=0.3)
-    ax.plot(rolling_window_sizes, avg_Biases_in_coding_big_grids, linewidth=3, color="black", marker="x")
-    ax.fill_between(rolling_window_sizes, avg_Biases_in_coding_big_grids-sem_Biases_in_coding_big_grids, avg_Biases_in_coding_big_grids+sem_Biases_in_coding_big_grids, color="black", alpha=0.3)
-    ax.set_ylabel('%Bias P/D', fontsize=20, labelpad = 10)
+    alphas = [0.333, 0.666, 1]
+    linestyles = ["solid", "dashed", "dashdot", "dotted"]
+    ax.axhline(y=0, color="black", linewidth=3, linestyle="solid", alpha=0.1)
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
+            ax.plot(rolling_window_sizes, np.nanmean(Biases_in_coding[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color="black",
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+    ax.set_ylabel('bias', fontsize=20, labelpad = 10)
     ax.set_xlabel('Rolling window size', fontsize=20, labelpad = 10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    #ax.set_xlim([0, 0.5])
+    ax.set_xlim([1, 1000])
     ax.set_ylim([-100, 100])
-    ax.set_yticks([-100, -50, 0, 50, 100])
     ax.yaxis.set_tick_params(labelsize=20)
     ax.xaxis.set_tick_params(labelsize=20)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
-    plt.savefig(save_path + '/bias_assay'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
+    plt.savefig(save_path + '/bias_trial'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
     plt.close()
 
 
-    # Finally lets use the frequency peaks to determine an optimal threshold
     fig = plt.figure()
     fig.set_size_inches(5, 5, forward=True)
     ax = fig.add_subplot(1, 1, 1)
-    avg_percentage_correct_position_trials = np.nanmean(position_coding_accuracy, axis=1)
-    sem_percentage_correct_position_trials = scipy.stats.sem(position_coding_accuracy, axis=1, nan_policy="omit")
-    avg_percentage_correct_distance_trials = np.nanmean(distance_coding_accuracy, axis=1)
-    sem_percentage_correct_distance_trials = scipy.stats.sem(distance_coding_accuracy, axis=1, nan_policy="omit")
-    avg_percentage_correct_position_trials_big_grids = np.nanmean(position_coding_accuracy_big_grids, axis=1)
-    sem_percentage_correct_position_trials_big_grids = scipy.stats.sem(position_coding_accuracy_big_grids, axis=1, nan_policy="omit")
-    avg_percentage_correct_distance_trials_big_grids = np.nanmean(distance_coding_accuracy_big_grids, axis=1)
-    sem_percentage_correct_distance_trials_big_grids = scipy.stats.sem(distance_coding_accuracy_big_grids, axis=1, nan_policy="omit")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_position_trials, linewidth=3, color=Settings.allocentric_color, marker="^")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_distance_trials, linewidth=3, color=Settings.egocentric_color, marker="^")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_position_trials_big_grids, linewidth=3, color=Settings.allocentric_color, marker="x")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_distance_trials_big_grids, linewidth=3, color=Settings.egocentric_color, marker="x")
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_position_trials-sem_percentage_correct_position_trials, avg_percentage_correct_position_trials+sem_percentage_correct_position_trials, color=Settings.allocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_distance_trials-sem_percentage_correct_distance_trials, avg_percentage_correct_distance_trials+sem_percentage_correct_distance_trials, color=Settings.egocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_position_trials_big_grids-sem_percentage_correct_position_trials_big_grids, avg_percentage_correct_position_trials_big_grids+sem_percentage_correct_position_trials_big_grids, color=Settings.allocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_distance_trials_big_grids-sem_percentage_correct_distance_trials_big_grids, avg_percentage_correct_distance_trials_big_grids+sem_percentage_correct_distance_trials_big_grids, color=Settings.egocentric_color, alpha=0.3)
-    ax.set_ylabel('% True X-coding classified correctly', fontsize=20, labelpad = 10)
+    alphas = [0.333, 0.666, 1]
+    linestyles = ["solid", "dashed", "dashdot", "dotted"]
+    ax.axhline(y=50, color="red", linewidth=3, linestyle="dashed")
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
+            ax.plot(rolling_window_sizes, np.nanmean(position_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=Settings.allocentric_color,
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+            ax.plot(rolling_window_sizes, np.nanmean(distance_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=Settings.egocentric_color,
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+            ax.plot(rolling_window_sizes, np.nanmean(overall_coding_accuracy[j, n], axis=1),label="s=" + str(noise) + ",ps=" + str(p_scalar), color="black",
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+
+    ax.set_ylabel('accuracy', fontsize=20, labelpad = 10)
     ax.set_xlabel('Rolling window size', fontsize=20, labelpad = 10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    #ax.set_xlim([0, 0.5])
+    ax.set_xlim([1, 1000])
     ax.set_ylim([0, 100])
     ax.yaxis.set_tick_params(labelsize=20)
     ax.xaxis.set_tick_params(labelsize=20)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
-    plt.savefig(save_path + '/percentage_correct'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
-    plt.close()
-
-
-    # Finally lets use the frequency peaks to determine an optimal threshold
-    fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
-    ax = fig.add_subplot(1, 1, 1)
-    avg_percentage_correct_position_trials = np.nanmean(position_coding_accuracy2, axis=1)
-    sem_percentage_correct_position_trials = scipy.stats.sem(position_coding_accuracy2, axis=1, nan_policy="omit")
-    avg_percentage_correct_distance_trials = np.nanmean(distance_coding_accuracy2, axis=1)
-    sem_percentage_correct_distance_trials = scipy.stats.sem(distance_coding_accuracy2, axis=1, nan_policy="omit")
-    avg_percentage_correct_position_trials_big_grids = np.nanmean(position_coding_accuracy2_big_grids, axis=1)
-    sem_percentage_correct_position_trials_big_grids = scipy.stats.sem(position_coding_accuracy2_big_grids, axis=1, nan_policy="omit")
-    avg_percentage_correct_distance_trials_big_grids = np.nanmean(distance_coding_accuracy2_big_grids, axis=1)
-    sem_percentage_correct_distance_trials_big_grids = scipy.stats.sem(distance_coding_accuracy2_big_grids, axis=1, nan_policy="omit")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_position_trials, linewidth=3, color=Settings.allocentric_color, marker="^")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_distance_trials, linewidth=3, color=Settings.egocentric_color, marker="^")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_position_trials_big_grids, linewidth=3, color=Settings.allocentric_color, marker="x")
-    ax.plot(rolling_window_sizes, avg_percentage_correct_distance_trials_big_grids, linewidth=3, color=Settings.egocentric_color, marker="x")
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_position_trials-sem_percentage_correct_position_trials, avg_percentage_correct_position_trials+sem_percentage_correct_position_trials, color=Settings.allocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_distance_trials-sem_percentage_correct_distance_trials, avg_percentage_correct_distance_trials+sem_percentage_correct_distance_trials, color=Settings.egocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_position_trials_big_grids-sem_percentage_correct_position_trials_big_grids, avg_percentage_correct_position_trials_big_grids+sem_percentage_correct_position_trials_big_grids, color=Settings.allocentric_color, alpha=0.3)
-    ax.fill_between(rolling_window_sizes, avg_percentage_correct_distance_trials_big_grids-sem_percentage_correct_distance_trials_big_grids, avg_percentage_correct_distance_trials_big_grids+sem_percentage_correct_distance_trials_big_grids, color=Settings.egocentric_color, alpha=0.3)
-    ax.set_ylabel('% Predicted X-coding classified correctly', fontsize=20, labelpad = 10)
-    ax.set_xlabel('Rolling window size', fontsize=20, labelpad = 10)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    #ax.set_xlim([0, 0.5])
-    ax.set_ylim([0, 100])
-    ax.yaxis.set_tick_params(labelsize=20)
-    ax.xaxis.set_tick_params(labelsize=20)
-    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
-    plt.savefig(save_path + '/percentage_correct2'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
+    plt.savefig(save_path + '/accuracy_trial'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
     plt.close()
 
     return
@@ -642,21 +554,14 @@ def main():
     save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/position_vs_distance/"
     n_cells = 100
     grid_spacing_low = 40
-    grid_spacing_high = 200
-    grid_spacings_v_high = 400
+    grid_spacing_high = 400
 
-    for field_noise_std in [0, 10]:
-        for switch_coding in ["block", "by_trial"]:
-            for freq_thres in [0.05]:
-                np.random.seed(0)
-                run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high, grid_spacings_v_high=grid_spacings_v_high,
-                               n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, freq_thres=freq_thres,
-                                            plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
-
-                #np.random.seed(0)
-                #grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
-                #run_bias_assay_frequentist_classifier(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, trial_switch_probability=0.1, field_noise_std=field_noise_std, freq_thres=freq_thres,
-                #                                      plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"cm_field_noise-"+str(field_noise_std)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
+    for switch_coding in ["block", "by_trial"]:
+        for freq_thres in [0.05]:
+            np.random.seed(0)
+            run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
+                           n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
+                                        plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
 
 
 if __name__ == '__main__':

@@ -46,7 +46,7 @@ def getSwitchGridCellType2(grid_stability, n_trials, bin_size_cm, sampling_rate,
     # a random subset of trials are position and distance encoding
 
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
     true_classifications = []
@@ -72,11 +72,20 @@ def getSwitchGridCellType2(grid_stability, n_trials, bin_size_cm, sampling_rate,
         #firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)
         firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
         firing_p = firing_p*p_scalar
+
+        # refactor
         spikes_at_locations_trial = np.zeros(len(trial_locations))
-        for i in range(len(spikes_at_locations_trial)):
-            spikes_at_locations_trial[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+        tmp_array = np.random.uniform(low=0, high=1, size=len(spikes_at_locations_trial))
+        # use the firing_p to evaluate if a spike should appear within the spike_at_locations_trial array
+        spikes_at_locations_trial[firing_p>=tmp_array] = 1
+
+        #spikes_at_locations_trial = np.zeros(len(trial_locations))
+        #for i in range(len(spikes_at_locations_trial)):
+        #    spikes_at_locations_trial[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+
         spikes_at_locations.extend(spikes_at_locations_trial.tolist())
         true_classifications.append(mode)
+
     true_classifications = np.array(true_classifications)
     spikes_at_locations = np.array(spikes_at_locations)
 
@@ -92,23 +101,32 @@ def getSwitchGridCellType2(grid_stability, n_trials, bin_size_cm, sampling_rate,
     firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
     firing_p = firing_p*p_scalar
     spikes_at_locations_D = np.zeros(len(locations))
-    true_classifications_long = []
-    for i in range(len(locations)):
-        tn = trial_numbers[i]
-        true_classifications_long.append(true_classifications[int(tn)-1])
-        spikes_at_locations_D[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
-    true_classifications_long = np.array(true_classifications_long)
+
+    #refactor
+    spikes_at_locations_D = np.zeros(len(locations))
+    tmp_array = np.random.uniform(low=0, high=1, size=len(spikes_at_locations_D))
+    # use the firing_p to evaluate if a spike should appear within the spike_at_locations_trial array
+    spikes_at_locations_D[firing_p >= tmp_array] = 1
+
+    #true_classifications_long = []
+    #for i in range(len(locations)):
+    #    tn = trial_numbers[i]
+    #    true_classifications_long.append(true_classifications[int(tn)-1])
+    #    spikes_at_locations_D[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+    #true_classifications_long = np.array(true_classifications_long)
 
     # merge spikes_at_locations and spikes_at_locations_D
-    spikes_at_locations[true_classifications_long=="D"] = spikes_at_locations_D[true_classifications_long=="D"]
+    #spikes_at_locations[true_classifications_long=="D"] = spikes_at_locations_D[true_classifications_long=="D"]
+    D_trials = np.unique(trial_numbers)[true_classifications=="D"]
+    D_mask = np.isin(trial_numbers, D_trials)
+    spikes_at_locations[D_mask] = spikes_at_locations_D[D_mask]
+
     spike_locations = locations[spikes_at_locations==1]
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
-    avg_fr = get_avg_firing_rates(number_of_spikes=np.sum(spikes_at_locations), time_interval=track_length*n_trials/avg_speed_cmps)
-    print(avg_fr)
-
     firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
+    print(np.nanmean(firing_rate_map_by_trial))
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial, true_classifications
 
@@ -117,7 +135,7 @@ def getSwitchGridCell(grid_stability, n_trials, bin_size_cm, sampling_rate, avg_
                                    p_scalar, track_length, field_spacing, step, trial_switch_probability, field_noise_std=5):
 
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
     true_classifications = []
@@ -148,9 +166,17 @@ def getSwitchGridCell(grid_stability, n_trials, bin_size_cm, sampling_rate, avg_
         #firing_p = np.clip(firing_p, a_min=-0.8, a_max=None)
         firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
         firing_p = firing_p*p_scalar
+
+        # refactor
         spikes_at_locations_trial = np.zeros(len(trial_locations))
-        for i in range(len(spikes_at_locations_trial)):
-            spikes_at_locations_trial[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+        tmp_array = np.random.uniform(low=0, high=1, size=len(spikes_at_locations_trial))
+        # use the firing_p to evaluate if a spike should appear within the spike_at_locations_trial array
+        spikes_at_locations_trial[firing_p>=tmp_array] = 1
+
+        #spikes_at_locations_trial = np.zeros(len(trial_locations))
+        #for i in range(len(spikes_at_locations_trial)):
+        #    spikes_at_locations_trial[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+
         spikes_at_locations.extend(spikes_at_locations_trial.tolist())
         true_classifications.append(mode)
     true_classifications = np.array(true_classifications)
@@ -168,24 +194,36 @@ def getSwitchGridCell(grid_stability, n_trials, bin_size_cm, sampling_rate, avg_
         firing_p += gaussian(x=locations, mu=previous_offset+offset+(field_spacing*i), sig=field_spacing/10)
     firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
     firing_p = firing_p*p_scalar
+
+    #refactor
     spikes_at_locations_D = np.zeros(len(locations))
-    true_classifications_long = []
-    for i in range(len(locations)):
-        tn = trial_numbers[i]
-        true_classifications_long.append(true_classifications[int(tn)-1])
-        spikes_at_locations_D[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
-    true_classifications_long = np.array(true_classifications_long)
+    tmp_array = np.random.uniform(low=0, high=1, size=len(spikes_at_locations_D))
+    # use the firing_p to evaluate if a spike should appear within the spike_at_locations_trial array
+    spikes_at_locations_D[firing_p >= tmp_array] = 1
+
+
+    #spikes_at_locations_D = np.zeros(len(locations))
+    #true_classifications_long = []
+    #for i in range(len(locations)):
+    #    tn = trial_numbers[i]
+    #    true_classifications_long.append(true_classifications[int(tn)-1])
+    #    spikes_at_locations_D[i] = np.random.choice([1, 0], 1, p=[firing_p[i], 1-firing_p[i]])[0]
+    #true_classifications_long = np.array(true_classifications_long)
 
     # merge spikes_at_locations and spikes_at_locations_D
-    spikes_at_locations[true_classifications_long=="D"] = spikes_at_locations_D[true_classifications_long=="D"]
+    #spikes_at_locations[true_classifications_long=="D"] = spikes_at_locations_D[true_classifications_long=="D"]
 
-    avg_fr = get_avg_firing_rates(number_of_spikes=np.sum(spikes_at_locations), time_interval=track_length*n_trials/avg_speed_cmps)
-    print(avg_fr)
+    # refactor
+    D_trials = np.unique(trial_numbers)[true_classifications=="D"]
+    D_mask = np.isin(trial_numbers, D_trials)
+    spikes_at_locations[D_mask] = spikes_at_locations_D[D_mask]
+
     spike_locations = locations[spikes_at_locations==1]
     spike_trial_numbers = (spike_locations//track_length)+1
     spike_locations = spike_locations%track_length
 
     firing_rate_map_by_trial = make_rate_map(spike_locations, spike_trial_numbers, n_trials, track_length, bin_size_cm)
+    print(np.nanmean(firing_rate_map_by_trial))
 
     return spike_locations, spike_trial_numbers, firing_rate_map_by_trial, true_classifications
 
@@ -194,7 +232,7 @@ def getStableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed
                                  p_scalar, track_length, field_spacing, step):
 
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered-step, avg_speed_cmps/sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
 
@@ -229,7 +267,7 @@ def getUnstableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spe
                                    p_scalar, track_length, field_spacing, step, field_noise_std):
 
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
 
@@ -264,7 +302,7 @@ def getUnstableAllocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spe
 def getStableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
                                 p_scalar, track_length, field_spacing, step):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     fields_to_insert = int((np.max(locations)/field_spacing)+1)
     firing_p = np.zeros(len(locations))
     offset = 0
@@ -290,7 +328,7 @@ def getStableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_
 def getUnstableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
                                   p_scalar, track_length, field_spacing, step, field_noise_std):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     fields_to_insert = int((np.max(locations)/field_spacing)+1)
     firing_p = np.zeros(len(locations))
     offset = 0
@@ -318,13 +356,13 @@ def getUnstableEgocentricGridCell(n_trials, bin_size_cm, sampling_rate, avg_spee
 def getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
                  p_scalar, track_length, step):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
 
     for trial_number in np.unique(trial_numbers):
         trial_locations = (locations%track_length)[trial_numbers==trial_number]
-        firing_p = signal.gaussian(len(trial_locations), std=80)
+        firing_p = gaussian(x=trial_locations, mu=track_length/2, sig=10)
         firing_p = Edmond.plot_utility2.min_max_normlise(firing_p, 0, 1)
         firing_p = firing_p*p_scalar
         spikes_at_locations_trial = np.zeros(len(trial_locations))
@@ -346,7 +384,7 @@ def getPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps,
 
 def getRampCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     trial_numbers = (locations//track_length)+1
     spikes_at_locations = []
 
@@ -374,7 +412,7 @@ def getRampCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, 
 
 def getNoisyCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, step):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     firing_p = 0.5*np.ones(len(locations))
     firing_p = firing_p*p_scalar
     spikes_at_locations = np.zeros(len(locations))
@@ -394,7 +432,7 @@ def getNoisyCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar,
 
 def getNoisyFieldCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p_scalar, track_length, field_spacing, step):
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
     firing_p = np.zeros(len(locations))
     n_fields = int((track_length/field_spacing)*n_trials)
     for i in range(n_fields):
@@ -428,7 +466,7 @@ def getShuffledPlaceCell(n_trials, bin_size_cm, sampling_rate, avg_speed_cmps, p
 
     # remake firing from shuffled place cell rate map
     distance_covered = n_trials*track_length
-    locations = np.linspace(0, distance_covered-step, int(sampling_rate*(distance_covered/bin_size_cm)/avg_speed_cmps))
+    locations = np.arange(0, distance_covered - step, avg_speed_cmps / sampling_rate)
 
     arr_interp = interp.interp1d(np.arange(field_shuffled_rate_map_smoothed_flattened.size),field_shuffled_rate_map_smoothed_flattened)
     firing_p = arr_interp(np.linspace(0,field_shuffled_rate_map_smoothed_flattened.size-1,locations.size))
@@ -591,7 +629,7 @@ def plot_field_shuffled_rate_map(cell_type, field_shuffled_rate_map, shuffled_sa
         plt.close()
 
 
-def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial, plot_suffix):
+def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial, plot_suffix=""):
     fr=firing_rate_map_by_trial.flatten()
     track_length = len(firing_rate_map_by_trial[0])
     autocorr_window_size = track_length*4
@@ -629,7 +667,7 @@ def plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_t
     plt.savefig(save_path + '/' + cell_type + '_spatial_autocorrelogram'+plot_suffix+'.png', dpi=200)
     plt.close()
 
-def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial, far, plot_suffix):
+def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial, far=0, plot_suffix="", color="black"):
     fr=firing_rate_map_by_trial.flatten()
     track_length = len(firing_rate_map_by_trial[0])
     n_trials = len(firing_rate_map_by_trial)
@@ -654,13 +692,13 @@ def plot_cell_avg_spatial_periodogram(cell_type, save_path, firing_rate_map_by_t
         ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
     avg_subset_powers = np.nanmean(powers, axis=0)
     sem_subset_powers = stats.sem(powers, axis=0, nan_policy="omit")
-    ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color="black", alpha=0.3)
-    ax.plot(frequency, avg_subset_powers, color="black", linestyle="solid", linewidth=3)
+    ax.fill_between(frequency, avg_subset_powers-sem_subset_powers, avg_subset_powers+sem_subset_powers, color=color, alpha=0.3)
+    ax.plot(frequency, avg_subset_powers, color=color, linestyle="solid", linewidth=3)
     ax.axhline(y=far, color="red", linewidth=3, linestyle="dashed")
     plt.ylabel('Periodic Power', fontsize=25, labelpad = 10)
     plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
     plt.xlim(0,5.05)
-    ax.set_xticks([0,5])
+    ax.set_xticks([1,2,3,4,5])
     ax.set_yticks([0, 1])
     ax.set_ylim(bottom=0, top=1)
     ax.yaxis.set_ticks_position('left')
@@ -919,6 +957,115 @@ def get_cluster_firing(cell_type_str, n_trials=Settings.sim_n_trials, bin_size_c
 
     return spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed, true_classifications
 
+def get_chi_square(y, y_test, as_str=True):
+    X_squared = []
+    for i in range(len(y)):
+        X_squared.append(np.square(y[i]-y_test[i]))
+
+    if as_str:
+        return str(np.round(np.sum(X_squared), decimals=2))
+    else:
+        return np.sum(X_squared)
+
+def get_chi_square_assayed(x, y, f, track_length):
+    chi_squared_all_offsets = []
+    for offset in np.arange(track_length):
+        f_sine = Edmond.plot_utility2.min_max_normlise(np.sin(f * np.pi * 2 * (x+offset) / track_length), 0, 1)
+        chi_squared = get_chi_square(y, f_sine, as_str=False)
+        chi_squared_all_offsets.append(chi_squared)
+    return np.array(chi_squared_all_offsets)
+
+def plot_lomb_demo(save_path, mode="allo"):
+    # construct a repeating allocentric signal every 200 cm
+    period = 80
+    offset = 0
+    n_trials = 100
+    track_length = 200
+    f = track_length/period
+    f1 = 2
+    f2 = 2.5
+    f3 = 3
+    x = np.arange(0.5, track_length+0.5)
+    if mode == "allo":
+        color = Settings.allocentric_color
+        y = np.sin(f * np.pi * 2 * (x+offset) / track_length)
+        y = np.tile(y, n_trials)
+    elif mode == "ego":
+        x = np.arange(0.5, n_trials * track_length + 0.5)
+        y = np.sin(f * np.pi * 2 * (x + offset) / track_length)
+        color = Settings.egocentric_color
+
+    x = np.arange(0.5, n_trials*track_length + 0.5)
+    f1_sine_1 = Edmond.plot_utility2.min_max_normlise(np.sin(f1 * np.pi * 2 * (x + 45) / track_length), 0, 1)
+    f1_sine_2 = Edmond.plot_utility2.min_max_normlise(np.sin(f1 * np.pi * 2 * (x + 5) / track_length), 0, 1)
+    f1_sine_3 = Edmond.plot_utility2.min_max_normlise(np.sin(f1 * np.pi * 2 * (x + 25) / track_length), 0, 1)
+    f2_sine_1 = Edmond.plot_utility2.min_max_normlise(np.sin(f2 * np.pi * 2 * (x + 30) / track_length), 0, 1)
+    f2_sine_2 = Edmond.plot_utility2.min_max_normlise(np.sin(f2 * np.pi * 2 * (x + 0) / track_length), 0, 1)
+    f2_sine_3 = Edmond.plot_utility2.min_max_normlise(np.sin(f2 * np.pi * 2 * (x + 15) / track_length), 0, 1)
+    f3_sine_1 = Edmond.plot_utility2.min_max_normlise(np.sin(f3 * np.pi * 2 * (x + 20) / track_length), 0, 1)
+    f3_sine_2 = Edmond.plot_utility2.min_max_normlise(np.sin(f3 * np.pi * 2 * (x - 4) / track_length), 0, 1)
+    f3_sine_3 = Edmond.plot_utility2.min_max_normlise(np.sin(f3 * np.pi * 2 * (x + 8) / track_length), 0, 1)
+    y = np.clip(y, a_min=0, a_max=1)
+    f1_min = np.min(get_chi_square_assayed(x, y, f1, track_length))
+    f2_min = np.min(get_chi_square_assayed(x, y, f2, track_length))
+    f3_min = np.min(get_chi_square_assayed(x, y, f3, track_length))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12,8), gridspec_kw={'height_ratios': [1,1,1]})
+    ax1.plot(x, y, color="black", label=str(f1_min))
+    ax1.plot(x, f1_sine_1, color="red", label=get_chi_square(y, f1_sine_1))
+    ax1.plot(x, f1_sine_2, color="green", label=get_chi_square(y, f1_sine_2))
+    ax1.plot(x, f1_sine_3, color="blue", label=get_chi_square(y, f1_sine_3))
+    ax2.plot(x, y, color="black", label=str(f2_min))
+    ax2.plot(x, f2_sine_1, color="red", label=get_chi_square(y, f2_sine_1))
+    ax2.plot(x, f2_sine_2, color="green", label=get_chi_square(y, f2_sine_2))
+    ax2.plot(x, f2_sine_3, color="blue", label=get_chi_square(y, f2_sine_3))
+    ax3.plot(x, y, color="black",label=str(f3_min))
+    ax3.plot(x, f3_sine_1, color="red", label=get_chi_square(y, f3_sine_1))
+    ax3.plot(x, f3_sine_2, color="green", label=get_chi_square(y, f3_sine_2))
+    ax3.plot(x, f3_sine_3, color="blue", label=get_chi_square(y, f3_sine_3))
+    ax1.set_xlim([0,600])
+    ax2.set_xlim([0, 600])
+    ax3.set_xlim([0, 600])
+    ax1.legend()
+    ax2.legend()
+    ax3.legend()
+    plt.savefig(save_path + '/lomb_demo_'+mode+'.png', dpi=300)
+    plt.close()
+
+
+    fig = plt.figure(figsize=(6,2))
+    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    for f in range(1,6):
+        ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+
+    min_chi_squared = []
+    frequencies = np.arange(0.02, 5+0.02, 0.02)
+    for f in frequencies:
+        min_chi_squared.append(np.min(get_chi_square_assayed(x, y, f, track_length)))
+    min_chi_squared = np.array(min_chi_squared)
+    ax.plot(frequencies, min_chi_squared, color=color, linewidth=3)
+    plt.ylabel('Min $\u03C7^2$', fontsize=25, labelpad = 10)
+    plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
+    plt.xlim(0,5.05)
+    #ax.set_xticks([0,5])
+    #ax.set_yticks([0, 1])
+    #ax.set_ylim(bottom=0, top=1)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/minimum_chi_square_vs_spatial_frequency_' + mode + '.png', dpi=300)
+    plt.close()
+
+    # plot spatial periodogram via lomb
+    plot_cell_avg_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length), color=color)
+    plot_cell_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length))
+    plot_cell_spatial_autocorrelogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial=y.reshape(n_trials, track_length))
+    return
+
+
 
 def plot_cell(cell_type, save_path, shuffled_save_path, n_trials=100, track_length=200, rolling_far=None, field_spacing=90, field_noise_std=5, rolling_window_size_for_lomb_classifier=Settings.rolling_window_size_for_lomb_classifier, switch_code_prob=0.05, plot_suffix=""):
     spikes_locations, spike_trial_numbers, firing_rate_map_by_trial, firing_rate_map_by_trial_smoothed, true_classifications = get_cluster_firing(cell_type_str=cell_type, n_trials=n_trials,track_length=track_length,
@@ -972,16 +1119,22 @@ def main():
     #plot_cell(cell_type="stable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
     #plot_cell(cell_type="stable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
 
+
+    # for lomb demo supp
+    #plot_lomb_demo(save_path, mode="ego")
+    #plot_lomb_demo(save_path, mode="allo")
+    print("look now")
+
     # supp
     np.random.seed(0)
-    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
+    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
+    #plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    #plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    #plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    #plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
     #plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
 
     # another supp

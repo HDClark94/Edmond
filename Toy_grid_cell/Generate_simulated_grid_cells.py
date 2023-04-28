@@ -64,7 +64,7 @@ def generate_spatial_periodogram(firing_rate_map_by_trial):
     centre_trials = np.round(np.array(centre_distances)).astype(np.int64)
     return powers, centre_trials, track_length
 
-def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability, field_noise_std, return_shuffled=False):
+def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability, field_noise_std, p_scalar=Settings.sim_p_scalar, return_shuffled=False):
     # generate n switch grid cells
     # generated n positional grid cells
     powers_all_cells = []
@@ -77,7 +77,8 @@ def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells
                                                                                                      grid_stability=grid_stability,
                                                                                                      field_spacing=grid_spacing,
                                                                                                      trial_switch_probability=trial_switch_probability,
-                                                                                                     field_noise_std=field_noise_std)
+                                                                                                     field_noise_std=field_noise_std,
+                                                                                                     p_scalar=p_scalar)
 
         powers, centre_trials, track_length = generate_spatial_periodogram(firing_rate_map_by_trial_smoothed)
         powers_all_cells.append(powers)
@@ -92,95 +93,41 @@ def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells
 
     return powers_all_cells, powers_all_cells_shuffled, centre_trials, track_length, true_classifications_all_cells, rate_maps_all_cells
 
-def generate_stable_grid_cells(field_noise, save_path, grid_spacings, n_cells):
+def generate_stable_grid_cells(field_noise, p_scalars, save_path, grid_spacings, n_cells, save_large_columns=True):
     # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
     simulated_data_set = pd.DataFrame()
-    for i in range(len(field_noise)):
-        # calculate the stats for the most random simulated cell
-        grid_stability="imperfect"
-        switch_coding = "block"
-        # generate_cells
-        powers_all_cells, _, centre_trials, track_length, true_classifications_all_cells, rate_maps = \
-            switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells, trial_switch_probability=0, field_noise_std=field_noise[i], return_shuffled=False)
+    for j in range(len(p_scalars)):
+        for i in range(len(field_noise)):
+            # calculate the stats for the most random simulated cell
+            grid_stability="imperfect"
+            switch_coding = "block"
+            # generate_cells
+            powers_all_cells, _, centre_trials, track_length, true_classifications_all_cells, rate_maps = \
+                switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells,
+                                  trial_switch_probability=0, field_noise_std=field_noise[i], p_scalar=p_scalars[j], return_shuffled=False)
 
-        for n in range(n_cells):
-            avg_power = np.nanmean(powers_all_cells[n], axis=0)
-            max_SNR, max_SNR_freq = get_max_SNR(Settings.frequency, avg_power)
-            lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, 0, 0.05, numeric=False)
-
-            cell_row = pd.DataFrame()
-            cell_row["rate_maps_smoothened"] = [rate_maps[n]]
-            cell_row["spatial_periodogram"] = [powers_all_cells[n]]
-            cell_row["centre_trials"] = [centre_trials[n]]
-            cell_row["track_length"] = [track_length]
-            cell_row["field_noise_sigma"] = [field_noise[i]]
-            cell_row["grid_spacing"] = [grid_spacings[n]]
-            cell_row["lomb_classification"] = [lomb_classifier]
-            cell_row["true_classification"] = [true_classifications_all_cells[n][0]]
-            simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
-            print("added_cell_to_dataframe")
-
-    simulated_data_set.to_pickle(save_path+"simulated_grid_cells.pkl")
-    return
-
-def generate_switch_grid_cells(field_noise, trial_switch_probability, save_path, grid_spacings, n_cells):
-    # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
-
-    simulated_data_set = pd.DataFrame()
-    for i in range(len(field_noise)):
-        # calculate the stats for the most random simulated cell
-        grid_stability="imperfect"
-        switch_coding = "by_trial"
-
-        # generate_cells
-        powers_all_cells, _, centre_trials, track_length, _, rate_maps = \
-            switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells, trial_switch_probability[0], field_noise_std=field_noise[i], return_shuffled=False)
-
-        for n in range(n_cells):
-            rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
-                get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_all_cells[n], power_threshold=Settings.lomb_rolling_threshold,
-                                                             power_step=Settings.power_estimate_step, track_length=track_length,
-                                                             n_window_size=Settings.rolling_window_size_for_lomb_classifier, lomb_frequency_threshold=Settings.lomb_frequency_threshold)
-
-            cell_row = pd.DataFrame()
-            cell_row["rate_maps_smoothened"] = [rate_maps[n]]
-            cell_row["spatial_periodogram"] = [powers_all_cells[n]]
-            cell_row["centre_trials"] = [centre_trials[n]]
-            cell_row["track_length"] = [track_length]
-            cell_row["rolling_lomb_classifier"] = [rolling_lomb_classifier]
-            cell_row["rolling_window_size_for_lomb_classifier"] = [Settings.rolling_window_size_for_lomb_classifier]
-            cell_row["lomb_frequency_threshold"] = [Settings.lomb_frequency_threshold]
-            cell_row["lomb_power_threshold"] = [Settings.lomb_rolling_threshold]
-            cell_row["field_noise_sigma"] = [field_noise[i]]
-            cell_row["switch_coding"] = [switch_coding]
-            cell_row["grid_spacing"] = [grid_spacings[i]]
-            simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
-            print("added_cell_to_dataframe")
-
-        switch_coding = "block"
-        # generate_cells
-        for j in range(len(trial_switch_probability)):
-            powers_all_cells, _, centre_trials, track_length, _, rate_maps = \
-                switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells, trial_switch_probability[j], field_noise_std=field_noise[i], return_shuffled=False)
-
-            # classify trials
             for n in range(n_cells):
-                rolling_lomb_classifier, _, _, rolling_frequencies, rolling_points = \
-                    get_rolling_lomb_classifier_for_centre_trial(centre_trials=centre_trials, powers=powers_all_cells[n], power_threshold=Settings.lomb_rolling_threshold,
-                                                                 power_step=Settings.power_estimate_step, track_length=track_length,
-                                                                 n_window_size=Settings.rolling_window_size_for_lomb_classifier, lomb_frequency_threshold=Settings.lomb_frequency_threshold)
+                avg_power = np.nanmean(powers_all_cells[n], axis=0)
+                max_SNR, max_SNR_freq = get_max_SNR(Settings.frequency, avg_power)
+                lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, 0, 0.05, numeric=False)
+
                 cell_row = pd.DataFrame()
+                cell_row["mean_firing_rate"] = [np.nanmean(rate_maps[n])]
+                cell_row["track_length"] = [track_length]
+                cell_row["field_noise_sigma"] = [field_noise[i]]
+                cell_row["p_scalar"] = [p_scalars[j]]
+                cell_row["grid_spacing"] = [grid_spacings[n]]
+                cell_row["lomb_classification"] = [lomb_classifier]
+                cell_row["true_classification"] = [true_classifications_all_cells[n][0]]
                 cell_row["rate_maps_smoothened"] = [rate_maps[n]]
                 cell_row["spatial_periodogram"] = [powers_all_cells[n]]
                 cell_row["centre_trials"] = [centre_trials[n]]
-                cell_row["track_length"] = [track_length]
-                cell_row["rolling_lomb_classifier"] = [rolling_lomb_classifier]
-                cell_row["rolling_window_size_for_lomb_classifier"] = [Settings.rolling_window_size_for_lomb_classifier]
-                cell_row["lomb_frequency_threshold"] = [Settings.lomb_frequency_threshold]
-                cell_row["lomb_power_threshold"] = [Settings.lomb_rolling_threshold]
-                cell_row["field_noise_sigma"] = [field_noise[i]]
-                cell_row["switch_coding"] = [switch_coding]
-                cell_row["grid_spacing"] = [grid_spacings[i]]
+                cell_row=compute_peak_statistics(cell_row)
+
+                if not save_large_columns:
+                    cell_row = cell_row.drop('rate_maps_smoothened', axis=1)
+                    cell_row = cell_row.drop('spatial_periodogram', axis=1)
+                    cell_row = cell_row.drop('centre_trials', axis=1)
                 simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
                 print("added_cell_to_dataframe")
 
@@ -188,10 +135,103 @@ def generate_switch_grid_cells(field_noise, trial_switch_probability, save_path,
     return
 
 
+def generate_unstable_grid_cells(field_noise, p_scalars, save_path, grid_spacings, n_cells, save_large_columns=True):
+    # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
+    simulated_data_set = pd.DataFrame()
+    for j in range(len(p_scalars)):
+        for i in range(len(field_noise)):
+            # calculate the stats for the most random simulated cell
+            grid_stability="imperfect"
+            switch_coding = "block"
+            # generate_cells
+            powers_all_cells, _, centre_trials, track_length, true_classifications_all_cells, rate_maps = \
+                switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells,
+                                  trial_switch_probability=0, field_noise_std=field_noise[i], p_scalar=p_scalars[j], return_shuffled=False)
+
+            for n in range(n_cells):
+                avg_power = np.nanmean(powers_all_cells[n], axis=0)
+                max_SNR, max_SNR_freq = get_max_SNR(Settings.frequency, avg_power)
+                lomb_classifier = get_lomb_classifier(max_SNR, max_SNR_freq, 0, 0.05, numeric=False)
+
+                cell_row = pd.DataFrame()
+                cell_row["mean_firing_rate"] = [np.nanmean(rate_maps[n])]
+                cell_row["track_length"] = [track_length]
+                cell_row["field_noise_sigma"] = [field_noise[i]]
+                cell_row["p_scalar"] = [p_scalars[j]]
+                cell_row["grid_spacing"] = [grid_spacings[n]]
+                cell_row["lomb_classification"] = [lomb_classifier]
+                cell_row["true_classification"] = [true_classifications_all_cells[n][0]]
+                cell_row["rate_maps_smoothened"] = [rate_maps[n]]
+                cell_row["spatial_periodogram"] = [powers_all_cells[n]]
+                cell_row["centre_trials"] = [centre_trials[n]]
+                cell_row=compute_peak_statistics(cell_row)
+
+                if not save_large_columns:
+                    cell_row = cell_row.drop('rate_maps_smoothened', axis=1)
+                    cell_row = cell_row.drop('spatial_periodogram', axis=1)
+                    cell_row = cell_row.drop('centre_trials', axis=1)
+                simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
+                print("added_cell_to_dataframe")
+
+    simulated_data_set.to_pickle(save_path+"simulated_remapped_grid_cells.pkl")
+    return
+
+def compute_peak_statistics(sim_data):
+    peak_frequencies = []
+    peak_frequencies_delta_int = []
+    peak_powers = []
+    for index, row in sim_data.iterrows():
+        spatial_periodogram = row["spatial_periodogram"]
+        avg_power = np.nanmean(spatial_periodogram, axis=0)
+        max_SNR, max_SNR_freq = get_max_SNR(Settings.frequency, avg_power)
+        max_SNR_freq_delta_int = distance_from_integer(max_SNR_freq)
+
+        peak_frequencies.append(max_SNR_freq)
+        peak_frequencies_delta_int.append(max_SNR_freq_delta_int[0])
+        peak_powers.append(max_SNR)
+
+    sim_data["peak_frequency"] = peak_frequencies
+    sim_data["peak_frequency_delta_int"] = peak_frequencies_delta_int
+    sim_data["peak_power"] = peak_powers
+    return sim_data
+
+def generate_switch_grid_cells(field_noise, trial_switch_probability, p_scalars, save_path, grid_spacings, n_cells):
+    # this function creates a dataframe of cells of a certain parametisation and creates the spatial periodograms and rate maps
+    grid_stability = "imperfect"
+
+    simulated_data_set = pd.DataFrame()
+    for j in range(len(p_scalars)):
+        for i in range(len(field_noise)):
+            for switch_coding in ["by_trial", "block"]:
+                # calculate the stats for the most random simulated cell
+
+                # generate_cells
+                powers_all_cells, _, centre_trials, track_length, true_classifications_all_cells, rate_maps = \
+                    switch_grid_cells(switch_coding, grid_stability, grid_spacings, n_cells, trial_switch_probability[0],
+                                      field_noise_std=field_noise[i], p_scalar=p_scalars[j], return_shuffled=False)
+
+                for n in range(n_cells):
+                    cell_row = pd.DataFrame()
+                    cell_row["rate_maps_smoothened"] = [rate_maps[n]]
+                    cell_row["spatial_periodogram"] = [powers_all_cells[n]]
+                    cell_row["centre_trials"] = [centre_trials[n]]
+                    cell_row["track_length"] = [track_length]
+                    cell_row["true_classification"] = [true_classifications_all_cells[n]]
+                    cell_row["lomb_frequency_threshold"] = [Settings.lomb_frequency_threshold]
+                    cell_row["field_noise_sigma"] = [field_noise[i]]
+                    cell_row["p_scalar"] = [p_scalars[j]]
+                    cell_row["switch_coding"] = [switch_coding]
+                    cell_row["grid_spacing"] = [grid_spacings[i]]
+                    simulated_data_set = pd.concat([simulated_data_set, cell_row], ignore_index=True)
+                    print("added_cell_to_dataframe")
+
+                simulated_data_set.to_pickle(save_path+"simulated_remapped_grid_cells.pkl")
+    return
+
+
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
-
 
     np.random.seed(0)
     save_path = "/mnt/datastore/Harry/Vr_grid_cells/simulated_data/grid_data/"
@@ -199,10 +239,8 @@ def main():
     grid_spacing_low = 40
     grid_spacing_high = 400
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
-    #generate_switch_grid_cells(field_noise=[0,5,10], trial_switch_probability=[0.5, 0.1, 0.05, 0.01],
-    #                           save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
-
-    generate_stable_grid_cells(field_noise=[0,5,10],save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
+    #generate_switch_grid_cells(field_noise=[0,10,20,30], trial_switch_probability=[0.1], p_scalars=[0.01, 0.1, 1], save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells)
+    generate_stable_grid_cells(field_noise=[0,10,20,30], p_scalars=[0.01, 0.1, 1], save_path=save_path, grid_spacings=grid_spacings, n_cells=n_cells, save_large_columns=False)
 
 if __name__ == '__main__':
     main()

@@ -105,10 +105,10 @@ def style_vr_plot_offset(ax, x_max):
     plt.ylim(0, x_max)
     return ax
 
-def style_track_plot(ax, track_length):
-    ax.axvspan(track_length-60-30-20, track_length-60-30, facecolor='DarkGreen', alpha=.25, linewidth =0)
+def style_track_plot(ax, track_length,alpha=0.25):
+    ax.axvspan(track_length-60-30-20, track_length-60-30, facecolor='DarkGreen', alpha=alpha, linewidth =0)
     ax.axvspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
-    ax.axvspan(track_length-30, track_length, facecolor='k', linewidth =0, alpha=.25)# black box
+    ax.axvspan(track_length-30, track_length, facecolor='k', linewidth =0, alpha=alpha)# black box
 
 
 def makelegend(fig,ax, x_location):
