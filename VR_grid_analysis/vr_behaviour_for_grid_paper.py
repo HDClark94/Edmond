@@ -688,7 +688,7 @@ def get_hmt_color(hmt):
     elif hmt =="miss":
         return "red"
     else:
-        return "SOMETING IS WRONGG"
+        return "grey"
 
 def plot_average_hmt_speed_trajectories_by_trial_type_by_mouse(processed_position_data, hmt, save_path):
     start=0;end=199
@@ -3631,31 +3631,6 @@ def population_shuffled_vs_training_day(all_behaviour200cm_tracks, save_path, pe
 def print_population_stats(all_behaviour200cm_tracks):
     print("hello there")
 
-def add_speed_per_100ms(position_data):
-    positions = np.array(position_data["x_position_cm"])
-    trial_numbers = np.array(position_data["trial_number"])
-    distance_travelled = positions+(200*(trial_numbers-1))
-
-    change_in_distance_travelled = np.concatenate([np.zeros(1), np.diff(distance_travelled)], axis=0)
-
-    speed_per_100ms = np.array(pd.Series(change_in_distance_travelled).rolling(100).sum())/(100/1000) # 0.1 seconds == 100ms
-    position_data["speed_per_100ms"] = speed_per_100ms
-    return position_data
-
-def add_stopped_in_rz(position_data):
-    position_data["below_speed_threshold"] = position_data["speed_per_100ms"]<4.7
-    position_data["stopped_in_rz"] = (position_data["below_speed_threshold"] == True) &\
-                                     (position_data["x_position_cm"] <= 110) & \
-                                     (position_data["x_position_cm"] >= 90)
-    return position_data
-
-def add_hit_according_to_blender(processed_position_data, position_data):
-    hit_trial_numbers = np.unique(position_data[position_data["stopped_in_rz"] == True]["trial_number"])
-    hit_array = np.zeros(len(processed_position_data), dtype=int)
-    hit_array[hit_trial_numbers-1] = 1
-    processed_position_data["hit_blender"] = hit_array
-
-    return processed_position_data
 
 def process_recordings(vr_recording_path_list, all_behaviour, cohort):
     print(" ")
@@ -3668,16 +3643,10 @@ def process_recordings(vr_recording_path_list, all_behaviour, cohort):
             session_number = int(session_id.split("_")[1].split("D")[-1])
 
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            position_data = pd.read_pickle(recording + "/MountainSort/DataFrames/position_data.pkl")
-            position_data = add_speed_per_100ms(position_data)
-            position_data = add_stopped_in_rz(position_data)
-
             processed_position_data = add_avg_trial_speed(processed_position_data)
             processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=track_length)
             processed_position_data = add_avg_track_speed(processed_position_data, track_length=track_length)
             processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=track_length)
-            processed_position_data = add_hit_according_to_blender(processed_position_data, position_data)
-
             processed_position_data["session_number"] = session_number
             processed_position_data["mouse_id"] = mouse_id
             processed_position_data["track_length"] = track_length
@@ -3748,6 +3717,68 @@ def add_nb_expected_reward_from_the_session(ratio_numeric, reward_ratio):
     nb_expected_reward = 100*non_beaconed_reward/(beaconed_reward+non_beaconed_reward)
     return nb_expected_reward
 
+def shortest_repeating_sequence(inp):
+    for i in range(1, len(inp)):
+        if all(inp[j] == inp[j % i] for j in range(i, len(inp))):
+            return inp[:i]
+
+    # inp doesn't have a repeating pattern if we got this far
+    return inp[:]
+
+def repeated_piece(target):
+    target = list(target)
+    length = len(target)
+
+    for final in range(1, length):
+        result = []
+
+        while len(result) < length:
+            for i in target[:final]:
+                result.append(i)
+
+        if result[:length] == target:
+            return result[:final]
+
+    return target
+
+def get_trial_type_scheme(trial_types):
+
+    if len(search_sequence_numpy(trial_types, np.array([0,0,0,0,1,0,0,0,0,2])))>0:
+        scheme = np.array([0,0,0,0,1,0,0,0,0,2], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,0,1,0,0,0,2])))>0:
+        scheme = np.array([0,0,0,1,0,0,0,2], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0,0,2])))>0:
+        scheme = np.array([0,0,1,0,0,2], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0,0,1,0,0,2])))>0:
+        scheme = np.array([0,0,1,0,0,1,0,0,2], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,0,1,2,0,1,1])))>0:
+        scheme = np.array([0,1,1,0,1,2,0,1,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1,1,1,1,1,2])))>0:
+        scheme = np.array([0,0,1,1,1,1,1,1,1,2], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1,0,0,1,2,1])))>0:
+        scheme = np.array([0,0,1,1,1,0,0,1,2,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,0,0,1])))>0:
+        scheme = np.array([0,0,0,0,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,0,1])))>0:
+        scheme = np.array([0,0,0,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0]))) > 0:
+        scheme = np.array([0,0,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,1,0,1,0,1]))) > 0:
+        scheme = np.array([0, 1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1]))) > 0:
+        scheme = np.array([0,0,1,1,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,0,1,1,0]))) > 0:
+        scheme = np.array([0,1,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,1,1,1,1,1,1]))) > 0:
+        scheme = np.array([0,1,1,1,1,1,1,1,1], dtype=np.str0)
+    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,1])))>0:
+        scheme = np.array([0,1,1,1], dtype=np.str0)
+    else:
+        print("")
+
+    scheme = ''.join(scheme)
+    return scheme
+
 def generate_metadata(behaviour_df):
     meta = pd.DataFrame()
 
@@ -3765,17 +3796,14 @@ def generate_metadata(behaviour_df):
                 n_probe_trials_correct = len(session_data[(session_data["trial_type"] == 2) & (session_data["hit_miss_try"] == "hit")])
                 n_beaconed_trials_correct = len(session_data[(session_data["trial_type"] == 0) & (session_data["hit_miss_try"] == "hit")])
                 n_nonbeaconed_trials_correct = len(session_data[(session_data["trial_type"] == 1) & (session_data["hit_miss_try"] == "hit")])
-                n_probe_trials_correct_blender = len(session_data[(session_data["trial_type"] == 2) & (session_data["hit_blender"] == 1)])
-                n_beaconed_trials_correct_blender = len(session_data[(session_data["trial_type"] == 0) & (session_data["hit_blender"] == 1)])
-                n_nonbeaconed_trials_correct_blender = len(session_data[(session_data["trial_type"] == 1) & (session_data["hit_blender"] == 1)])
-
-
                 track_length = session_data["track_length"].iloc[0]
                 mouse_id = session_data["mouse_id"].iloc[0]
                 session_number = session_data["session_number"].iloc[0]
                 reward_ratio = add_reward_ratio(session_data)
                 cohort = session_data["cohort"].iloc[0]
                 cohort_mouse = str(cohort)+"_"+mouse_id
+
+                trial_type_scheme = get_trial_type_scheme(np.array(session_data["trial_type"]))
 
                 # search for the ratio used out of 4:1, 3:1, 2:1, 3:2
                 trial_types = np.array(session_data["trial_type"])
@@ -3819,14 +3847,6 @@ def generate_metadata(behaviour_df):
                 session_meta["percent_probe_trials_correct"] =[100*pass_div_by_zero(n_probe_trials_correct, n_probe_trials)]
                 session_meta["percent_beaconed_trials_correct"] = [100*pass_div_by_zero(n_beaconed_trials_correct, n_beaconed_trials)]
                 session_meta["percent_nonbeaconed_trials_correct"] = [100*pass_div_by_zero(n_nonbeaconed_trials_correct, n_nonbeaconed_trials)]
-
-                session_meta["n_probe_trials_correct_blender"] =[n_probe_trials_correct_blender]
-                session_meta["n_beaconed_trials_correct_blender"] = [n_beaconed_trials_correct_blender]
-                session_meta["n_nonbeaconed_trials_correct_blender"] = [n_nonbeaconed_trials_correct_blender]
-                session_meta["percent_probe_trials_correct_blender"] = [100 * pass_div_by_zero(n_probe_trials_correct_blender, n_probe_trials)]
-                session_meta["percent_beaconed_trials_correct_blender"] = [100 * pass_div_by_zero(n_beaconed_trials_correct_blender, n_beaconed_trials)]
-                session_meta["percent_nonbeaconed_trials_correct_blender"] = [100 * pass_div_by_zero(n_nonbeaconed_trials_correct_blender, n_nonbeaconed_trials)]
-
                 session_meta["trial_type_ratio"] = [ratio]
                 session_meta["trial_type_ratio_numeric"] = [ratio_numeric]
                 session_meta["reward_ratio"] = [reward_ratio]
@@ -3836,6 +3856,7 @@ def generate_metadata(behaviour_df):
                 session_meta["session_number"] = [session_number]
                 session_meta["cohort"] = [cohort]
                 session_meta["cohort_mouse"] = [cohort_mouse]
+                session_meta["trial_type_scheme"] = [trial_type_scheme]
 
                 meta = pd.concat([meta, session_meta], ignore_index=True)
 
@@ -4212,43 +4233,283 @@ def plot_histogram_first_and_last_5_days_stops(behaviour_df,save_path, first_sto
     plt.close()
     return
 
+def plot_performance_between_different_trial_type_schemes(meta_behaviour_data, save_path):
+    # for each mouse, look at the five days before and after the introduction of probe trials
+
+    x_pos = np.arange(len(np.unique(meta_behaviour_data["trial_type_scheme"])))
+    x_labels = np.unique(meta_behaviour_data["trial_type_scheme"])
+    colors = [u'#1f77b4', u'#ff7f0e', u'#2ca02c', u'#d62728', u'#9467bd', u'#8c564b', u'#e377c2', u'#7f7f7f', u'#bcbd22', u'#17becf']
+    for tt in [0,1,2]:
+        fig, ax = plt.subplots(figsize=(18, 4))
+        for i, mouse in enumerate(np.unique(meta_behaviour_data["mouse_id"])):
+            mouse_meta_data = meta_behaviour_data[meta_behaviour_data["mouse_id"] == mouse]
+
+            for index, session_row in mouse_meta_data.iterrows():
+                session_row = session_row.to_frame().T.reset_index(drop=True)
+                scheme = session_row["trial_type_scheme"].iloc[0]
+                x_pos_i = x_pos[x_labels==scheme][0]
+                if tt == 0:
+                    ax.scatter(x_pos_i+np.random.uniform(low=-0.2, high=0.2), session_row["percent_beaconed_trials_correct"], color=colors[i])
+                elif tt == 1:
+                    ax.scatter(x_pos_i+np.random.uniform(low=-0.2, high=0.2), session_row["percent_nonbeaconed_trials_correct"], color=colors[i])
+                elif tt == 2:
+                    ax.scatter(x_pos_i+np.random.uniform(low=-0.2, high=0.2), session_row["percent_probe_trials_correct"], color=colors[i])
+
+        for scheme, x_pos_i in zip(x_labels, x_pos):
+            scheme_meta = meta_behaviour_data[meta_behaviour_data["trial_type_scheme"] == scheme]
+            if tt == 0:
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_beaconed_trials_correct"]), stats.sem(scheme_meta["percent_beaconed_trials_correct"], nan_policy="omit"), color="black")
+            elif tt == 1:
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_nonbeaconed_trials_correct"]), stats.sem(scheme_meta["percent_nonbeaconed_trials_correct"], nan_policy="omit"), color="black")
+            elif tt == 2:
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_probe_trials_correct"]), stats.sem(scheme_meta["percent_probe_trials_correct"], nan_policy="omit"),color="black")
+
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(x_labels, rotation = 45)
+        ax.tick_params(axis='both', which='major', labelsize=15)
+        fig.tight_layout()
+        ax.set_ylim(bottom=0, top=100)
+        ax.set_xlim(left=-0.5, right=max(x_pos)+0.5)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_ylabel("% Hits", fontsize=20)
+        #ax.legend(title='Mouse')
+        plt.subplots_adjust(left=0.2, bottom=0.3, right=0.8, top=0.8)
+        plt.savefig(save_path + '/percentage_hits_for_different_trials_schemes_'+str(tt)+'.png', dpi=300)
+        plt.close()
+    return
+
+
+def plot_performance_between_session_with_probes_vs_session_without_probes(meta_behaviour_data, save_path):
+    # for each mouse, look at the five days before and after the introduction of probe trials
+
+    x_pos = [0, 1, 2]
+    x_labels = ["pre-P NB", "post-P NB", "post-P P"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    for mouse in np.unique(meta_behaviour_data["mouse_id"]):
+        mouse_meta_data = meta_behaviour_data[meta_behaviour_data["mouse_id"] == mouse]
+        if np.sum(mouse_meta_data['n_probe_trials']) > 0:
+            first_probe_day = min(mouse_meta_data[mouse_meta_data["n_probe_trials"]>0]["session_number"])
+            five_pre_probe_trials_meta = mouse_meta_data[(mouse_meta_data["session_number"]<first_probe_day) &
+                                                         (mouse_meta_data["session_number"]>=first_probe_day-5)]
+            five_post_probe_trials_meta = mouse_meta_data[(mouse_meta_data["session_number"]>=first_probe_day) &
+                                                          (mouse_meta_data["session_number"]<first_probe_day+5)]
+
+            ax.plot(x_pos, [np.nanmean(five_pre_probe_trials_meta['percent_nonbeaconed_trials_correct']),
+                            np.nanmean(five_post_probe_trials_meta['percent_nonbeaconed_trials_correct']),
+                            np.nanmean(five_post_probe_trials_meta['percent_probe_trials_correct'])], label=str(mouse))
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(x_labels)
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    fig.tight_layout()
+    ax.set_ylim(bottom=0, top=100)
+    ax.set_xlim(left=-0.5, right=2.5)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylabel("% Hits", fontsize=20)
+    ax.legend(title='Mouse')
+    plt.subplots_adjust(left=0.2, bottom=0.2, right=0.8, top=0.8)
+    plt.savefig(save_path + '/percentage_hits_before_and_after_the_introduction_of_probe_trials.png', dpi=300)
+    plt.close()
+    """
+        print("comparing column " + column_str + " across expected_reward conditions Default vs TTR, df=",
+              str(len(Default) + len(TTR) - 2), ", p= ",
+              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[1]), ", t= ",
+              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[0]))
+        print("comparing column " + column_str + " across expected_reward conditions Default vs TTR_R, df=",
+              str(len(Default) + len(TTR_R) - 2), ", p= ",
+              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ",
+              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[0]))
+        print("comparing column " + column_str + " across expected_reward conditions TTR vs TTR_R, df=",
+              str(len(TTR) + len(TTR_R) - 2), ", p= ",
+              str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ",
+              str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[0]))
+    """
+    return
+
+def plot_speeds_from_processed_position_data_and_position_data(processed_position_data, position_data,save_path):
+    processed_position_data = add_avg_track_speed(processed_position_data, track_length=200)
+    processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=200)
+
+    accepted_trials = np.array(processed_position_data[processed_position_data['hit_miss_try'] != "rejected"]["trial_number"])
+    processed_position_data = processed_position_data[np.isin(processed_position_data['trial_number'], accepted_trials)]
+    position_data = position_data[np.isin(position_data['trial_number'], accepted_trials)]
+    position_data["below_speed_threshold"] = position_data["speed_per_100ms"]<4.7
+    position_data["stopped_in_rz"] = (position_data["below_speed_threshold"] == True) &\
+                                     (position_data["x_position_cm"] <= 110) & \
+                                     (position_data["x_position_cm"] >= 90)
+
+
+    for tt in [0,1,2]:
+        subset_processed_position_data = processed_position_data[(processed_position_data["trial_type"] == tt)]
+        subset_position_data = position_data[position_data["trial_type"] == tt]
+
+        print("USING THE OLD METRIC FOR SPEED QUANTIFICATION: % hit trials for tt ", str(tt), ": " + str(
+            100 * len(subset_processed_position_data[subset_processed_position_data["hit_miss_try"] == "hit"]) / len(
+                subset_processed_position_data)))
+
+        print("USING THE NEW METRIC FOR SPEED QUANTIFICATION: % hit trials for tt ", str(tt), ": " + str(
+            100 * len(np.unique(subset_position_data[subset_position_data["stopped_in_rz"] == True]["trial_number"])) / len(
+                np.unique(subset_position_data["trial_number"]))))
+
+
+    trial_numbers_to_test = np.array([50])
+
+    speed_histogram = plt.figure(figsize=(6, 4))
+    ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+    for tn in trial_numbers_to_test:
+        trial_processed_data = processed_position_data[processed_position_data["trial_number"] == tn]
+        trial_position_data = position_data[position_data["trial_number"] == tn]
+
+        ax.plot(trial_processed_data['pos_binned_in_time'].iloc[0][2:-2], trial_processed_data['speeds_binned_in_time'].iloc[0][2:-2], color="red", alpha=0.3)
+        ax.plot(trial_position_data["x_position_cm"], trial_position_data["speed_per_100ms"], color="green", alpha=0.3)
+
+    ax.axhline(y=4.7, color="black", linestyle="dashed", linewidth=2)
+    plt.ylabel('Speed (cm/s)', fontsize=25, labelpad=10)
+    plt.xlabel('Location (cm)', fontsize=25, labelpad=10)
+    plt.xlim(0, 200)
+    ax.set_yticks([0, 50, 100])
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    style_track_plot(ax, 200)
+    tick_spacing = 100
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    x_max = 115
+    Edmond.plot_utility2.style_vr_plot(ax, x_max)
+    plt.subplots_adjust(bottom=0.2, left=0.2)
+    # plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + 'trial_speeds_test.png', dpi=300)
+    plt.close()
+
+    return
+
+
+def plot_speeds(processed_position_data, save_path):
+    processed_position_data = add_avg_track_speed(processed_position_data, track_length=200)
+    processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=200)
+
+    for tt in [0,1,2]:
+        subset_processed_position_data = processed_position_data[(processed_position_data["trial_type"] == tt)]
+        print("% hit trials for tt ",str(tt),": "+ str(100*len(subset_processed_position_data[subset_processed_position_data["hit_miss_try"]=="hit"])/len(subset_processed_position_data)))
+
+        if len(subset_processed_position_data)>0:
+            speed_histogram = plt.figure(figsize=(6,4))
+            ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+            # to plot by trial using the time binned data we need the n-1, n and n+1 trials so we can plot around the track limits
+            # here we extract the n-1, n and n+1 trials, correct for any time binned teleports and concatenated the positions and speeds for each trial
+            for i, tn in enumerate(subset_processed_position_data["trial_number"]):
+                trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == tn]
+                tt_trial = trial_processed_position_data["trial_type"].iloc[0]
+                hmt_trial = trial_processed_position_data["hit_miss_try"].iloc[0]
+                trial_speeds_in_time = np.asarray(trial_processed_position_data['speeds_binned_in_time'].iloc[0])
+                trial_pos_in_time = np.asarray(trial_processed_position_data['pos_binned_in_time'].iloc[0])
+
+                # cases above trial number 1
+                if tn != min(processed_position_data["trial_number"]):
+                    trial_processed_position_data_1down = processed_position_data[processed_position_data["trial_number"] == tn-1]
+                    trial_speeds_in_time_1down = np.asarray(trial_processed_position_data_1down['speeds_binned_in_time'].iloc[0])
+                    trial_pos_in_time_1down = np.asarray(trial_processed_position_data_1down['pos_binned_in_time'].iloc[0])
+                else:
+                    trial_speeds_in_time_1down = np.array([])
+                    trial_pos_in_time_1down = np.array([])
+
+                # cases below trial number n
+                if tn != max(processed_position_data["trial_number"]):
+                    trial_processed_position_data_1up = processed_position_data[processed_position_data["trial_number"] == tn+1]
+                    trial_speeds_in_time_1up = np.asarray(trial_processed_position_data_1up['speeds_binned_in_time'].iloc[0])
+                    trial_pos_in_time_1up = np.asarray(trial_processed_position_data_1up['pos_binned_in_time'].iloc[0])
+                else:
+                    trial_speeds_in_time_1up = np.array([])
+                    trial_pos_in_time_1up = np.array([])
+
+                trial_pos_in_time = np.concatenate((trial_pos_in_time_1down[-2:], trial_pos_in_time, trial_pos_in_time_1up[:2]))
+                trial_speeds_in_time = np.concatenate((trial_speeds_in_time_1down[-2:], trial_speeds_in_time, trial_speeds_in_time_1up[:2]))
+
+
+                trial_pos_in_time = correct_for_time_binned_teleport(trial_pos_in_time, 200)
+                ax.plot(trial_pos_in_time, trial_speeds_in_time, color=get_hmt_color(hmt_trial), alpha=0.3)
+
+            ax.axhline(y=4.7, color="black", linestyle="dashed", linewidth=2)
+            plt.ylabel('Speed (cm/s)', fontsize=25, labelpad = 10)
+            plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+            plt.xlim(0,200)
+            ax.set_yticks([0, 50, 100])
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            if tt == 0:
+                style_track_plot(ax, 200)
+            else:
+                style_track_plot_no_RZ(ax, 200)
+            tick_spacing = 100
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            x_max = 115
+            Edmond.plot_utility2.style_vr_plot(ax, x_max)
+            plt.subplots_adjust(bottom = 0.2, left=0.2)
+            #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+            plt.savefig(save_path + 'trial_speeds_tt_'+str(tt)+'.png', dpi=300)
+            plt.close()
+    return
+
+def add_speed_per_100ms(position_data):
+    positions = np.array(position_data["x_position_cm"])
+    trial_numbers = np.array(position_data["trial_number"])
+    distance_travelled = positions+(200*(trial_numbers-1))
+
+    change_in_distance_travelled = np.concatenate([np.zeros(1), np.diff(distance_travelled)], axis=0)
+
+    speed_per_100ms = np.array(pd.Series(change_in_distance_travelled).rolling(100).sum())/(100/1000) # 0.1 seconds == 100ms
+    position_data["speed_per_100ms"] = speed_per_100ms
+    return position_data
+
+def running_mean(x, N):
+   cumsum = np.cumsum(np.insert(x, 0, 0))
+   return (cumsum[N:] - cumsum[:-N]) / N
 
 
 def main():
     print('-------------------------------------------------------------')
 
+    processed_position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/processed_position_data.pkl")
+    position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/position_data.pkl")
+    position_data = add_speed_per_100ms(position_data)
 
+    plot_speeds_from_processed_position_data_and_position_data(processed_position_data, position_data,
+                                                               save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
+    plot_speeds(processed_position_data, save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
+    '''
     # give a path for a directory of recordings or path of a single recording
     all_behaviour = pd.DataFrame()
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort2/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=2)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort3/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=3)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort4/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=4)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort5/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=5)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=6)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=7)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=8)
-        
-    # save dataframes
-    all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
-    all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl") 
+    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M2"]
+    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M4"]
+    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M15"]
 
+    # save dataframes
+    all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
+    all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
+    '''
 
     # load dataframe
-    all_behaviour_all_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour.pkl")
-    _ = generate_metadata(all_behaviour_all_tracks)
-
-    all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm.pkl")
+    all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
     meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
 
-    plot_histogram_all_track_lengths(all_behaviour_all_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=True)
-    plot_histogram_all_track_lengths(all_behaviour_all_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=False)
+    plot_performance_between_different_trial_type_schemes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
+
+    plot_performance_between_session_with_probes_vs_session_without_probes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
+
 
     # plot performance by default, improvement (trial type ratio), improvement (trial type ratio and reward)
     plot_performance_against_improvements(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
@@ -4278,10 +4539,10 @@ def main():
     #remove probe trials before day 20
     all_behaviour200cm_tracks = all_behaviour200cm_tracks.drop(all_behaviour200cm_tracks[(all_behaviour200cm_tracks.trial_type == 2) & (all_behaviour200cm_tracks.session_number < 20)].index)
 
-    """
     plot_histogram_first_and_last_5_days_stops(all_behaviour200cm_tracks,save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=True)
     plot_histogram_first_and_last_5_days_stops(all_behaviour200cm_tracks,save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/population", first_stops=False)
 
+    """
     # speeds 
     plot_speed_heat_map(example_mouse, session_number=1, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")
     plot_speed_heat_map(example_mouse, session_number=24, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/example_mouse")

@@ -299,7 +299,7 @@ def plot_voltage_traces_from_recording_by_shank(recording, save_path):
             print("I have made a video snippet")
     return
 
-def plot_voltage_traces_from_recording_by_probe(recording, save_path):
+def plot_voltage_traces_from_recording_by_probe(recording, save_path, min_start=0, min_end=2):
     # by shark
     n_channels, _ = count_files_that_match_in_folder(recording, data_file_prefix=settings.data_file_prefix, data_file_suffix='.continuous')
     probe_group_df = get_probe_dataframe(n_channels)
@@ -323,7 +323,7 @@ def plot_voltage_traces_from_recording_by_probe(recording, save_path):
         base_probe_recording = base_probe_recording.save(folder= '/home/ubuntu/tmp/processed_probe'+str(probe_index)+'_segment0',
                                                          n_jobs=1, chunk_size=2000, progress_bar=True, overwrite=True)
 
-        traces = base_probe_recording.get_traces(start_frame=4*60*settings.sampling_rate, end_frame=7*60*settings.sampling_rate)
+        traces = base_probe_recording.get_traces(start_frame=min_start*60*settings.sampling_rate, end_frame=min_end*60*settings.sampling_rate)
 
         plt.rcParams["figure.figsize"] = [24, 48]
         plt.rcParams["figure.autolayout"] = True
@@ -363,9 +363,12 @@ def main():
 
     print('-------------------------------------------------------------')
 
-    remove_tmp_files()
+    #remove_tmp_files()
+    #plot_voltage_traces_from_recording_by_probe(recording="/mnt/datastore/Harry/Cohort9_february2023/of/M17_2023-05-16_15-43-04",
+    #                          save_path="/mnt/datastore/Harry/Cohort9_february2023/of/M17_2023-05-16_15-43-04/Figures/", min_start=1, min_end=2)
+
     plot_voltage_traces_from_recording_by_probe(recording="/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27",
-                              save_path="/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/Figures/")
+                              save_path="/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/Figures/", min_start=4, min_end=7)
 
     print('-------------------------------------------------------------')
 

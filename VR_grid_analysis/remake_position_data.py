@@ -496,16 +496,7 @@ def process_recordings(vr_recording_path_list):
 def main():
     print('-------------------------------------------------------------')
 
-    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
-    #vr_path_list = ["/mnt/datastore/Harry/cohort6_july2020/vr/M1_D5_2020-08-07_14-27-26_fixed"]
-
     #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort9_Junji/vr") if f.is_dir()]
-    #J1_list = [k for k in vr_path_list if 'J1' in k]
-    #J2_list = [k for k in vr_path_list if 'J2' in k]
-
-    #vr_path_list = vr_path_list[7:]
-    #log_files = log_files[7:]
     #process_recordings(J1_list)
     #process_recordings(J2_list)
 

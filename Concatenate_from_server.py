@@ -3,16 +3,23 @@ import pandas as pd
 import os
 import traceback
 import sys
-import PostSorting.open_field_head_direction
 import PostSorting.parameters
-import PostSorting.open_field_grid_cells
-import PostSorting.open_field_firing_maps
-import PostSorting.theta_modulation
-import control_sorting_analysis
+import file_utility
+import settings
 
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
 prm.set_pixel_ratio(440)
+
+def get_tags_parameter_file(recording_directory):
+    tags = False
+    parameters_path = recording_directory + '/parameters.txt'
+    param_file_reader = open(parameters_path, 'r')
+    parameters = param_file_reader.readlines()
+    parameters = list([x.strip() for x in parameters])
+    if len(parameters) > 2:
+        tags = parameters[2]
+    return tags
 
 def remove_outlier_waveforms(all_waveforms, max_deviations=2):
     # remove snippets that have data points > 3 standard dev away from mean
@@ -36,9 +43,30 @@ def add_peaks_to_troughs(df):
     df["snippet_peak_to_trough"] = peak_to_troughs
     return df
 
+def process_running_parameter_tag(running_parameter_tags):
+    stop_threshold = 4.9  # defaults
+    track_length = 200 # default assumptions
+    cue_conditioned_goal = False
+
+    if not running_parameter_tags:
+        return stop_threshold, track_length, cue_conditioned_goal
+
+    tags = [x.strip() for x in running_parameter_tags.split('*')]
+    for tag in tags:
+        if tag.startswith('stop_threshold'):
+            stop_threshold = float(tag.split("=")[1])
+        elif tag.startswith('track_length'):
+            track_length = int(tag.split("=")[1])
+        elif tag.startswith('cue_conditioned_goal'):
+            cue_conditioned_goal = bool(tag.split('=')[1])
+        else:
+            print('Unexpected / incorrect tag in the third line of parameters file')
+            unexpected_tag = True
+    return stop_threshold, track_length, cue_conditioned_goal
+
 def get_track_length(recording_path):
-    parameter_file_path = control_sorting_analysis.get_tags_parameter_file(recording_path)
-    stop_threshold, track_length, cue_conditioned_goal = PostSorting.post_process_sorted_data_vr.process_running_parameter_tag(parameter_file_path)
+    parameter_file_path = get_tags_parameter_file(recording_path)
+    stop_threshold, track_length, cue_conditioned_goal = process_running_parameter_tag(parameter_file_path)
     return track_length
 
 def get_proportion_reward(processed_position, trial_type="all"):
@@ -102,12 +130,36 @@ def add_full_session_id(spatial_firing, full_path):
     return spatial_firing
 
 
+def get_tags_parameter_file(recording_directory):
+    tags = False
+    parameters_path = recording_directory + '/parameters.txt'
+    param_file_reader = open(parameters_path, 'r')
+    parameters = param_file_reader.readlines()
+    parameters = list([x.strip() for x in parameters])
+    if len(parameters) > 2:
+        tags = parameters[2]
+    return tags
+
+def check_for_tag_name(running_parameter_tags, tag_name):
+    tag_in_file = None
+    if running_parameter_tags is not False:
+        tags = [x.strip() for x in running_parameter_tags.split('*')]
+        for tag in tags:
+            if tag.startswith(tag_name):
+                tag_in_file = str(tag.split("=")[1]).split(',')[0]
+    return tag_in_file
+
+
 def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix=""):
-    spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
-    spatial_path = "/MountainSort/DataFrames/position_data.pkl"
-    processed_path = "/MountainSort/DataFrames/processed_position_data.pkl"
 
     for path in recording_paths:
+        tags = get_tags_parameter_file(path)
+        sorter_name = check_for_tag_name(tags, "sorter_name")
+        spatial_firing_path = "/"+sorter_name+"/DataFrames/spatial_firing.pkl"
+        spatial_path = "/"+sorter_name+"/DataFrames/position_data.pkl"
+        processed_path = "/"+sorter_name+"/DataFrames/processed_position_data.pkl"
+        number_of_channels, _ = file_utility.count_files_that_match_in_folder(path, data_file_prefix=settings.data_file_prefix, data_file_suffix='.continuous')
+
         data_frame_path = path+spatial_firing_path
         spatial_df_path = path+spatial_path
         processed_position_path = path+processed_path
@@ -201,6 +253,18 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("miss_spatial_periodogram_tt1")
                     if "miss_spatial_periodogram_tt2" in list(spatial_firing):
                         collumn_names_to_keep.append("miss_spatial_periodogram_tt2")
+                    if "rolling:spatial_info_by_other_P" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:spatial_info_by_other_P")
+                    if "rolling:spatial_info_by_other_D" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:spatial_info_by_other_D")
+                    if "rolling:spatial_info_by_other_ids" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:spatial_info_by_other_ids")
+                    if "average_rolling_classification_for_multiple_grid_cells" in list(spatial_firing):
+                        collumn_names_to_keep.append("average_rolling_classification_for_multiple_grid_cells")
+                    if "average_rolling_centre_trials_for_multiple_grid_cells" in list(spatial_firing):
+                        collumn_names_to_keep.append("average_rolling_centre_trials_for_multiple_grid_cells")
+                    if "fr_binned_in_space_smoothed" in list(spatial_firing):
+                        collumn_names_to_keep.append("fr_binned_in_space_smoothed")
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
@@ -215,6 +279,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     spatial_firing = spatial_firing.loc[:,~spatial_firing.columns.duplicated()]
 
                     spatial_firing["n_trials"] = len(processed_position)
+                    spatial_firing["number_of_channels"] = number_of_channels
 
                     all_days_df = pd.concat([all_days_df, spatial_firing], ignore_index=True)
                     print('spatial firing data extracted from frame successfully')
@@ -245,14 +310,15 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
 
 
 def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None, suffix=""):
-    spatial_firing_path = "/MountainSort/DataFrames/spatial_firing.pkl"
-    spatial_path = "/MountainSort/DataFrames/position.pkl"
-
     for path in recording_paths:
-        data_frame_path = path+spatial_firing_path
-        spatial_df_path = path+spatial_path
-        print('Processing ' + data_frame_path)
+        tags = get_tags_parameter_file(path)
+        sorter_name = check_for_tag_name(tags, "sorter_name")
+        spatial_firing_path = "/" + sorter_name + "/DataFrames/spatial_firing.pkl"
+        spatial_path = "/" + sorter_name + "/DataFrames/position_data.pkl"
+        data_frame_path = path + spatial_firing_path
+        spatial_df_path = path + spatial_path
 
+        print('Processing ' + data_frame_path)
         if os.path.exists(data_frame_path):
             try:
                 print('I found a spatial data frame, processing ' + data_frame_path)
@@ -305,15 +371,18 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
     print("completed all in list")
     return all_days_df
 
-def combine_of_vr_dataframes(of_dataframe, vr_dataframe):
+def combine_of_vr_dataframes(vr_dataframe, of_dataframe):
     # combine and return of and vr matches with same session day, mouse id and cluster id
     combined_df = pd.DataFrame()
+    print("==========================================")
+    print(np.unique(vr_dataframe[vr_dataframe["mouse"]=="M16"]["recording_day"]))
+    print("==========================================")
 
-    for index, cluster_of_series in of_dataframe.iterrows():
-        cluster_id = cluster_of_series["cluster_id"]
-        date=cluster_of_series["date"]
-        mouse=cluster_of_series["mouse"]
-        training_day=cluster_of_series["recording_day"]
+    for index, cluster_vr_series in vr_dataframe.iterrows():
+        cluster_id = cluster_vr_series["cluster_id"]
+        date=cluster_vr_series["date"]
+        mouse=cluster_vr_series["mouse"]
+        training_day=cluster_vr_series["recording_day"]
 
         cluster_of_df = of_dataframe[(of_dataframe.cluster_id == cluster_id) &
                                      (of_dataframe.date == date) &
@@ -323,13 +392,24 @@ def combine_of_vr_dataframes(of_dataframe, vr_dataframe):
                                      (vr_dataframe.date == date) &
                                      (vr_dataframe.mouse == mouse)]
 
+        print("I am looking at cluster", str(cluster_id), " from ", str(date), ", mouse ", str(mouse), ", day", str(training_day))
+
+
         combined_cluster = cluster_of_df.copy()
         if ((len(cluster_vr_df) == 1) and (len(cluster_of_df) == 1)):
             collumns_to_add = np.setdiff1d(list(cluster_vr_df), list(cluster_of_df)) # finds collumns in 1 list that are not in the other
             for i in range(len(collumns_to_add)):
                 combined_cluster[collumns_to_add[i]] = [cluster_vr_df[collumns_to_add[i]].iloc[0]]
-
             combined_df = pd.concat([combined_df, combined_cluster], ignore_index=True)
+            print("Added combined cluster", str(cluster_id), " from ", str(date), ", mouse ", str(mouse), ", day",str(training_day))
+        elif (len(cluster_vr_df) == 1):
+            combined_df = pd.concat([combined_df, cluster_vr_df], ignore_index=True)
+            print("Added vr cluster", str(cluster_id), " from ", str(date), ", mouse ", str(mouse), ", day", str(training_day))
+        elif (len(cluster_of_df) == 1):
+            combined_df = pd.concat([combined_df, cluster_of_df], ignore_index=True)
+            print("Added of cluster", str(cluster_id), " from ", str(date), ", mouse ", str(mouse), ", day",str(training_day))
+        else:
+            print("Did not add cluster", str(cluster_id), " from ", str(date), ", mouse ", str(mouse), ", day", str(training_day))
 
     return combined_df
 

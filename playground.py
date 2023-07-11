@@ -155,7 +155,7 @@ def plot_waveforms_from_sever2(sorter_dir_path, save_path, load_closest_channels
 
         for i in Sorter.get_unit_ids():
             sw.plot_unit_waveforms(we, unit_ids=np.array([int(i)]))
-            plt.savefig(save_path + '/by_geometry_waveforms_' + str(probe_id) + str(shank_id) + str(i) + '_2.png', dpi=300)
+            plt.savefig(save_path + '/by_geometry_waveforms_' + str(probe_id) + str(shank_id) + str(i) + '_plot_waveforms_from_sever2.png', dpi=300)
             plt.close()
     return
 
@@ -239,7 +239,7 @@ def plot_waveforms_from_sever_using_probe_geometry(waveform_path, save_path, loa
     waveform_paths = [f for f in os.listdir(waveform_path) if f.endswith('.npy')]
     #waveform_paths = ["waveforms_112.npy"]
     for sub_path in waveform_paths:
-        cluster_id = sub_path.split("_")[-1].split(".npy")[0]
+        cluster_id = sub_path.split("_")[1].split(".npy")[0]
         probe_id= cluster_id[0]
         shank_id=cluster_id[1]
         on_shank_id = cluster_id[2:]
@@ -272,7 +272,7 @@ def plot_waveforms_from_sever_using_probe_geometry(waveform_path, save_path, loa
                 ax.plot(x+(np.linspace(-1, 1, len(waveforms_to_plot[j, :]))*x_stretch_factor), y+(waveforms_to_plot[j, :]*y_stretch_factor), color="grey")
             ax.plot(x+(np.linspace(-1, 1, len(waveforms_to_plot[j,:]))*x_stretch_factor), y+(np.nanmean(waveforms_to_plot, axis=0)*y_stretch_factor), color="red")
 
-        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '.png', dpi=300)
+        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_plot_waveforms_from_sever_using_probe_geometry.png', dpi=300)
         plt.close()
 
     return
@@ -282,7 +282,7 @@ def plot_waveforms_again(waveform_path, save_path):
     waveform_paths = [f for f in os.listdir(waveform_path) if f.endswith('.npy')]
     #waveform_paths = ["waveforms_112.npy"]
     for sub_path in waveform_paths:
-        cluster_id = sub_path.split("_")[-1].split(".npy")[0]
+        cluster_id = sub_path.split("_")[1].split(".npy")[0]
         probe_id= cluster_id[0]
         shank_id=cluster_id[1]
         on_shank_id = cluster_id[2:]
@@ -303,21 +303,26 @@ def plot_waveforms_again(waveform_path, save_path):
             if x % 4 == 0:
                 y += 1
                 x = 0
-        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_2.png', dpi=300)
+        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_plot_waveforms_again1.png', dpi=300)
         plt.close()
 
 
 
         sw.plot_unit_waveforms(we, unit_ids=np.array([int(on_shank_id)]))
-        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_3.png', dpi=300)
+        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '__plot_waveforms_again2.png', dpi=300)
         plt.close()
 
 
+def adjust_pvals(p_values):
+    import statsmodels.stats.multitest as multitest
+    _, correct_p_values, _, _ = multitest.multipletests(p_values, alpha=0.05, method='bonferroni')
+    print(correct_p_values)
+    return
 
 def main():
 
     print('-------------------------------------------------------------')
-
+    adjust_pvals(p_values=[0.26, 0.03, 0.001])
 
     plot_waveforms_again(waveform_path="/home/ubuntu/to_sort/recordings/tmp/waveform_arrays",
                               save_path="/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/Figures/")

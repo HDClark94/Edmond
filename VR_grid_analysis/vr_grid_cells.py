@@ -40,7 +40,7 @@ warnings.filterwarnings('ignore')
 from scipy.stats.stats import pearsonr
 from scipy.stats import shapiro
 plt.rc('axes', linewidth=3)
-
+from scipy.signal import find_peaks
 
 def compute_peak(firing_rate_map_by_trial):
     fr=firing_rate_map_by_trial.flatten()
@@ -145,6 +145,42 @@ def add_avg_track_speed(processed_position_data, track_length):
     processed_position_data["avg_speed_on_track"] = avg_speed_on_tracks
     return processed_position_data
 
+
+def add_avg_track_speed2(processed_position_data, position_data, track_length):
+    reward_zone_start = track_length-60-30-20
+    reward_zone_end = track_length-60-30
+    track_start = 30
+    track_end = track_length-30
+
+    avg_speed_on_tracks = []
+    avg_speed_in_RZs = []
+    for i, trial_number in enumerate(processed_position_data.trial_number):
+        trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == trial_number]
+        trial_position_data = position_data[position_data["trial_number"] == trial_number]
+        speeds_in_time = np.array(trial_position_data["speed_per_100ms"])
+        pos_in_time = np.array(trial_position_data["x_position_cm"])
+        in_rz_mask = (pos_in_time > reward_zone_start) & (pos_in_time <= reward_zone_end)
+        speeds_in_time_outside_RZ = speeds_in_time[~in_rz_mask]
+        speeds_in_time_inside_RZ = speeds_in_time[in_rz_mask]
+
+        if len(speeds_in_time_outside_RZ)==0:
+            avg_speed_on_track = np.nan
+        else:
+            avg_speed_on_track = np.nanmean(speeds_in_time_outside_RZ)
+
+        if len(speeds_in_time_inside_RZ) == 0:
+            avg_speed_in_RZ = np.nan
+        else:
+            avg_speed_in_RZ= np.nanmean(speeds_in_time_inside_RZ)
+
+        avg_speed_on_tracks.append(avg_speed_on_track)
+        avg_speed_in_RZs.append(avg_speed_in_RZ)
+
+    processed_position_data["avg_speed_on_track"] = avg_speed_on_tracks
+    processed_position_data["avg_speed_in_RZ"] = avg_speed_in_RZs
+    return processed_position_data
+
+
 def add_RZ_bias(processed_position_data):
     avg_RZ_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_in_RZ"])
     avg_track_speed = pandas_collumn_to_numpy_array(processed_position_data["avg_speed_on_track"])
@@ -225,6 +261,36 @@ def add_hit_miss_try3(processed_position_data, track_length):
 
     processed_position_data["hit_miss_try"] = hit_miss_try
     processed_position_data["avg_speed_in_rz"] = avg_speed_in_rz
+    return processed_position_data, upper
+
+def add_hit_miss_try4(processed_position_data, position_data, track_length):
+    # this version of the function uses hit classification based on the blender calculation of speed (rolling average of the last 100ms)
+
+    # first get the avg speeds in the reward zone for all hit trials
+    rewarded_processed_position_data = processed_position_data[processed_position_data["hit_blender"] == True]
+    speeds_in_rz = np.array(rewarded_processed_position_data["avg_speed_in_RZ"])
+
+    mean, sigma = np.nanmean(speeds_in_rz), np.nanstd(speeds_in_rz)
+    interval = stats.norm.interval(0.95, loc=mean, scale=sigma)
+    upper = interval[1]
+    lower = interval[0]
+
+    hit_miss_try =[]
+    for i, trial_number in enumerate(processed_position_data.trial_number):
+        trial_process_position_data = processed_position_data[(processed_position_data.trial_number == trial_number)]
+        track_speed = trial_process_position_data["avg_speed_on_track"].iloc[0]
+        speed_in_rz = trial_process_position_data["avg_speed_in_RZ"].iloc[0]
+
+        if (trial_process_position_data["hit_blender"].iloc[0] == True) and (track_speed>Settings.track_speed_threshold):
+            hit_miss_try.append("hit")
+        elif (speed_in_rz >= lower) and (speed_in_rz <= upper) and (track_speed>Settings.track_speed_threshold):
+            hit_miss_try.append("try")
+        elif (speed_in_rz < lower) or (speed_in_rz > upper) and (track_speed>Settings.track_speed_threshold):
+            hit_miss_try.append("miss")
+        else:
+            hit_miss_try.append("rejected")
+
+    processed_position_data["hit_miss_try"] = hit_miss_try
     return processed_position_data, upper
 
 def add_hit_miss_try(processed_position_data, track_length):
@@ -997,6 +1063,77 @@ def plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, proce
             plt.close()
     return
 
+def plot_power_spectra_of_spikes(spike_data, output_path):
+    print('plotting power spectra...')
+    save_path = output_path + '/Figures/power_spectra'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    for cluster in range(len(spike_data)):
+        cluster_data = spike_data.iloc[cluster]
+        firing_times_cluster = cluster_data.firing_times
+        if len(firing_times_cluster)>1:
+
+            firing_times = firing_times_cluster / 30  # convert from samples to ms
+            bins = np.arange(0, np.max(firing_times), 1)
+            instantaneous_firing_rate = np.histogram(firing_times, bins=bins, range=(0, max(bins)))[0]
+
+            #instantaneous_firing_rate = PostSorting.theta_modulation.extract_instantaneous_firing_rate(cluster_data)
+            firing_rate = PostSorting.theta_modulation.calculate_firing_probability(instantaneous_firing_rate)
+            f, Pxx_den = PostSorting.theta_modulation.calculate_spectral_density(firing_rate, cluster_data, save_path, xlim=500)
+    return
+
+
+def add_peak_power_from_classic_power_spectra(spike_data, output_path):
+    print('plotting power spectra...')
+    save_path = output_path + '/Figures/power_spectra'
+    if os.path.exists(save_path) is False:
+        os.makedirs(save_path)
+
+    peak_powers = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)] # dataframe for that cluster
+        firing_times_cluster = cluster_df["firing_times"].iloc[0]
+        if len(firing_times_cluster)>1:
+
+            firing_times = firing_times_cluster / 30  # convert from samples to ms
+            bins = np.arange(0, np.max(firing_times), 1)
+            instantaneous_firing_rate = np.histogram(firing_times, bins=bins, range=(0, max(bins)))[0]
+            firing_rate = PostSorting.theta_modulation.calculate_firing_probability(instantaneous_firing_rate)
+            f, Pxx_den = signal.welch(firing_rate, fs=1000, nperseg=10000, scaling='spectrum')
+            Pxx_den = Pxx_den * f
+            # print(cluster)
+            # plt.semilogy(f, Pxx_den)
+            plt.plot(f, Pxx_den, color='black')
+            plt.xlim(([0, 500]))
+            plt.ylim([0, max(Pxx_den)])
+            # plt.ylim([1e1, 1e7])
+            # plt.ylim([0.5e-3, 1])
+
+            peaks, peak_dict = find_peaks(Pxx_den, height=1)
+            peak_heights = peak_dict['peak_heights']
+            peaks = peaks[np.argsort(peak_heights)[::-1]]
+            peaks = peaks[:5]  # take max of 5 peaks
+            for i in range(len(peaks)):
+                plt.text(x=f[peaks[i]], y=Pxx_den[peaks[i]], s=str(np.round(f[peaks[i]], decimals=1)) + "Hz")
+            plt.ylim([0, max(Pxx_den) + (0.1 * max(Pxx_den))])
+            plt.xlabel('frequency [Hz]')
+            plt.ylabel('PSD [V**2/Hz]')
+            plt.savefig(save_path + '/' + cluster_df.session_id.iloc[0] + '_' + str(
+                cluster_df.cluster_id.iloc[0]) + '_power_spectra_ms.png', dpi=300, bbox_inches='tight', pad_inches=0)
+            plt.close()
+
+            if len(peaks)>0:
+                peak_powers.append(peaks[0])
+            else:
+                peak_powers.append(np.nan)
+        else:
+            peak_powers.append(np.nan)
+
+    spike_data["peak_power_from_classic_power_spectra"] = peak_powers
+    return spike_data
+
+
 def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data, position_data, output_path, track_length):
     print('plotting trial firing rate maps...')
     save_path = output_path + '/Figures/firing_rate_maps'
@@ -1012,7 +1149,7 @@ def plot_firing_rate_maps_short_with_rolling_classifications(spike_data, process
             rolling_classifiers = np.array(spike_data["rolling:rolling_classifiers"].iloc[cluster_index])
 
             # remove first and last classification in streak
-            remove_last_and_first_from_streak = True
+            remove_last_and_first_from_streak = False
             last_classifier=""
             streak = 1
             new_rolling_classifier = rolling_classifiers.copy()
@@ -1110,7 +1247,7 @@ def get_spatial_information_score_for_trials(track_length, position_data, cluste
 
     return Ispike
 
-def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path, track_length):
+def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path, track_length, by_trial_type=False):
     print('plotting trial firing rate maps...')
     save_path = output_path + '/Figures/firing_rate_maps'
     if os.path.exists(save_path) is False:
@@ -1134,8 +1271,21 @@ def plot_firing_rate_maps_short(spike_data, processed_position_data, output_path
             #ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), color="black", alpha=0.3)
             #ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=1)
 
-            ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0, nan_policy="omit"), color="black", alpha=0.2)
-            ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=1)
+            if by_trial_type:
+                for tt in [0,1,2]:
+                    tt_trial_numbers = np.array(processed_position_data[processed_position_data["trial_type"] == tt]["trial_number"])
+                    ax.fill_between(locations, np.nanmean(cluster_firing_maps[tt_trial_numbers-1], axis=0) - stats.sem(cluster_firing_maps[tt_trial_numbers-1], axis=0,nan_policy="omit"),
+                                    np.nanmean(cluster_firing_maps[tt_trial_numbers-1], axis=0) + stats.sem(cluster_firing_maps[tt_trial_numbers-1], axis=0,nan_policy="omit"),
+                                    color=get_trial_color(tt), alpha=0.2)
+                    ax.plot(locations, np.nanmean(cluster_firing_maps[tt_trial_numbers-1], axis=0), color=get_trial_color(tt), linewidth=1)
+            else:
+
+                ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0) - stats.sem(cluster_firing_maps, axis=0,
+                                                                                    nan_policy="omit"),
+                                np.nanmean(cluster_firing_maps, axis=0) + stats.sem(cluster_firing_maps, axis=0,
+                                                                                    nan_policy="omit"), color="black",alpha=0.2)
+                ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color="black", linewidth=1)
+
 
             plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
             plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
@@ -2743,6 +2893,111 @@ def add_trials(spike_data, processed_position_data):
     spike_data["behaviour_trial_types"] = cluster_trial_types
     return spike_data
 
+def compress_rolling_stats_df(spike_data):
+    rolling_classifications_compressed = []
+    rolling_centre_trials_compressed = []
+
+    for index, cell_row in spike_data.iterrows():
+        cell_row = cell_row.to_frame().T.reset_index(drop=True)
+        rolling_centre_trials = cell_row["rolling:rolling_centre_trials"].iloc[0]
+        rolling_classifications = cell_row["rolling:rolling_classifiers"].iloc[0]
+        rolling_centre_trials, rolling_classifications, _ = compress_rolling_stats(rolling_centre_trials, rolling_classifications)
+        rolling_classifications_compressed.append(rolling_classifications)
+        rolling_centre_trials_compressed.append(rolling_centre_trials)
+
+    spike_data["rolling:rolling_centre_trials_compressed"] = rolling_centre_trials_compressed
+    spike_data["rolling:rolling_classifiers_compressed"] = rolling_classifications_compressed
+    return spike_data
+
+def calculate_average_rolling_classification_for_multiple_grid_cells(spike_data, paired_spike_data, position_data, track_length):
+    spike_data = compress_rolling_stats_df(spike_data)
+
+    paired_spike_data = paired_spike_data[["cluster_id", "session_id", "grid_cell"]]
+    spike_data_copy = spike_data.merge(paired_spike_data, on=["cluster_id"])
+
+    # get all grid_cell recordings
+    grid_cells = spike_data_copy[spike_data_copy["grid_cell_x"] == 1]
+
+    # calculate the average rolling classifications for all grid cells
+    rolling_classifications_for_grid_cells = pandas_collumn_to_2d_numpy_array(grid_cells["rolling:rolling_classifiers_compressed"])
+    rolling_centre_trials_for_grid_cells = pandas_collumn_to_2d_numpy_array(grid_cells["rolling:rolling_centre_trials_compressed"])[0]
+
+    # if there is only one grid cell, using this rolling classsifcation, otherwise get the mode of the rolling classifications
+    if len(rolling_classifications_for_grid_cells) == 1:
+        rolling_classifications = rolling_classifications_for_grid_cells[0]
+    elif len(rolling_classifications_for_grid_cells) > 1:
+        rolling_classifications = stats.mode(rolling_classifications_for_grid_cells, axis=0)[0][0]
+    else:
+        rolling_classifications = np.nan
+
+    proportion_encoding_P = len(rolling_classifications[rolling_classifications == "P"]) / len(rolling_classifications)
+    proportion_encoding_D = len(rolling_classifications[rolling_classifications == "D"]) / len(rolling_classifications)
+    proportion_encoding_N = len(rolling_classifications[rolling_classifications == "N"]) / len(rolling_classifications)
+
+    # loop over all grid cells
+    rolling_classifications_all_cells = []
+    rolling_centre_trials_for_all_cells = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        rolling_classifications_all_cells.append(rolling_classifications)
+        rolling_centre_trials_for_all_cells.append(rolling_centre_trials_for_grid_cells)
+    spike_data["average_rolling_classification_for_multiple_grid_cells"] = rolling_classifications_all_cells
+    spike_data["average_rolling_centre_trials_for_multiple_grid_cells"] = rolling_centre_trials_for_all_cells
+    spike_data["average_rolling_classification_for_multiple_grid_cells_proportion_encoding_P"] = proportion_encoding_P
+    spike_data["average_rolling_classification_for_multiple_grid_cells_proportion_encoding_D"] = proportion_encoding_D
+    spike_data["average_rolling_classification_for_multiple_grid_cells_proportion_encoding_N"] = proportion_encoding_N
+    return spike_data
+
+def calculate_spatial_information_against_other_cells_rolling_classifications(spike_data, processed_position_data, position_data, track_length):
+
+    spatial_information_scores_P = []
+    spatial_information_scores_D = []
+    cluster_pairs = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_df = spike_data[(spike_data.cluster_id == cluster_id)]  # dataframe for that cluster
+        cluster_trial_numbers = np.asarray(cluster_df["trial_number"].iloc[0])
+        cluster_firing = np.asarray(cluster_df["firing_times"].iloc[0])
+        if len(cluster_firing)>0:
+            # get P and D trials for reference cell
+            rolling_centre_trials = np.array(spike_data["rolling:rolling_centre_trials"].iloc[cluster_index])
+            rolling_classifiers = np.array(spike_data["rolling:rolling_classifiers"].iloc[cluster_index])
+            P_trial_numbers = rolling_centre_trials[rolling_classifiers=="P"]
+            D_trial_numbers = rolling_centre_trials[rolling_classifiers=="D"]
+
+            # Subset trials using the lowest n number if necessary
+            lowest_n_number = min([len(P_trial_numbers), len(D_trial_numbers)])
+            np.random.shuffle(P_trial_numbers)
+            np.random.shuffle(D_trial_numbers)
+            P_trial_numbers = P_trial_numbers[:lowest_n_number]
+            D_trial_numbers = D_trial_numbers[:lowest_n_number]
+
+            spatial_information_scores_p_cluster = []
+            spatial_information_scores_d_cluster = []
+            cluster_ids = []
+            # calculate spatial information score during P and D trials of reference cluster
+            for cluster_index_j, cluster_id_j in enumerate(spike_data.cluster_id):
+                cluster_df_j = spike_data[(spike_data.cluster_id == cluster_id_j)]  # dataframe for that cluster
+                cluster_j_firing = np.asarray(cluster_df_j["firing_times"].iloc[0])
+                if len(cluster_j_firing) > 0:
+                    SI_P = get_spatial_information_score_for_trials(track_length, position_data, cluster_df_j, P_trial_numbers)
+                    SI_D = get_spatial_information_score_for_trials(track_length, position_data, cluster_df_j, D_trial_numbers)
+                else:
+                    SI_P = np.nan
+                    SI_D = np.nan
+                spatial_information_scores_p_cluster.append(SI_P)
+                spatial_information_scores_d_cluster.append(SI_D)
+                cluster_ids.append(cluster_id_j)
+
+            spatial_information_scores_P.append(spatial_information_scores_p_cluster)
+            spatial_information_scores_D.append(spatial_information_scores_d_cluster)
+            cluster_pairs.append(cluster_ids)
+
+    spike_data["rolling:spatial_info_by_other_P"] = spatial_information_scores_P
+    spike_data["rolling:spatial_info_by_other_D"] = spatial_information_scores_D
+    spike_data["rolling:spatial_info_by_other_ids"] = cluster_pairs
+    return spike_data
+
+
+
 def calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length):
 
     for tt in [0,1,2]:
@@ -2913,8 +3168,8 @@ def add_spatial_information_during_position_and_distance_trials(spike_data, posi
         np.random.shuffle(D_trial_numbers)
 
         if lowest_n_number>0:
-            position_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, P_trial_numbers))
-            distance_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, D_trial_numbers))
+            position_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, P_trial_numbers[:lowest_n_number]))
+            distance_spatial_information_scores.append(get_spatial_information_score_for_trials(track_length, position_data, cluster_df, D_trial_numbers[:lowest_n_number]))
         else:
             position_spatial_information_scores.append(np.nan)
             distance_spatial_information_scores.append(np.nan)
@@ -2962,20 +3217,53 @@ def add_bin_time(position_data):
     position_data["time_spent_in_bin"] = time_spent_in_bin
     return position_data
 
+def add_speed_per_100ms(position_data, track_length):
+    positions = np.array(position_data["x_position_cm"])
+    trial_numbers = np.array(position_data["trial_number"])
+    distance_travelled = positions+(track_length*(trial_numbers-1))
+
+    change_in_distance_travelled = np.concatenate([np.zeros(1), np.diff(distance_travelled)], axis=0)
+
+    speed_per_100ms = np.array(pd.Series(change_in_distance_travelled).rolling(100).sum())/(100/1000) # 0.1 seconds == 100ms
+    position_data["speed_per_100ms"] = speed_per_100ms
+    return position_data
+
+def add_stopped_in_rz(position_data, track_length):
+    reward_zone_start = track_length-60-30-20
+    reward_zone_end = track_length-60-30
+    track_start = 30
+    track_end = track_length-30
+
+    position_data["below_speed_threshold"] = position_data["speed_per_100ms"]<4.7
+    position_data["stopped_in_rz"] = (position_data["below_speed_threshold"] == True) &\
+                                     (position_data["x_position_cm"] <= reward_zone_end) & \
+                                     (position_data["x_position_cm"] >= reward_zone_start)
+    return position_data
+
+def add_hit_according_to_blender(processed_position_data, position_data):
+    hit_trial_numbers = np.unique(position_data[position_data["stopped_in_rz"] == True]["trial_number"])
+    hit_array = np.zeros(len(processed_position_data), dtype=int)
+    hit_array[hit_trial_numbers-1] = 1
+    processed_position_data["hit_blender"] = hit_array
+
+    return processed_position_data
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
     for recording in vr_recording_path_list:
         print("processing ", recording)
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
         try:
-            output_path = recording+'/'+settings.sorterName
-            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            tags = control_sorting_analysis.get_tags_parameter_file(recording)
+            sorter_name = control_sorting_analysis.check_for_tag_name(tags, "sorter_name")
+            output_path = recording+'/'+sorter_name
+            processed_position_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/processed_position_data.pkl")
+            position_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/position_data.pkl")
+            spike_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
 
             if len(spike_data) != 0:
                 if paired_recording is not None:
-                    paired_spike_data = pd.read_pickle(paired_recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+                    paired_spike_data = pd.read_pickle(paired_recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
                     spike_data = add_open_field_classifier(spike_data, paired_spike_data)
 
                 spike_data = delete_unused_columns(spike_data)
@@ -2990,15 +3278,23 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #spike_data = bin_fr_in_time(spike_data, raw_position_data, smoothen=False)
                 #spike_data = add_displayed_peak_firing(spike_data)
                 #spike_data = calculate_spatial_information(spike_data, position_data, track_length=get_track_length(recording))
+                #spike_data = add_peak_power_from_classic_power_spectra(spike_data, output_path)
 
                 # BEHAVIOURAL
-                processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-                processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+                position_data = add_speed_per_100ms(position_data, track_length=get_track_length(recording))
+                position_data = add_stopped_in_rz(position_data, track_length=get_track_length(recording))
+                processed_position_data = add_hit_according_to_blender(processed_position_data, position_data)
+                processed_position_data = add_avg_track_speed2(processed_position_data, position_data, track_length=get_track_length(recording))
+                processed_position_data, _ = add_hit_miss_try4(processed_position_data, position_data, track_length=get_track_length(recording))
+
+                #processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+                #processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+
                 spike_data = add_percentage_hits(spike_data, processed_position_data)
                 spike_data = add_n_PI_trial(spike_data, processed_position_data)
                 spike_data = add_stops(spike_data, processed_position_data, track_length=get_track_length(recording))
                 spike_data = add_trials(spike_data, processed_position_data)
-                position_data = add_bin_time(position_data)
+                #position_data = add_bin_time(position_data)
                 #spike_data = calculate_spatial_information_for_hmt_trials(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
 
                 # MOVING LOMB PERIODOGRAMS
@@ -3013,12 +3309,14 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #spike_data = add_rolling_stats_hmt(spike_data, processed_position_data) # requires add_rolling_stats,
                 #spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
                 #spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
-                spike_data = add_mean_firing_rate_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
+                #spike_data = add_mean_firing_rate_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=0)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=1)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=2)
                 #spike_data = compare_block_length_stats_vs_shuffled(spike_data, processed_position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_spatial_information_against_other_cells_rolling_classifications(spike_data, processed_position_data, position_data, track_length=get_track_length(recording))
+                #spike_data = calculate_average_rolling_classification_for_multiple_grid_cells(spike_data, paired_spike_data, position_data, track_length=get_track_length(recording))
 
                 # Joint activity analysis
                 #spike_data = add_realignement_shifts(spike_data=spike_data, processed_position_data=processed_position_data, track_length=get_track_length(recording))
@@ -3026,11 +3324,12 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 # FIRING AND BEHAVIOURAL PLOTTING
                 #plot_spikes_on_track(spike_data, processed_position_data, output_path, track_length=get_track_length(recording),plot_trials=["beaconed", "non_beaconed", "probe"])
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+                #plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), by_trial_type=True)
                 #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_stop_histogram(processed_position_data, output_path, track_length=get_track_length(recording))
 
-                spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-                #position_data.to_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
+                spike_data.to_pickle(recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
+                #position_data.to_pickle(recording+"/"+sorter_name+"/DataFrames/position_data.pkl")
                 print("successfully processed and saved vr_grid analysis on "+recording)
 
         except Exception as ex:
@@ -3048,9 +3347,11 @@ def main():
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
     vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_february2023/vr") if f.is_dir()])
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_february2023/of") if f.is_dir()])
 
     #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
     #vr_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
@@ -3065,8 +3366,72 @@ def main():
     #vr_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21"]
     #vr_path_list= ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15"]
     #vr_path_list=["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20"]
+    '''
+    # all recordings with grid cells
+    vr_path_list = ["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20",
+                    "/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D8_2020-08-12_15-06-01",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D4_2021-05-13_09-56-11",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D7_2021-05-18_09-51-25",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M12_D15_2021-05-28_11-15-04",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D23_2021-06-09_12-04-16",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D25_2021-06-11_12-03-07",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D28_2021-06-16_11-45-54",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D19_2021-06-03_12-45-13",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57",
+                    "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D26_2020-12-03_14-51-03",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M6_D23_2020-11-28_17-01-43",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D15_2020-11-16_16-16-33",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D17_2020-11-20_16-15-32",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D22_2020-11-27_16-11-24",
+                    "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
+    '''
+    #vr_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M17_D5_2023-05-26_15-02-40"]
     process_recordings(vr_path_list, of_path_list)
-
 
     print("look now")
 

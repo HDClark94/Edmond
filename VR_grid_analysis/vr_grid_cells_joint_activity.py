@@ -1070,10 +1070,11 @@ def plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comp
         os.makedirs(save_path)
 
     spike_data = add_peaks_to_troughs(spike_data)
-    spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell"]], on="cluster_id")
-    #spike_data = spike_data[spike_data["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
+    spike_data = pd.merge(spike_data, of_spike_data[["cluster_id", "grid_cell", "grid_spacing"]], on="cluster_id")
+    spike_data = spike_data[spike_data["snippet_peak_to_trough"] < 500] # uV remove lick artefacts
 
     spike_data = spike_data[spike_data["grid_cell"] == True]
+    spike_data = spike_data.sort_values(by="grid_spacing", ignore_index=True)
     cluster_ids = np.array(spike_data["cluster_id"])
 
     agreement_matrix = np.zeros((len(spike_data), len(spike_data)))
@@ -1239,7 +1240,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_firing_rate_maps_per_trial_aligned_other_neuron(spike_data=spike_data, of_spike_data=of_spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), shuffled=True)
 
                 # ANALYSIS OF ROLLING CLASSIFICATION
-                agreement_comparions_df = plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df)
+                agreement_comparions_df = plot_agreement_matrix(spike_data, of_spike_data, output_path, agreement_comparions_df, n_shuffles=100)
                 agreement_comparions_df.to_pickle("/mnt/datastore/Harry/VR_grid_cells/agreement_comparions_df.pkl")
 
                 #spike_data = spike_data.head(10)

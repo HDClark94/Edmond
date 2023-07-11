@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import PostSorting.lfp
 import matplotlib as plt
 from Edmond.Concatenate_from_server import *
 
@@ -186,7 +185,10 @@ def add_session_identifiers(all_days_df):
         timestamp_string = session_id.split("_")[-1][0:8]  # eg 14-49-23  time = 14:49, 23rd second
         date_string = session_id.split("_")[-2]
         mouse = session_id.split("_")[0]
-        training_day = session_id.split("_")[1]
+        training_day = int(session_id.split("_")[1].split("D")[1])
+
+        if mouse=="M16":
+            print("")
 
         timestamp_list.append(timestamp_string)
         date_list.append(date_string)
@@ -376,6 +378,11 @@ def main():
     # =================== for concatenation ====================================== #
 
     # VR grid cell project
+    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_february2023/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort9_february2023/summary/")
+    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_february2023/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort9_february2023/summary/")
+    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
+
     vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
@@ -390,11 +397,6 @@ def main():
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
-
-    #vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
-    #of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort9_Junji/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort9_Junji/summary/")
-    #combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
 
     '''
     # Ramp cell project

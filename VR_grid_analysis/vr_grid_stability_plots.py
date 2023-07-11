@@ -56,7 +56,7 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_wine
 from sklearn.pipeline import make_pipeline
-
+from PostSorting.theta_modulation import extract_instantaneous_firing_rate, calculate_firing_probability, calculate_spectral_density
 def min_max_normalize(x):
     """
         argument
@@ -4917,23 +4917,24 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
         print("processing ", recording)
         paired_recording, found_paired_recording = find_paired_recording(recording, of_recording_path_list)
         try:
+            sorter_name = "mountainsort4"
             session_id = recording.split("/")[-1]
-            output_path = recording+'/MountainSort'
-            position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position_data.pkl")
-            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            spike_data = add_lomb_classifier(spike_data)
-            processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
+            output_path = recording+'/'+sorter_name
+            #position_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/position_data.pkl")
+            spike_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
+            #spike_data = add_lomb_classifier(spike_data)
+            processed_position_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/processed_position_data.pkl")
 
             if len(spike_data)>0:
-                processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
-                processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
+                #processed_position_data = add_avg_track_speed(processed_position_data, track_length=get_track_length(recording))
+                #processed_position_data, percentile_speed = add_hit_miss_try3(processed_position_data, track_length=get_track_length(recording))
 
                 # BEHAVIOUR PLOTS
-                plot_speed_histogram_with_error_probe(processed_position_data, output_path, track_length=get_track_length(recording))
-                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="hit")
-                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="miss")
-                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="try")
-                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
+                #plot_speed_histogram_with_error_probe(processed_position_data, output_path, track_length=get_track_length(recording))
+                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="hit")
+                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="miss")
+                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="try")
+                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=2, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=0, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="hit")
@@ -4943,7 +4944,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_trial_types(processed_position_data, output_path)
-                plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+                #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_streak_vs_trial_types(processed_position_data, output_path)
                 #plot_streak_vs_trial_types_with_rolling_classification(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
@@ -4953,14 +4954,14 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_rolling_lomb_codes_across_cells3(spike_data, paired_recording, output_path)
                 #plot_snr(spike_data, processed_position_data, output_path, track_length =get_track_length(recording))
                 #plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length=get_track_length(recording), suffix="")
-                plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
+                #plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
                 #plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
-                plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+                #plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=True, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=False, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
-                plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                #plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=0)
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=1)
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=0, plot_by_code="P")
@@ -4990,6 +4991,9 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_firing_rate_maps_per_trial_by_tt(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), hmts=["hit"])
                 #plot_snr_by_trial_type(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+
+                # misc analysis
+                plot_power_spectra_of_spikes(spike_data=spike_data, output_path=output_path)
                 print("complete for ", recording)
 
         except Exception as ex:
@@ -5102,8 +5106,12 @@ def main():
     #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
 
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39"]
-    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
-    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
+    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20"]
+
+    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M17_D6_2023-05-29_15-02-14"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27"]
     process_recordings(vr_recording_path_list, of_recording_path_list)
     print("look now")
 
