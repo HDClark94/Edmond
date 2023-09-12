@@ -83,7 +83,7 @@ def main():
     #folders.append("/mnt/datastore/Harry/Cohort9_Junji/vr")
     #folders.append("/mnt/datastore/Harry/Cohort7_october2020/vr")
     #folders.append("/mnt/datastore/Harry/Cohort6_july2020/vr")
-    #folders.append("/mnt/datastore/Harry/Cohort8_may2021/vr")
+    folders.append("/mnt/datastore/Harry/Cohort8_may2021/vr")
 
     for folder in folders:
         add_shuffled_cutoffs(folder)

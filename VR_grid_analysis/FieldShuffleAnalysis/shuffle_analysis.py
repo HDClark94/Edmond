@@ -236,12 +236,23 @@ def main():
 
     #========================FOR RUNNING ON FROM TERMINAL=====================================#
     #=========================================================================================#
-    recording_path = os.environ['RECORDING_PATH']
-    n_shuffles = int(os.environ['SHUFFLE_NUMBER'])
-    cluster_id = int(os.environ["CLUSTER_ID"])
-    one_job_shuffle_parallel(recording_path, cluster_id, n_shuffles)
+    #recording_path = os.environ['RECORDING_PATH']
+    #n_shuffles = int(os.environ['SHUFFLE_NUMBER'])
+    #cluster_id = int(os.environ["CLUSTER_ID"])
+    #one_job_shuffle_parallel(recording_path, cluster_id, n_shuffles)
     #=========================================================================================#
     #=========================================================================================#
 
+
+    #================FOR RUNNING ON ELEANOR (SINGLE RECORDING)================================#
+    #=========================================================================================#
+
+    recording_path = '/mnt/datastore/Harry/cohort8_may2021/vr/M10_D10_2021-05-21_09-05-27'
+    spatial_firing = pd.read_pickle(recording_path+"/MountainSort/DataFrames/spatial_firing.pkl")
+    for cluster_id in spatial_firing["cluster_id"]:
+        one_job_shuffle_parallel(recording_path, cluster_id, n_shuffles=1000)
+
+    #=========================================================================================#
+    #=========================================================================================#
 if __name__ == '__main__':
     main()

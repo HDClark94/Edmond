@@ -14,6 +14,8 @@ import Edmond.VR_grid_analysis.analysis_settings as Settings
 import Edmond.plot_utility2
 import scipy.interpolate as interp
 from scipy.stats import norm
+from sklearn.cluster import KMeans
+
 
 plt.rc('axes', linewidth=3)
 import warnings
@@ -722,6 +724,118 @@ def get_numeric_classifation(classifications):
             numeric_classifications.append(2.5)
     return np.array(numeric_classifications)
 
+def plot_k_means_reconstruction(cell_type, save_path, firing_rate_map_by_trial, true_classifications, plot_suffix):
+    n_trials = len(firing_rate_map_by_trial)
+    track_length = len(firing_rate_map_by_trial[0])
+
+    cluster_firing_maps = firing_rate_map_by_trial
+    where_are_NaNs = np.isnan(cluster_firing_maps)
+    cluster_firing_maps[where_are_NaNs] = 0
+    cluster_firing_maps = Edmond.plot_utility2.min_max_normalize(cluster_firing_maps)
+    percentile_99th = np.nanpercentile(cluster_firing_maps, 99);
+    cluster_firing_maps = np.clip(cluster_firing_maps, a_min=0, a_max=percentile_99th)
+    vmin, vmax = Edmond.plot_utility2.get_vmin_vmax(cluster_firing_maps)
+
+    kmeans = KMeans(n_clusters=2, random_state=0, n_init=100).fit(cluster_firing_maps)
+    labels = kmeans.labels_
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(6, 6, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    locations = np.arange(0, len(cluster_firing_maps[0]))
+    ordered = np.arange(1, n_trials + 1, 1)
+    X, Y = np.meshgrid(locations, ordered)
+    cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
+    c = ax.pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=vmin, vmax=vmax)
+
+    x_pos = 195
+    legend_freq = np.linspace(x_pos, x_pos+5, 5)
+    labels_tiled = np.tile(labels,(len(legend_freq),1))
+    cmap = colors.ListedColormap(["tab:blue", "tab:orange"])
+    boundaries = [-1, 0.5, 1.5]
+    norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
+    Y, X = np.meshgrid(ordered, legend_freq)
+    ax.pcolormesh(X, Y, labels_tiled, cmap=cmap, norm=norm, shading="flat", zorder=2)
+
+    x_pos = 190
+    legend_freq = np.linspace(x_pos, x_pos+5, 5)
+    if len(true_classifications)==1:
+        true_classifications = np.repeat(true_classifications[0], n_trials)
+    true_classifications_numeric = get_numeric_classifation(true_classifications)
+    true_classifications_tiled = np.tile(true_classifications_numeric, (len(legend_freq),1))
+    cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
+    boundaries = [0, 1, 2, 3, 4]
+    norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
+    Y, X = np.meshgrid(np.arange(1,n_trials+1), legend_freq)
+    ax.pcolormesh(X, Y, true_classifications_tiled, cmap=cmap, norm=norm, shading="flat", zorder=2)
+
+    plt.ylabel('Trial Number', fontsize=25, labelpad=10)
+    plt.xlabel('Location (cm)', fontsize=25, labelpad=10)
+    plt.xlim(0, track_length)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    ax.set_xlim([0, track_length])
+    ax.set_ylim([0, n_trials - 1])
+    ax.set_yticks([1, 50, 100])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.32, right=0.87, top=0.92)
+    # cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    # cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    # cbar.set_ticks([0,vmax])
+    # cbar.set_ticklabels(["0", "Max"])
+    # cbar.outline.set_visible(False)
+    # cbar.ax.tick_params(labelsize=20)
+    plt.savefig(save_path + '/' + cell_type + '_rate_map_Kmeans' + plot_suffix + '.png', dpi=300)
+    plt.close()
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(6, 2, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    locations = np.arange(0, len(cluster_firing_maps[0]))
+    ax.fill_between(locations, np.nanmean(cluster_firing_maps[labels==0], axis=0) - stats.sem(cluster_firing_maps[labels==0], axis=0),
+                    np.nanmean(cluster_firing_maps[labels==0], axis=0) + stats.sem(cluster_firing_maps[labels==0], axis=0), color="tab:blue",
+                    alpha=0.3)
+    ax.plot(locations, np.nanmean(cluster_firing_maps[labels==0], axis=0), color="tab:blue", linewidth=3)
+
+    ax.fill_between(locations, np.nanmean(cluster_firing_maps[labels==1], axis=0) - stats.sem(cluster_firing_maps[labels==1], axis=0),
+                    np.nanmean(cluster_firing_maps[labels==1], axis=0) + stats.sem(cluster_firing_maps[labels==1], axis=0), color="tab:orange",
+                    alpha=0.3)
+    ax.plot(locations, np.nanmean(cluster_firing_maps[labels==1], axis=0), color="tab:orange", linewidth=3)
+
+    plt.ylabel('FR (Hz)', fontsize=25, labelpad=10)
+    plt.xlabel('Location (cm)', fontsize=25, labelpad=10)
+    plt.xlim(0, track_length)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    ax.set_xlim([0, track_length])
+    max_fr = max(np.nanmean(cluster_firing_maps, axis=0) + stats.sem(cluster_firing_maps, axis=0))
+    max_fr = max_fr + (0.1 * (max_fr))
+    # ax.set_ylim([0, max_fr])
+
+    ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+    ax.set_yticks([0, 1])
+    ax.set_ylim(bottom=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+    # ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.32, right=0.87, top=0.92)
+    # cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    # cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    # cbar.set_ticks([0,vmax])
+    # cbar.set_ticklabels(["0", "Max"])
+    # cbar.outline.set_visible(False)
+    # cbar.ax.tick_params(labelsize=20)
+    plt.savefig(save_path + '/' + cell_type + '_avg_rate_map_Kmeans_' + plot_suffix + '.png', dpi=300)
+    plt.close()
+    return
+
+
 def plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial, true_classifications, rolling_far=None, rolling_window_size_for_lomb_classifier=200, plot_suffix=""):
     fr=firing_rate_map_by_trial.flatten()
     track_length = len(firing_rate_map_by_trial[0])
@@ -1084,6 +1198,7 @@ def plot_cell(cell_type, save_path, shuffled_save_path, n_trials=100, track_leng
                                   rolling_window_size_for_lomb_classifier=rolling_window_size_for_lomb_classifier, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
     plot_rolling_classification_vs_true_classification(cell_type, save_path, firing_rate_map_by_trial_smoothed, true_classifications=true_classifications,
                                                        rolling_far=rolling_far, rolling_window_size_for_lomb_classifier=rolling_window_size_for_lomb_classifier, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
+    plot_k_means_reconstruction(cell_type, save_path, firing_rate_map_by_trial_smoothed, true_classifications=true_classifications, plot_suffix=plot_suffix)
     print("plotted ", cell_type)
 
 def main():
@@ -1127,15 +1242,15 @@ def main():
 
     # supp
     np.random.seed(0)
-    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    #plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    #plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    #plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
-    #plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    plot_cell(cell_type="unstable_egocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
+    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    plot_cell(cell_type="unstable_allocentric_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
+    plot_cell(cell_type="shuffled_place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    plot_cell(cell_type="noisy_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    plot_cell(cell_type="place_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
+    plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
 
     # another supp
     plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)

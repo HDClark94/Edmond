@@ -1169,19 +1169,19 @@ def plot_lomb_classifier_mfr_vs_groups_vs_open_field(concantenated_dataframe, su
     plt.close()
     return
 
-def plot_lomb_classifier_spatinfo_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6)):
+def plot_lomb_classifier_spatinfo_vs_groups(concantenated_dataframe, suffix="", save_path="", fig_size=(6,6), score="spatial_information_score_Ispike_vr"):
     concantenated_dataframe = add_lomb_classifier(concantenated_dataframe, suffix=suffix)
     print('plotting lomb classifers...')
 
     grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] == "G"]
     non_grid_cells = concantenated_dataframe[concantenated_dataframe["classifier"] != "G"]
 
-    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"]['spatial_information_score_vr'])
-    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"]['spatial_information_score_vr'])
-    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"]['spatial_information_score_vr'])
-    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"]['spatial_information_score_vr'])
-    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"]['spatial_information_score_vr'])
-    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"]['spatial_information_score_vr'])
+    g_distance_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Distance"][score])
+    g_position_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Position"][score])
+    g_null_cells = np.asarray(grid_cells[grid_cells["Lomb_classifier_"+suffix] == "Null"][score])
+    ng_distance_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Distance"][score])
+    ng_position_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Position"][score])
+    ng_null_cells = np.asarray(non_grid_cells[non_grid_cells["Lomb_classifier_"+suffix] == "Null"][score])
 
     fig, ax = plt.subplots(figsize=fig_size)
     data = [g_position_cells[~np.isnan(g_position_cells)],
@@ -1203,10 +1203,10 @@ def plot_lomb_classifier_spatinfo_vs_groups(concantenated_dataframe, suffix="", 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
-    ax.set_ylim(bottom=0, top=1)
+    #ax.set_ylim(bottom=0, top=4)
     ax.set_xlim(left=0.5, right=3.5)
     #ax.set_xticks([2, 6])
-    ax.set_yticks([0, 0.5, 1])
+    #ax.set_yticks([0, 1,2,3,4])
     #ax.set_xticklabels(["G", "NG"])
     fig.tight_layout()
     plt.subplots_adjust(left=0.25, bottom=0.2)
@@ -1217,7 +1217,7 @@ def plot_lomb_classifier_spatinfo_vs_groups(concantenated_dataframe, suffix="", 
     #significance_bar(start=2, end=3, height=0.7, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[2])[1]))
     #significance_bar(start=2, end=6, height=0.3125, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[1], data[5])[1]))
     #significance_bar(start=1, end=5, height=0.325, displaystring=get_p_text(scipy.stats.mannwhitneyu(data[0], data[4])[1]))
-    plt.savefig(save_path + '/lomb_classifier_spatinfo_vs_groups.png', dpi=300)
+    plt.savefig(save_path + '/lomb_classifier_spatinfo_vs_groups_'+score+'.png', dpi=300)
     plt.close()
 
     print("comping spatinfo between postion and distance encoding grid cells, df=",str(len(data[0])+len(data[1])-2), ", p= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[1]), ", t= ", str(scipy.stats.mannwhitneyu(data[0], data[1])[0]))
@@ -1241,7 +1241,7 @@ def plot_lomb_classifier_spatinfo_vs_groups(concantenated_dataframe, suffix="", 
     plt.subplots_adjust(left=0.25, bottom=0.2)
     ax.set_xlabel("Spatial info", fontsize=20)
     ax.set_ylabel("Cumulative prob", fontsize=20)
-    plt.savefig(save_path + '/lomb_classifier_spatinfo_vs_groups_cumhist.png', dpi=300)
+    plt.savefig(save_path + '/lomb_classifier_spatinfo_vs_groups_cumhist'+score+'.png', dpi=300)
     plt.close()
     return
 
@@ -1425,6 +1425,48 @@ def get_rolling_percent_encoding(df, code="P", tt=1, hmt="hit"):
             print(df["session_id"].iloc[m], " is missing an entry in ", result_column)
     return np.array(result)*100
 
+def plot_percentage_encoding_by_trial_category_each_mouse_from_global(combined_df, save_path="", suffix=""):
+    print('plotting lomb classifers proportions...')
+    for tt in [0, 1, 2]:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        for code, code_color, code_z_order in zip(["P", "D", "N"], [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color], [1,2,3]):
+            for i, mouse_id in enumerate(np.unique(combined_df["mouse"])):
+                mouse_cells = combined_df[combined_df["mouse"] == mouse_id]
+                mouse_hit = get_percentage_from_global_code(mouse_cells, code=code, tt=tt, hmt="hit")
+                mouse_try = get_percentage_from_global_code(mouse_cells, code=code, tt=tt, hmt="try")
+                mouse_miss = get_percentage_from_global_code(mouse_cells, code=code, tt=tt, hmt="miss")
+
+                mask = ~np.isnan(mouse_hit) & ~np.isnan(mouse_try) & ~np.isnan(mouse_miss)
+                ax.plot([2, 6, 10], [np.nanmean(mouse_hit[mask]), np.nanmean(mouse_try[mask]), np.nanmean(mouse_miss[mask])], clip_on=False, color=code_color, linewidth=1.5, alpha=0.3, zorder=-1)
+
+            All_hit = get_percentage_from_global_code(combined_df, code=code, tt=tt, hmt="hit")
+            All_try = get_percentage_from_global_code(combined_df, code=code, tt=tt, hmt="try")
+            All_miss = get_percentage_from_global_code(combined_df, code=code, tt=tt, hmt="miss")
+            mask = ~np.isnan(All_hit) & ~np.isnan(All_try) & ~np.isnan(All_miss)
+
+            #ax.plot([2, 6, 10],[np.nanmean(All_hit[mask]), np.nanmean(All_try[mask]), np.nanmean(All_miss[mask])],clip_on=False, linewidth=3, color=code_color, zorder=3)
+            ax.errorbar(x=[2, 6, 10], y=[np.nanmean(All_hit[mask]), np.nanmean(All_try[mask]), np.nanmean(All_miss[mask])],
+                        yerr=[scipy.stats.sem(All_hit[mask], axis=0), scipy.stats.sem(All_try[mask], axis=0), scipy.stats.sem(All_miss[mask], axis=0)], capsize=25, linewidth=3, color=code_color, zorder=code_z_order)
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        ax.set_xticks([2,6,10])
+        ax.xaxis.set_tick_params(labelbottom=False)
+        ax.set_xticks([])
+        #ax.set_xticklabels(["Hit", "Try", "Run"])
+        ax.set_xlim(left=0, right=12)
+        ax.set_ylim(bottom=0, top=100)
+        #ax.legend(loc="best")
+        plt.savefig(save_path + '/rolling_percent_encooding_from_global_'+str(tt)+'_for_each_mouse.png', dpi=300)
+        plt.close()
+    return
+
 def plot_percentage_encoding_by_trial_category_each_mouse(combined_df, save_path="", suffix=""):
     print('plotting lomb classifers proportions...')
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
@@ -1470,7 +1512,841 @@ def plot_percentage_encoding_by_trial_category_each_mouse(combined_df, save_path
         plt.close()
     return
 
+def plot_percentage_encoding_by_trial_category_non_grid_cells(combined_df, save_path="", suffix="_non_grid_cells"):
+    print('plotting lomb classifers proportions...')
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
 
+    # we only want to look at the remapped coding cells (<85% encoding)
+    # grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+    #                        (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+
+    p_b_hit = get_rolling_percent_encoding(non_grid_cells, code="P", tt=0, hmt="hit")
+    d_b_hit = get_rolling_percent_encoding(non_grid_cells, code="D", tt=0, hmt="hit")
+    n_b_hit = get_rolling_percent_encoding(non_grid_cells, code="N", tt=0, hmt="hit")
+    p_b_try = get_rolling_percent_encoding(non_grid_cells, code="P", tt=0, hmt="try")
+    d_b_try = get_rolling_percent_encoding(non_grid_cells, code="D", tt=0, hmt="try")
+    n_b_try = get_rolling_percent_encoding(non_grid_cells, code="N", tt=0, hmt="try")
+    p_b_miss = get_rolling_percent_encoding(non_grid_cells, code="P", tt=0, hmt="miss")
+    d_b_miss = get_rolling_percent_encoding(non_grid_cells, code="D", tt=0, hmt="miss")
+    n_b_miss = get_rolling_percent_encoding(non_grid_cells, code="N", tt=0, hmt="miss")
+    p_nb_hit = get_rolling_percent_encoding(non_grid_cells, code="P", tt=1, hmt="hit")
+    d_nb_hit = get_rolling_percent_encoding(non_grid_cells, code="D", tt=1, hmt="hit")
+    n_nb_hit = get_rolling_percent_encoding(non_grid_cells, code="N", tt=1, hmt="hit")
+    p_nb_try = get_rolling_percent_encoding(non_grid_cells, code="P", tt=1, hmt="try")
+    d_nb_try = get_rolling_percent_encoding(non_grid_cells, code="D", tt=1, hmt="try")
+    n_nb_try = get_rolling_percent_encoding(non_grid_cells, code="N", tt=1, hmt="try")
+    p_nb_miss = get_rolling_percent_encoding(non_grid_cells, code="P", tt=1, hmt="miss")
+    d_nb_miss = get_rolling_percent_encoding(non_grid_cells, code="D", tt=1, hmt="miss")
+    n_nb_miss = get_rolling_percent_encoding(non_grid_cells, code="N", tt=1, hmt="miss")
+    p_p_hit = get_rolling_percent_encoding(non_grid_cells, code="P", tt=2, hmt="hit")
+    d_p_hit = get_rolling_percent_encoding(non_grid_cells, code="D", tt=2, hmt="hit")
+    n_p_hit = get_rolling_percent_encoding(non_grid_cells, code="N", tt=2, hmt="hit")
+    p_p_try = get_rolling_percent_encoding(non_grid_cells, code="P", tt=2, hmt="try")
+    d_p_try = get_rolling_percent_encoding(non_grid_cells, code="D", tt=2, hmt="try")
+    n_p_try = get_rolling_percent_encoding(non_grid_cells, code="N", tt=2, hmt="try")
+    p_p_miss = get_rolling_percent_encoding(non_grid_cells, code="P", tt=2, hmt="miss")
+    d_p_miss = get_rolling_percent_encoding(non_grid_cells, code="D", tt=2, hmt="miss")
+    n_p_miss = get_rolling_percent_encoding(non_grid_cells, code="N", tt=2, hmt="miss")
+
+    p_b_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=0, hmt="hit")
+    d_b_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=0, hmt="hit")
+    n_b_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=0, hmt="hit")
+    p_b_try = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=0, hmt="try")
+    d_b_try = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=0, hmt="try")
+    n_b_try = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=0, hmt="try")
+    p_b_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=0, hmt="miss")
+    d_b_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=0, hmt="miss")
+    n_b_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=0, hmt="miss")
+    p_nb_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=1, hmt="hit")
+    d_nb_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=1, hmt="hit")
+    n_nb_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=1, hmt="hit")
+    p_nb_try = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=1, hmt="try")
+    d_nb_try = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=1, hmt="try")
+    n_nb_try = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=1, hmt="try")
+    p_nb_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=1, hmt="miss")
+    d_nb_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=1, hmt="miss")
+    n_nb_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=1, hmt="miss")
+    p_p_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=2, hmt="hit")
+    d_p_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=2, hmt="hit")
+    n_p_hit = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=2, hmt="hit")
+    p_p_try = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=2, hmt="try")
+    d_p_try = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=2, hmt="try")
+    n_p_try = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=2, hmt="try")
+    p_p_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="P", tt=2, hmt="miss")
+    d_p_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="D", tt=2, hmt="miss")
+    n_p_miss = get_percentage_from_rolling_classification2(non_grid_cells, code="N", tt=2, hmt="miss")
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(p_b_try) & ~np.isnan(p_b_miss)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(p_nb_try) & ~np.isnan(p_nb_miss)
+    p_mask = ~np.isnan(p_p_hit) & ~np.isnan(p_p_try) & ~np.isnan(p_p_miss)
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color, Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], n_b_hit[b_mask],
+            p_b_try[b_mask], d_b_try[b_mask], n_b_try[b_mask],
+            p_b_miss[b_mask], d_b_miss[b_mask], n_b_miss[b_mask]]
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1, 2, 3, 5, 6, 7, 9, 10, 11], widths=1, boxprops=boxprops,
+                     medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    # ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2, 6, 10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    # fig.tight_layout()
+    # plt.subplots_adjust(left=0.25, bottom=0.2)
+    # ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_beaconed' + suffix + '.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_beaconed2' + suffix + '.png', dpi=300)
+    plt.close()
+
+    data = [p_nb_hit[nb_mask], d_nb_hit[nb_mask], n_nb_hit[nb_mask],
+            p_nb_try[nb_mask], d_nb_try[nb_mask], n_nb_try[nb_mask],
+            p_nb_miss[nb_mask], d_nb_miss[nb_mask], n_nb_miss[nb_mask]]
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1, 2, 3, 5, 6, 7, 9, 10, 11], widths=1, boxprops=boxprops,
+                     medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    # ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2, 6, 10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    # fig.tight_layout()
+    # plt.subplots_adjust(left=0.25, bottom=0.2)
+    # ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed' + suffix + '.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed2' + suffix + '.png', dpi=300)
+    plt.close()
+
+    data = [p_p_hit[p_mask], d_p_hit[p_mask], n_p_hit[p_mask],
+            p_p_try[p_mask], d_p_try[p_mask], n_p_try[p_mask],
+            p_p_miss[p_mask], d_p_miss[p_mask], n_p_miss[p_mask]]
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1, 2, 3, 5, 6, 7, 9, 10, 11], widths=1, boxprops=boxprops,
+                     medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    # ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2, 6, 10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    # fig.tight_layout()
+    # plt.subplots_adjust(left=0.25, bottom=0.2)
+    # ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_probe' + suffix + '.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_probe2' + suffix + '.png', dpi=300)
+    plt.close()
+
+    print("=========for position encoding trials =========")
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(p_b_hit[b_mask])), 'percentage_position_encoding': p_b_hit[b_mask],
+         'unique_id': np.arange(len(p_b_hit[b_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(p_b_hit[b_mask])), 'percentage_position_encoding': p_b_try[b_mask],
+         'unique_id': np.arange(len(p_b_hit[b_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(p_b_hit[b_mask])), 'percentage_position_encoding': p_b_miss[b_mask],
+         'unique_id': np.arange(len(p_b_hit[b_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(p_b_hit[b_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(p_nb_hit[nb_mask])), 'percentage_position_encoding': p_nb_hit[nb_mask],
+         'unique_id': np.arange(len(p_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(p_nb_hit[nb_mask])), 'percentage_position_encoding': p_nb_try[nb_mask],
+         'unique_id': np.arange(len(p_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(p_nb_hit[nb_mask])), 'percentage_position_encoding': p_nb_miss[nb_mask],
+         'unique_id': np.arange(len(p_nb_hit[nb_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(p_nb_hit[nb_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(p_p_hit[p_mask])), 'percentage_position_encoding': p_p_hit[p_mask],
+         'unique_id': np.arange(len(p_p_hit[p_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(p_p_hit[p_mask])), 'percentage_position_encoding': p_p_try[p_mask],
+         'unique_id': np.arange(len(p_p_hit[p_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(p_p_hit[p_mask])), 'percentage_position_encoding': p_p_miss[p_mask],
+         'unique_id': np.arange(len(p_p_hit[p_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_position_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(p_p_hit[p_mask]) - 1))
+
+    print("=========for distance encoding trials =========")
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(d_b_hit[b_mask])), 'percentage_distance_encoding': d_b_hit[b_mask],
+         'unique_id': np.arange(len(d_b_hit[b_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(d_b_hit[b_mask])), 'percentage_distance_encoding': d_b_try[b_mask],
+         'unique_id': np.arange(len(d_b_hit[b_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(d_b_hit[b_mask])), 'percentage_distance_encoding': d_b_miss[b_mask],
+         'unique_id': np.arange(len(d_b_hit[b_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_b_hit[b_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(d_nb_hit[nb_mask])), 'percentage_distance_encoding': d_nb_hit[nb_mask],
+         'unique_id': np.arange(len(d_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(d_nb_hit[nb_mask])), 'percentage_distance_encoding': d_nb_try[nb_mask],
+         'unique_id': np.arange(len(d_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(d_nb_hit[nb_mask])), 'percentage_distance_encoding': d_nb_miss[nb_mask],
+         'unique_id': np.arange(len(d_nb_hit[nb_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_nb_hit[nb_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(d_p_hit[p_mask])), 'percentage_distance_encoding': d_p_hit[p_mask],
+         'unique_id': np.arange(len(d_p_hit[p_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(d_p_hit[p_mask])), 'percentage_distance_encoding': d_p_try[p_mask],
+         'unique_id': np.arange(len(d_p_hit[p_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(d_p_hit[p_mask])), 'percentage_distance_encoding': d_p_miss[p_mask],
+         'unique_id': np.arange(len(d_p_hit[p_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_distance_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(d_p_hit[p_mask]) - 1))
+
+    print("=========for aperiodic encoding trials =========")
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(n_b_hit[b_mask])), 'percentage_null_encoding': n_b_hit[b_mask],
+         'unique_id': np.arange(len(n_b_hit[b_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(n_b_hit[b_mask])), 'percentage_null_encoding': n_b_try[b_mask],
+         'unique_id': np.arange(len(n_b_hit[b_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(n_b_hit[b_mask])), 'percentage_null_encoding': n_b_miss[b_mask],
+         'unique_id': np.arange(len(n_b_hit[b_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for beacoend trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_b_hit[b_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(n_nb_hit[nb_mask])), 'percentage_null_encoding': n_nb_hit[nb_mask],
+         'unique_id': np.arange(len(n_nb_hit[nb_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(n_nb_hit[nb_mask])), 'percentage_null_encoding': n_nb_try[nb_mask],
+         'unique_id': np.arange(len(n_nb_hit[nb_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(n_nb_hit[nb_mask])), 'percentage_null_encoding': n_nb_miss[nb_mask],
+         'unique_id': np.arange(len(n_nb_hit[nb_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for non_beaconed trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_nb_hit[nb_mask]) - 1))
+
+    # do stats test
+    df_hit = pd.DataFrame(
+        {'trial_outcome': np.tile(0, len(n_p_hit[p_mask])), 'percentage_null_encoding': n_p_hit[p_mask],
+         'unique_id': np.arange(len(n_p_hit[p_mask]))})
+    df_try = pd.DataFrame(
+        {'trial_outcome': np.tile(1, len(n_p_hit[p_mask])), 'percentage_null_encoding': n_p_try[p_mask],
+         'unique_id': np.arange(len(n_p_hit[p_mask]))})
+    df_miss = pd.DataFrame(
+        {'trial_outcome': np.tile(2, len(n_p_hit[p_mask])), 'percentage_null_encoding': n_p_miss[p_mask],
+         'unique_id': np.arange(len(n_p_hit[p_mask]))})
+    df = pd.DataFrame()
+    df = pd.concat([df, df_hit], ignore_index=True);
+    df = pd.concat([df, df_try], ignore_index=True);
+    df = pd.concat([df, df_miss], ignore_index=True)
+
+    # Conduct the repeated measures ANOVA
+    print("=========for probe trial outcomes =========")
+    aov = pg.rm_anova(dv='percentage_null_encoding', within='trial_outcome', subject='unique_id', data=df,
+                      detailed=True)
+    print(aov[['Source', 'DF', 'F', 'p-unc']])
+    print("degrees of freedom: ", str(len(n_p_hit[p_mask]) - 1))
+
+    return
+
+def get_percentage_from_global_code(df, code, tt, hmt):
+    percentages = []
+    for index, cell in df.iterrows():
+        cell = cell.to_frame().T.reset_index(drop=True)
+
+        behaviours = np.array(cell["behaviour_hit_try_miss"].iloc[0])
+        trial_types = np.array(cell["behaviour_trial_types"].iloc[0])
+        rolling_classifiers = np.array(cell["rolling:code_global"].iloc[0])
+
+        # mask by trial type
+        tt_mask = trial_types == tt
+        trial_types = trial_types[tt_mask]
+        behaviours = behaviours[tt_mask]
+        rolling_classifiers = rolling_classifiers[tt_mask]
+
+        # mask by behaviour
+        beh_mask = behaviours == hmt
+        trial_types = trial_types[beh_mask]
+        behaviours = behaviours[beh_mask]
+        rolling_classifiers = rolling_classifiers[beh_mask]
+
+        # mask by code
+        code_mask = rolling_classifiers != "" # remove
+        trial_types = trial_types[code_mask]
+        behaviours = behaviours[code_mask]
+        rolling_classifiers = rolling_classifiers[code_mask]
+
+        print(np.unique(rolling_classifiers))
+        code_mask = rolling_classifiers == code
+        rolling_classifiers_masked = rolling_classifiers[code_mask]
+
+        if len(rolling_classifiers) == 0:
+            percentages.append(np.nan)
+        else:
+            percentage_encoding = (len(rolling_classifiers_masked)/len(rolling_classifiers))*100
+            percentages.append(percentage_encoding)
+
+    return np.array(percentages)
+
+def plot_percentage_encoding_for_trials(combined_df, save_path="", suffix=""):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    combined_df = combined_df[combined_df["classifier"] == "G"]
+    combined_df = drop_duplicate_sessions(combined_df)
+
+    print('plotting lomb classifers proportions...')
+
+    p_b_hit = get_percentage_from_global_code(combined_df, code="P", tt=0, hmt="hit")
+    d_b_hit = get_percentage_from_global_code(combined_df, code="D", tt=0, hmt="hit")
+    n_b_hit = get_percentage_from_global_code(combined_df, code="N", tt=0, hmt="hit")
+    p_b_try = get_percentage_from_global_code(combined_df, code="P", tt=0, hmt="try")
+    d_b_try = get_percentage_from_global_code(combined_df, code="D", tt=0, hmt="try")
+    n_b_try = get_percentage_from_global_code(combined_df, code="N", tt=0, hmt="try")
+    p_b_miss = get_percentage_from_global_code(combined_df, code="P", tt=0, hmt="miss")
+    d_b_miss = get_percentage_from_global_code(combined_df, code="D", tt=0, hmt="miss")
+    n_b_miss = get_percentage_from_global_code(combined_df, code="N", tt=0, hmt="miss")
+    p_nb_hit = get_percentage_from_global_code(combined_df, code="P", tt=1, hmt="hit")
+    d_nb_hit = get_percentage_from_global_code(combined_df, code="D", tt=1, hmt="hit")
+    n_nb_hit = get_percentage_from_global_code(combined_df, code="N", tt=1, hmt="hit")
+    p_nb_try = get_percentage_from_global_code(combined_df, code="P", tt=1, hmt="try")
+    d_nb_try = get_percentage_from_global_code(combined_df, code="D", tt=1, hmt="try")
+    n_nb_try = get_percentage_from_global_code(combined_df, code="N", tt=1, hmt="try")
+    p_nb_miss = get_percentage_from_global_code(combined_df, code="P", tt=1, hmt="miss")
+    d_nb_miss = get_percentage_from_global_code(combined_df, code="D", tt=1, hmt="miss")
+    n_nb_miss = get_percentage_from_global_code(combined_df, code="N", tt=1, hmt="miss")
+    p_p_hit = get_percentage_from_global_code(combined_df, code="P", tt=2, hmt="hit")
+    d_p_hit = get_percentage_from_global_code(combined_df, code="D", tt=2, hmt="hit")
+    n_p_hit = get_percentage_from_global_code(combined_df, code="N", tt=2, hmt="hit")
+    p_p_try = get_percentage_from_global_code(combined_df, code="P", tt=2, hmt="try")
+    d_p_try = get_percentage_from_global_code(combined_df, code="D", tt=2, hmt="try")
+    n_p_try = get_percentage_from_global_code(combined_df, code="N", tt=2, hmt="try")
+    p_p_miss = get_percentage_from_global_code(combined_df, code="P", tt=2, hmt="miss")
+    d_p_miss = get_percentage_from_global_code(combined_df, code="D", tt=2, hmt="miss")
+    n_p_miss = get_percentage_from_global_code(combined_df, code="N", tt=2, hmt="miss")
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(p_b_try) & ~np.isnan(p_b_miss)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(p_nb_try) & ~np.isnan(p_nb_miss)
+    p_mask = ~np.isnan(p_p_hit) & ~np.isnan(p_p_try) & ~np.isnan(p_p_miss)
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color, Settings.egocentric_color, Settings.null_color,
+              Settings.allocentric_color, Settings.egocentric_color, Settings.null_color]
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], n_b_hit[b_mask],
+            p_b_try[b_mask], d_b_try[b_mask], n_b_try[b_mask],
+            p_b_miss[b_mask], d_b_miss[b_mask], n_b_miss[b_mask]]
+
+
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_beaconed_from_global_code2'+suffix+'.png', dpi=300)
+    plt.close()
+
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_beaconed_from_global_code' + suffix + '.png', dpi=300)
+    plt.close()
+
+    data = [p_nb_hit[nb_mask], d_nb_hit[nb_mask], n_nb_hit[nb_mask],
+            p_nb_try[nb_mask], d_nb_try[nb_mask], n_nb_try[nb_mask],
+            p_nb_miss[nb_mask], d_nb_miss[nb_mask], n_nb_miss[nb_mask]]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed_from_global_code2'+suffix+'.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_non_beaconed_from_global_code' + suffix + '.png', dpi=300)
+    plt.close()
+
+    data = [p_p_hit[p_mask], d_p_hit[p_mask], n_p_hit[p_mask],
+            p_p_try[p_mask], d_p_try[p_mask], n_p_try[p_mask],
+            p_p_miss[p_mask], d_p_miss[p_mask], n_p_miss[p_mask]]
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,3, 5,6,7, 9,10,11], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([2,6,10])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0, right=12)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% encoding", fontsize=20)
+    plt.savefig(save_path + '/rolling_percent_encooding_probe_from_global_code2'+suffix+'.png', dpi=300)
+    plt.close()
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[0]), np.mean(data[3]), np.mean(data[6])],
+                yerr=[scipy.stats.sem(data[0], axis=0), scipy.stats.sem(data[3], axis=0),
+                      scipy.stats.sem(data[6], axis=0)], color=Settings.allocentric_color, capsize=25, linewidth=3)
+    ax.errorbar(x=[1, 2, 3], y=[np.mean(data[1]), np.mean(data[4]), np.mean(data[7])],
+                yerr=[scipy.stats.sem(data[1], axis=0), scipy.stats.sem(data[4], axis=0),
+                      scipy.stats.sem(data[7], axis=0)], color=Settings.egocentric_color, capsize=25, linewidth=3)
+    # ax.errorbar(x=[1,2,3], y=[np.mean(data[2]),  np.mean(data[5]), np.mean(data[8])], yerr=[scipy.stats.sem(data[2], axis=0), scipy.stats.sem(data[5], axis=0), scipy.stats.sem(data[8], axis=0)], color=Settings.null_color, capsize=25, linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[0]), np.mean(data[3]), np.mean(data[6])], color=Settings.allocentric_color,
+            linewidth=3)
+    ax.plot([1, 2, 3], [np.mean(data[1]), np.mean(data[4]), np.mean(data[7])], color=Settings.egocentric_color,
+            linewidth=3)
+    # ax.plot([1,2,3], [np.mean(data[2]), np.mean(data[5]), np.mean(data[8])], color=Settings.null_color, linewidth=3)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.set_xticks([1, 2, 3])
+    ax.set_xticklabels(["Hit", "Try", "Run"])
+    ax.set_xlim(left=0.5, right=3.5)
+    ax.set_ylim(bottom=0, top=100)
+    plt.savefig(save_path + '/rolling_percent_encooding_probe_from_global_code' + suffix + '.png', dpi=300)
+    plt.close()
+    return
+
+def get_first_stops(stop_locations, stop_trial_numbers, trial_numbers):
+    first_stop_locations = []
+    for tn in trial_numbers:
+        stops_on_trial = stop_locations[stop_trial_numbers == tn]
+        if len(stops_on_trial) == 0:
+            first_stop_locations.append(np.nan)
+        else:
+            first_stop_locations.append(stops_on_trial[0])
+    return np.array(first_stop_locations)
+
+def plot_position_coding_predictions_of_first_stop_locations(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    combined_df = combined_df[combined_df["classifier"] == "G"]
+    lags = np.arange(-100, 100, 1)
+
+    for tt in [0,1,2]:
+        true_scores = []
+        shuffled_scores = []
+        for session_id in np.unique(combined_df["session_id_vr"]):
+            session_df = combined_df[combined_df["session_id_vr"] == session_id]
+
+            trial_types = np.array(session_df["behaviour_trial_types"].iloc[0])
+            trial_numbers = np.array(session_df["behaviour_trial_numbers"].iloc[0])
+            rolling_classifiers = np.array(session_df["rolling:code_global"].iloc[0])
+            firing_rates = pandas_collumn_to_2d_numpy_array(session_df["fr_binned_in_space_smoothed"])
+            firing_rates = scipy.stats.zscore(firing_rates, axis=1, nan_policy='omit')
+            firing_rates[np.isnan(firing_rates)] = 0
+            stop_trial_numbers = np.array(session_df["stop_trial_numbers"].iloc[0])
+            stop_locations = np.array(session_df["stop_locations"].iloc[0])
+            first_stop_locations = get_first_stops(stop_locations, stop_trial_numbers, trial_numbers=np.arange(1,len(firing_rates[0,:,0])+1))
+
+            tt_mask = trial_types == tt
+            trial_numbers = trial_numbers[tt_mask]
+            rolling_classifiers = rolling_classifiers[tt_mask]
+
+            position_trial_numbers = trial_numbers[rolling_classifiers == "P"]
+
+            if len(position_trial_numbers) >= 10:
+                reference_position_trials = np.random.choice(position_trial_numbers, size=int(len(position_trial_numbers)/3))
+                test_position_trials = np.array(list(set(position_trial_numbers) - set(reference_position_trials)))
+
+                avg_firing_rates = np.nanmean(firing_rates[:,reference_position_trials-1,:], axis=1)
+                avg_first_stop_location = np.nanmean(first_stop_locations[reference_position_trials-1])
+
+                zero_padded_avg_firing_rates = np.hstack((np.zeros((len(avg_firing_rates), int(len(lags) / 2))),
+                                                           avg_firing_rates,
+                                                           np.zeros((len(avg_firing_rates), int(len(lags) / 2)))))
+                delta_frs = []
+                delta_first_stops = []
+                for test_trial_number in test_position_trials:
+                    test_firing_rate_map = firing_rates[:,test_trial_number-1,:]
+                    test_first_stop = first_stop_locations[test_trial_number-1]
+                    delta_first_stop = avg_first_stop_location-test_first_stop
+                    delta_first_stops.append(delta_first_stop)
+
+                    correlations = []
+                    for i in range(len(lags)):
+                        zero_padded_test_firing_rates = np.hstack((np.zeros((len(test_firing_rate_map), i)),
+                                                                        test_firing_rate_map,
+                                                                        np.zeros((len(test_firing_rate_map), len(lags)-i))))
+
+                        corr = stats.pearsonr(zero_padded_avg_firing_rates.flatten(), zero_padded_test_firing_rates.flatten())[0]
+                        correlations.append(corr)
+                    correlations =np.array(correlations)
+                    delta_fr = lags[np.argmax(correlations)]
+                    delta_frs.append(delta_fr)
+
+                delta_frs = np.array(delta_frs)
+                delta_first_stops = np.array(delta_first_stops)
+
+                true_diff = np.nanmean(delta_frs-delta_first_stops)
+
+                # shuffle the trial order
+                np.random.shuffle(delta_frs)
+                shuffled_diff = np.nanmean(delta_frs-delta_first_stops)
+
+                """
+                x = delta_frs[~np.isnan(delta_frs)].reshape(-1, 1)
+                y = delta_first_stops[~np.isnan(delta_first_stops)].reshape(-1, 1)
+                pearson_r = stats.pearsonr(x.flatten(), y.flatten())
+                R=pearson_r[0]
+                true_scores.append(R)
+
+                # shuffle the trial order
+                np.random.shuffle(delta_frs)
+                shuffled_diff = np.nanmean(delta_frs-delta_first_stops)
+
+                x = delta_frs[~np.isnan(delta_frs)].reshape(-1, 1)
+                y = delta_first_stops[~np.isnan(delta_first_stops)].reshape(-1, 1)
+                pearson_r = stats.pearsonr(x.flatten(), y.flatten())
+                R = pearson_r[0]
+                shuffled_scores.append(R)"""
+
+                true_scores.append(true_diff)
+                shuffled_scores.append(shuffled_diff)
+            else:
+                true_scores.append(np.nan)
+                shuffled_scores.append(np.nan)
+
+        true_scores = np.array(true_scores)
+        shuffled_scores = np.array(shuffled_scores)
+        # make a plot here showing true vs shuffled
+
+        x_pos = np.array([0, 1])
+        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+        ax.bar(x_pos, [np.nanmean(true_scores), np.nanmean(shuffled_scores)], 0.4, color="white", edgecolor="black", linewidth=3)
+        ax.errorbar(x_pos, [np.nanmean(true_scores), np.nanmean(shuffled_scores)], yerr=[stats.tstd(true_scores), stats.tstd(shuffled_scores)], capsize=10,
+                    color="black", linestyle='', elinewidth=3)
+        for i in range(len(true_scores)):
+            ax.plot(x_pos, [true_scores[i], shuffled_scores[i]], alpha=0.1,
+                    color="black")
+
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.set_ylim(bottom=0, top=1)
+        ax.set_xlabel("", fontsize=20)
+        ax.set_xticks([0, 1])
+        #ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+        #ax.set_yticklabels([0, 25, 50, 75, 100])
+        ax.set_xticklabels(["T", "S"])
+        # ax.set_ylabel("Agreement", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        # ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='both', labelsize=25)
+        plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.3, right=0.87, top=0.92)
+        plt.savefig(save_path + '/position_coding_predictions_of_first_stop_locations_tt'+str(tt)+'.png', dpi=300)
+        plt.close()
+    return
 
 
 def plot_percentage_encoding_by_trial_category(combined_df, save_path="", suffix=""):
@@ -2107,6 +2983,132 @@ def plot_p_hit_for_remapped_encoding_grid_cells(combined_df, save_path="", suffi
 
         print("comparing % hits between position and distance encoding trials for tt "+str(tt)+" trials, df=",str(len(p_b_hit[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[0]))
 
+    return
+
+def plot_percentage_hits_for_remapped_encoding_non_grid_cells(combined_df, save_path="", suffix=""):
+    print('plotting lomb classifers proportions...')
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    fig, ax = plt.subplots(figsize=(8,6))
+
+    p_b_hit = get_rolling_percent_encoding2(non_grid_cells, code="P", tt=0, hmt="hit")*100
+    d_b_hit = get_rolling_percent_encoding2(non_grid_cells, code="D", tt=0, hmt="hit")*100
+    n_b_hit = get_rolling_percent_encoding2(non_grid_cells, code="N", tt=0, hmt="hit")*100
+    p_nb_hit = get_rolling_percent_encoding2(non_grid_cells, code="P", tt=1, hmt="hit")*100
+    d_nb_hit = get_rolling_percent_encoding2(non_grid_cells, code="D", tt=1, hmt="hit")*100
+    n_nb_hit = get_rolling_percent_encoding2(non_grid_cells, code="N", tt=1, hmt="hit")*100
+
+
+    p_b_hit = get_percentage_from_rolling_classification(non_grid_cells, code="P", tt=0)
+    d_b_hit = get_percentage_from_rolling_classification(non_grid_cells, code="D", tt=0)
+    n_b_hit = get_percentage_from_rolling_classification(non_grid_cells, code="N", tt=0)
+    p_nb_hit = get_percentage_from_rolling_classification(non_grid_cells, code="P", tt=1)
+    d_nb_hit = get_percentage_from_rolling_classification(non_grid_cells, code="D", tt=1)
+    n_nb_hit = get_percentage_from_rolling_classification(non_grid_cells, code="N", tt=1)
+    p_p_hit = get_percentage_from_rolling_classification(non_grid_cells, code="P", tt=2)
+    d_p_hit = get_percentage_from_rolling_classification(non_grid_cells, code="D", tt=2)
+    n_p_hit = get_percentage_from_rolling_classification(non_grid_cells, code="N", tt=2)
+
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(d_b_hit)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(d_nb_hit)
+    p_mask = ~np.isnan(p_p_hit) & ~np.isnan(d_p_hit)
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], p_nb_hit[nb_mask], d_nb_hit[nb_mask], p_p_hit[p_mask], d_p_hit[p_mask]]
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,4,5,7,8], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=-1)
+    for i, x in enumerate([1,2,4,5,7,8]):
+        ax.scatter((np.ones(len( data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    #ax.set_yticks([0,0.5,1])
+    ax.set_xticks([1,2,4,5,7,8])
+    ax.set_xticklabels(["B", "B", "NB", "NB", "P", "P"])
+    ax.set_xlim(left=0, right=9)
+    #ax.set_ylim(bottom=0, top=100)
+    #fig.tight_layout()
+    #plt.subplots_adjust(left=0.25, bottom=0.2)
+    #ax.set_ylabel("% hit trials", fontsize=20)
+    plt.savefig(save_path + '/percentage_hit_trials_in_coded_trials'+suffix+'_non_grid_cells.png', dpi=300)
+    plt.close()
+
+
+    print("comparing % hits between position and distance encoding trials for beaconed trials non_grid_cells, df=",str(len(p_b_hit[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[0]))
+    print("comparing % hits between position and distance encoding trials for non beaconed trials non_grid_cells, df=",str(len(p_nb_hit[nb_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[0]))
+    print("comparing % hits between position and distance encoding trials for probe trials non_grid_cells, df=",str(len(p_p_hit[p_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_p_hit[p_mask], d_p_hit[p_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_p_hit[p_mask], d_p_hit[p_mask])[0]))
+
+    return
+
+
+
+#
+
+def plot_percentage_hits_for_trials(combined_df, save_path="", suffix=""):
+    print('plotting lomb classifers proportions...')
+    #grid_cells = combined_df[combined_df["classifier"] == "G"]
+    cells = combined_df
+    cells = drop_duplicate_sessions(cells)
+    fig, ax = plt.subplots(figsize=(8,6))
+
+    p_b_hit = get_percentage_from_rolling_classification(cells, code="P", tt=0, rolling_classsifier_collumn_name="rolling:code_global")
+    d_b_hit = get_percentage_from_rolling_classification(cells, code="D", tt=0, rolling_classsifier_collumn_name="rolling:code_global")
+    n_b_hit = get_percentage_from_rolling_classification(cells, code="N", tt=0, rolling_classsifier_collumn_name="rolling:code_global")
+    p_nb_hit = get_percentage_from_rolling_classification(cells, code="P", tt=1, rolling_classsifier_collumn_name="rolling:code_global")
+    d_nb_hit = get_percentage_from_rolling_classification(cells, code="D", tt=1, rolling_classsifier_collumn_name="rolling:code_global")
+    n_nb_hit = get_percentage_from_rolling_classification(cells, code="N", tt=1, rolling_classsifier_collumn_name="rolling:code_global")
+    p_p_hit = get_percentage_from_rolling_classification(cells, code="P", tt=2, rolling_classsifier_collumn_name="rolling:code_global")
+    d_p_hit = get_percentage_from_rolling_classification(cells, code="D", tt=2, rolling_classsifier_collumn_name="rolling:code_global")
+    n_p_hit = get_percentage_from_rolling_classification(cells, code="N", tt=2, rolling_classsifier_collumn_name="rolling:code_global")
+
+    b_mask = ~np.isnan(p_b_hit) & ~np.isnan(d_b_hit)
+    nb_mask = ~np.isnan(p_nb_hit) & ~np.isnan(d_nb_hit)
+    p_mask = ~np.isnan(p_p_hit) & ~np.isnan(d_p_hit)
+
+    data = [p_b_hit[b_mask], d_b_hit[b_mask], p_nb_hit[nb_mask], d_nb_hit[nb_mask], p_p_hit[p_mask], d_p_hit[p_mask]]
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,4,5,7,8], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=-1)
+    for i, x in enumerate([1,2,4,5,7,8]):
+        ax.scatter((np.ones(len( data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    ax.set_xticks([1,2,4,5,7,8])
+    ax.set_xticklabels(["B", "B", "NB", "NB", "P", "P"])
+    ax.set_xlim(left=0, right=9)
+    plt.savefig(save_path + '/percentage_hit_trials_encoding_position_and_distance.png', dpi=300)
+    plt.close()
+
+    print("comparing % hits between position and distance encoding trials for beaconed trials, df=",str(len(p_b_hit[b_mask])-1), ", p= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_b_hit[b_mask], d_b_hit[b_mask])[0]))
+    print("comparing % hits between position and distance encoding trials for non beaconed trials, df=",str(len(p_nb_hit[nb_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_nb_hit[nb_mask], d_nb_hit[nb_mask])[0]))
+    print("comparing % hits between position and distance encoding trials for probe trials, df=",str(len(p_p_hit[p_mask])-1), ", p= ",str(scipy.stats.wilcoxon(p_p_hit[p_mask], d_p_hit[p_mask])[1]), ", t= ", str(scipy.stats.wilcoxon(p_p_hit[p_mask], d_p_hit[p_mask])[0]))
     return
 
 def plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path="", suffix=""):
@@ -2786,7 +3788,7 @@ def getjitterr(scalar,grid_cell_percentage, grid_cell_session_number,grid_cells)
         jitter_x=0
     return jitter_x, jitter_y
 
-def plot_regression(ax, x, y, c, y_text_pos):
+def plot_regression(ax, x, y, c, y_text_pos, x_test_min=None, x_test_max=None):
     # x  and y are pandas collumn
     try:
         x = x.values
@@ -2802,7 +3804,12 @@ def plot_regression(ax, x, y, c, y_text_pos):
     linear_regressor = LinearRegression()  # create object for the class
     linear_regressor.fit(x,y)  # perform linear regression
 
-    x_test = np.linspace(min(x), max(x), 100)
+    if x_test_min is None:
+        x_test_min = min(x)
+    if x_test_max is None:
+        x_test_max = max(x)
+
+    x_test = np.linspace(x_test_min, x_test_max, 100)
 
     Y_pred = linear_regressor.predict(x_test.reshape(-1, 1))  # make predictions
     #ax.text(6, 0.65, "R= "+str(np.round(pearson_r[0], decimals=2))+ ", p = "+str(np.round(pearson_r[1], decimals=2)))
@@ -5793,14 +6800,16 @@ def get_percentage_from_rolling_classification2(df, code, tt, hmt, remove_last_a
     return np.array(percentages)
 
 
-def get_percentage_from_rolling_classification(df, code, tt, remove_last_and_first_from_streak = False):
+def get_percentage_from_rolling_classification(df, code, tt,
+                                               remove_last_and_first_from_streak=False,
+                                               rolling_classsifier_collumn_name="rolling:classifier_by_trial_number"):
 
     percentage_hits = []
     for index, cluster_df in df.iterrows():
         cluster_df = cluster_df.to_frame().T.reset_index(drop=True)
         behaviours = np.array(cluster_df["behaviour_hit_try_miss"].iloc[0])
         trial_types = np.array(cluster_df["behaviour_trial_types"].iloc[0])
-        rolling_classifiers = np.array(cluster_df["rolling:classifier_by_trial_number"].iloc[0])
+        rolling_classifiers = np.array(cluster_df[rolling_classsifier_collumn_name].iloc[0])
 
         # remove first and last classification in streak
         last_classifier=""
@@ -6551,6 +7560,97 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells_by_mouse(combined_df, s
         plt.close()
     return
 
+def plot_stop_histogram_for_trials(combined_df, save_path, suffix="", lock_y_axis=True):
+    print("do stuff")
+    #grid_cells = combined_df[combined_df["classifier"] == "G"]
+    cells = combined_df
+    #grid_cells = grid_cells[(grid_cells["rolling:proportion_encoding_position"] < 0.85) &
+    #                        (grid_cells["rolling:proportion_encoding_distance"] < 0.85)]
+
+    #compile_remapped_grid_cell_stop_histogram(grid_cells, tt=0)
+    #compile_remapped_grid_cell_stop_histogram(grid_cells, tt=1)
+
+    cells = drop_duplicate_sessions(cells)
+
+    for tt in [0,1,2]:
+        fig, ax = plt.subplots(1,1, figsize=(6,4))
+        ax.axhline(y=0, linestyle="dashed", linewidth=2, color="black")
+        remapped_null_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="N",shuffle=False, rolling_classsifier_collumn_name="rolling:code_global")
+        remapped_position_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="P", shuffle=False, rolling_classsifier_collumn_name="rolling:code_global")
+        remapped_distance_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="D", shuffle=False, rolling_classsifier_collumn_name="rolling:code_global")
+        remapped_null_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="N",shuffle=True, rolling_classsifier_collumn_name="rolling:code_global")
+        remapped_position_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="P",shuffle=True, rolling_classsifier_collumn_name="rolling:code_global")
+        remapped_distance_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(cells, tt=tt, coding_scheme="D",shuffle=True, rolling_classsifier_collumn_name="rolling:code_global")
+
+        remapped_null_cells_stop_histogram_tt = np.array(remapped_null_cells_stop_histogram_tt)
+        remapped_position_cells_stop_histogram_tt = np.array(remapped_position_cells_stop_histogram_tt)
+        remapped_distance_cells_stop_histogram_tt = np.array(remapped_distance_cells_stop_histogram_tt)
+        remapped_position_cells_shuffled_histogram_tt = np.array(remapped_position_cells_shuffled_histogram_tt)
+        remapped_distance_cells_shuffled_histogram_tt = np.array(remapped_distance_cells_shuffled_histogram_tt)
+        remapped_null_cells_shuffled_histogram_tt = np.array(remapped_null_cells_shuffled_histogram_tt)
+
+        # remove stop profiles where there isn't a stop profile for both postion and distance encoding trials
+        #nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_tt) & ~np.isnan(remapped_distance_grid_cells_stop_histogram_tt)
+        #nan_mask = nan_mask[:,0]
+        #remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt[nan_mask,:]
+        #remapped_distance_grid_cells_stop_histogram_tt = remapped_distance_grid_cells_stop_histogram_tt[nan_mask,:]
+        #remapped_grid_cells_shuffled_histogram_tt = remapped_grid_cells_shuffled_histogram_tt[nan_mask,:]
+
+        p_nan_mask = ~np.isnan(remapped_position_cells_stop_histogram_tt)[:,0]
+        d_nan_mask = ~np.isnan(remapped_distance_cells_stop_histogram_tt)[:,0]
+        n_nan_mask = ~np.isnan(remapped_null_cells_stop_histogram_tt)[:, 0]
+        #remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt[p_nan_mask,:]
+        #remapped_distance_grid_cells_stop_histogram_tt = remapped_distance_grid_cells_stop_histogram_tt[d_nan_mask,:]
+
+        # normalise to baseline
+        remapped_position_cells_stop_histogram_tt = remapped_position_cells_stop_histogram_tt-remapped_position_cells_shuffled_histogram_tt
+        remapped_distance_cells_stop_histogram_tt = remapped_distance_cells_stop_histogram_tt-remapped_distance_cells_shuffled_histogram_tt
+        remapped_null_cells_stop_histogram_tt = remapped_null_cells_stop_histogram_tt - remapped_null_cells_shuffled_histogram_tt
+
+        # apply mask
+        remapped_position_cells_stop_histogram_tt = remapped_position_cells_stop_histogram_tt[p_nan_mask,:]
+        remapped_distance_cells_stop_histogram_tt = remapped_distance_cells_stop_histogram_tt[d_nan_mask,:]
+        remapped_null_cells_stop_histogram_tt = remapped_null_cells_stop_histogram_tt[n_nan_mask, :]
+
+        # plot position grid cell session stop histogram
+        ax.plot(bin_centres, np.nanmean(remapped_position_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color, linewidth=3)
+        ax.fill_between(bin_centres, np.nanmean(remapped_position_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_position_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                        np.nanmean(remapped_position_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_position_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+        # plot distance grid cell session stop histogram
+        ax.plot(bin_centres, np.nanmean(remapped_distance_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color, linewidth=3)
+        ax.fill_between(bin_centres, np.nanmean(remapped_distance_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_distance_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                        np.nanmean(remapped_distance_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_distance_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+        # plot null grid cell session stop histogram
+        #ax.plot(bin_centres, np.nanmean(remapped_null_cells_stop_histogram_tt, axis=0), color= Settings.null_color, linewidth=3)
+        #ax.fill_between(bin_centres, np.nanmean(remapped_null_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(remapped_null_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+        #                np.nanmean(remapped_null_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(remapped_null_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.null_color, alpha=0.3)
+
+        if tt == 0:
+            style_track_plot(ax, 200)
+        else:
+            style_track_plot_no_RZ(ax, 200)
+        #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+        #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+        plt.xlim(0, 200)
+        tick_spacing = 100
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        Edmond.plot_utility2.style_vr_plot(ax)
+        if lock_y_axis:
+            ax.set_ylim([-0.05,0.15])
+            ax.set_yticks([0, 0.1])
+
+        plt.locator_params(axis = 'y', nbins  = 3)
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        plt.tight_layout()
+        plt.subplots_adjust(bottom = 0.2, left=0.2)
+        plt.savefig(save_path + '/stop_histogram_for_trials_encoding_position_and_distance_'+str(tt)+suffix+'.png', dpi=300)
+        plt.close()
+    return
 
 def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path, suffix="", lock_y_axis=True):
     print("do stuff")
@@ -6631,28 +7731,160 @@ def plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path,
         plt.close()
     return
 
-
-def plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path):
+def plot_stop_histogram_for_stable_sessions(combined_df, save_path):
     print("do stuff")
-    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    cells = combined_df
 
-    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
-    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
-    stable_position_grid_cells = Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"] > 0.85]
-    stable_distance_grid_cells = Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"] > 0.85]
-    stable_position_grid_cells = drop_duplicate_sessions(stable_position_grid_cells)
-    stable_distance_grid_cells = drop_duplicate_sessions(stable_distance_grid_cells)
+    #position_cells = cells[cells["Lomb_classifier_"] == "Position"]
+    #distance_cells = cells[cells["Lomb_classifier_"] == "Distance"]
+    #stable_position_cells = position_cells[position_cells["rolling:code_global_encoding_position"] > 0.85]
+    #stable_distance_cells = distance_cells[distance_cells["rolling:code_global_encoding_distance"] > 0.85]
+    #stable_position_cells = drop_duplicate_sessions(stable_position_cells)
+    #stable_distance_cells = drop_duplicate_sessions(stable_distance_cells)
 
-    stable_grid_cells = pd.concat([stable_position_grid_cells, stable_distance_grid_cells], ignore_index=True)
+    stable_position_cells = combined_df[combined_df["proportion_network_encoding_position"] > 0.85]
+    stable_distance_cells = combined_df[combined_df["proportion_network_encoding_distance"] > 0.85]
+    print("n session for stable position sessions, n = ", str(len(stable_position_cells)))
+    print("n session for stable distance sessions, n = ", str(len(stable_distance_cells)))
 
     for tt in [0,1,2]:
         fig, ax = plt.subplots(1,1, figsize=(6,4))
         ax.axhline(y=0, linestyle="dashed", linewidth=2, color="black")
-        stable_position_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
-        stable_distance_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=False)
-        stable_position_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_grid_cells, tt=tt, coding_scheme=None, shuffle=True)
-        stable_distance_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_grid_cells, tt=tt, coding_scheme=None, shuffle=True)
+        stable_position_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_cells, tt=tt, coding_scheme=None, shuffle=False)
+        stable_distance_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_cells, tt=tt, coding_scheme=None, shuffle=False)
+        stable_position_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_cells, tt=tt, coding_scheme=None, shuffle=True)
+        stable_distance_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_cells, tt=tt, coding_scheme=None, shuffle=True)
+        stable_position_grid_cells_stop_histogram_tt = np.array(stable_position_grid_cells_stop_histogram_tt)
+        stable_distance_grid_cells_stop_histogram_tt = np.array(stable_distance_grid_cells_stop_histogram_tt)
+        stable_position_grid_cells_shuffled_histogram_tt = np.array(stable_position_grid_cells_shuffled_histogram_tt)
+        stable_distance_grid_cells_shuffled_histogram_tt = np.array(stable_distance_grid_cells_shuffled_histogram_tt)
+
+        # apply normalisation with baseline
+        stable_position_grid_cells_stop_histogram_tt = stable_position_grid_cells_stop_histogram_tt-stable_position_grid_cells_shuffled_histogram_tt
+        stable_distance_grid_cells_stop_histogram_tt = stable_distance_grid_cells_stop_histogram_tt-stable_distance_grid_cells_shuffled_histogram_tt
+
+        # plot position grid cell session stop histogram
+        ax.plot(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0), color= Settings.allocentric_color,linewidth=3)
+        ax.fill_between(bin_centres, np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                        np.nanmean(stable_position_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.allocentric_color, alpha=0.3)
+
+        # plot distance grid cell session stop histogram
+        ax.plot(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0), color= Settings.egocentric_color,linewidth=3)
+        ax.fill_between(bin_centres, np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)-scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"),
+                        np.nanmean(stable_distance_grid_cells_stop_histogram_tt, axis=0)+scipy.stats.sem(stable_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit"), color=Settings.egocentric_color, alpha=0.3)
+
+        # plot_the_baseline_shuffle stop histogram
+        #ax.plot(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0), color="black", linestyle="dashed")
+        #ax.fill_between(bin_centres, np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)-scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"),
+        #                np.nanmean(stable_grid_cells_shuffled_histogram_tt, axis=0)+scipy.stats.sem(stable_grid_cells_shuffled_histogram_tt, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+
+        if tt == 0:
+            style_track_plot(ax, 200)
+        else:
+            style_track_plot_no_RZ(ax, 200)
+        #plt.ylabel('Stops (/cm)', fontsize=20, labelpad = 20)
+        #plt.xlabel('Location (cm)', fontsize=20, labelpad = 20)
+        plt.xlim(0, 200)
+        tick_spacing = 100
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        Edmond.plot_utility2.style_vr_plot(ax)
+        ax.set_ylim([-0.05,0.15])
+        ax.set_yticks([0, 0.1])
+
+        #ax.set_ylim([-0.05,0.05])
+        #ax.set_yticks([0, 0.05])
+
+        plt.locator_params(axis = 'y', nbins  = 3)
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        plt.tight_layout()
+        plt.subplots_adjust(bottom = 0.2, left=0.2)
+        plt.savefig(save_path + '/stop_histogram_for_stable_session_encoding_position_and_distance_'+str(tt)+'.png', dpi=300)
+        plt.close()
+    return
+
+def plot_percentage_hits_for_stable_sessions(combined_df, save_path):
+    print("do stuff")
+    cells = combined_df
+
+    position_cells = cells[cells["Lomb_classifier_"] == "Position"]
+    distance_cells = cells[cells["Lomb_classifier_"] == "Distance"]
+    stable_position_cells = position_cells[position_cells["rolling:code_global_encoding_position"] > 0.85]
+    stable_distance_cells = distance_cells[distance_cells["rolling:code_global_encoding_distance"] > 0.85]
+    stable_position_cells = drop_duplicate_sessions(stable_position_cells)
+    stable_distance_cells = drop_duplicate_sessions(stable_distance_cells)
+
+    stable_position_cells = combined_df[combined_df["proportion_network_encoding_position"] > 0.85]
+    stable_distance_cells = combined_df[combined_df["proportion_network_encoding_distance"] > 0.85]
+
+    fig, ax = plt.subplots(1,1, figsize=(8,6))
+
+    beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=0)
+    non_beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=1)
+    beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=0)
+    non_beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=1)
+    probe_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=2)
+    probe_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=2)
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
+
+    data = [beaconed_percentage_hits_stable_position_grid_cells, beaconed_percentage_hits_stable_distance_grid_cells,
+            non_beaconed_percentage_hits_stable_position_grid_cells, non_beaconed_percentage_hits_stable_distance_grid_cells,
+            probe_percentage_hits_stable_position_grid_cells, probe_percentage_hits_stable_distance_grid_cells]
+
+    print("comping % hits between postion and distance encoding grid cells for beaconed trials, df=",str(len(beaconed_percentage_hits_stable_position_grid_cells)+len(beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_grid_cells,beaconed_percentage_hits_stable_distance_grid_cells)[0]))
+    print("comping % hits between postion and distance encoding grid cells for non beaconed trials, df=",str(len(non_beaconed_percentage_hits_stable_position_grid_cells)+len(non_beaconed_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_grid_cells,non_beaconed_percentage_hits_stable_distance_grid_cells)[0]))
+    print("comping % hits between postion and distance encoding grid cells for probe trials, df=",str(len(probe_percentage_hits_stable_position_grid_cells)+len(probe_percentage_hits_stable_distance_grid_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(probe_percentage_hits_stable_position_grid_cells,probe_percentage_hits_stable_distance_grid_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(probe_percentage_hits_stable_position_grid_cells,probe_percentage_hits_stable_distance_grid_cells)[0]))
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,4,5, 7,8], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=-1)
+    for i, x in enumerate([1,2,4,5, 7,8]):
+        ax.scatter((np.ones(len( data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xticks([1,2,4,5,7,8])
+    ax.set_xticklabels(["B", "B", "NB", "NB", "P", "P"])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([0, 100])
+    ax.set_xlim([0, 9])
+    #ax.set_xlabel("Encoding grid cells", fontsize=20)
+    #ax.set_ylabel("Percentage hits", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/percentage_hits_for_stable_sessions.png', dpi=300)
+    plt.close()
+    return
+
+def plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path):
+    print("do stuff")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    cells = combined_df
+    cells = combined_df[combined_df["classifier"] == "G"]
+
+    position_cells = cells[cells["Lomb_classifier_"] == "Position"]
+    distance_cells = cells[cells["Lomb_classifier_"] == "Distance"]
+    stable_position_cells = position_cells[position_cells["rolling:proportion_encoding_position"] > 0.85]
+    stable_distance_cells = distance_cells[distance_cells["rolling:proportion_encoding_distance"] > 0.85]
+    stable_position_cells = drop_duplicate_sessions(stable_position_cells)
+    stable_distance_cells = drop_duplicate_sessions(stable_distance_cells)
+
+    for tt in [0,1,2]:
+        fig, ax = plt.subplots(1,1, figsize=(6,4))
+        ax.axhline(y=0, linestyle="dashed", linewidth=2, color="black")
+        stable_position_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_cells, tt=tt, coding_scheme=None, shuffle=False)
+        stable_distance_grid_cells_stop_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_cells, tt=tt, coding_scheme=None, shuffle=False)
+        stable_position_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_position_cells, tt=tt, coding_scheme=None, shuffle=True)
+        stable_distance_grid_cells_shuffled_histogram_tt, _, bin_centres, _, _, _ = get_stop_histogram(stable_distance_cells, tt=tt, coding_scheme=None, shuffle=True)
         stable_position_grid_cells_stop_histogram_tt = np.array(stable_position_grid_cells_stop_histogram_tt)
         stable_distance_grid_cells_stop_histogram_tt = np.array(stable_distance_grid_cells_stop_histogram_tt)
         stable_position_grid_cells_shuffled_histogram_tt = np.array(stable_position_grid_cells_shuffled_histogram_tt)
@@ -6779,33 +8011,34 @@ def plot_p_hit_for_stable_encoding_grid_cells(combined_df, save_path):
 
 def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
-    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    cells = combined_df
+    cells = combined_df[combined_df["classifier"] == "G"]
 
-    Position_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Position"]
-    Distance_grid_cells = grid_cells[grid_cells["Lomb_classifier_"] == "Distance"]
+    position_cells = cells[cells["Lomb_classifier_"] == "Position"]
+    distance_cells = cells[cells["Lomb_classifier_"] == "Distance"]
 
-    stable_position_grid_cells = Position_grid_cells[Position_grid_cells["rolling:proportion_encoding_position"] > 0.85]
-    stable_distance_grid_cells = Distance_grid_cells[Distance_grid_cells["rolling:proportion_encoding_distance"] > 0.85]
+    stable_position_cells = position_cells[position_cells["rolling:proportion_encoding_position"] > 0.85]
+    stable_distance_cells = distance_cells[distance_cells["rolling:proportion_encoding_distance"] > 0.85]
 
     #stable_position_grid_cells = Position_grid_cells
     #stable_distance_grid_cells = Distance_grid_cells
 
-    stable_position_grid_cells = drop_duplicate_sessions(stable_position_grid_cells)
-    stable_distance_grid_cells = drop_duplicate_sessions(stable_distance_grid_cells)
+    stable_position_cells = drop_duplicate_sessions(stable_position_cells)
+    stable_distance_cells = drop_duplicate_sessions(stable_distance_cells)
 
-    print("n session for stable position grid cells, n = ", str(len(stable_position_grid_cells)))
-    print("n session for stable distance grid cells, n = ", str(len(stable_distance_grid_cells)))
+    print("n session for stable position grid cells, n = ", str(len(stable_position_cells)))
+    print("n session for stable distance grid cells, n = ", str(len(stable_distance_cells)))
     #stable_position_grid_cells = Position_grid_cells
     #stable_distance_grid_cells = Distance_grid_cells
 
     fig, ax = plt.subplots(1,1, figsize=(8,6))
 
-    beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_grid_cells, tt=0)
-    non_beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_grid_cells, tt=1)
-    beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=0)
-    non_beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=1)
-    probe_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_grid_cells, tt=2)
-    probe_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_grid_cells, tt=2)
+    beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=0)
+    non_beaconed_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=1)
+    beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=0)
+    non_beaconed_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=1)
+    probe_percentage_hits_stable_position_grid_cells = get_percentage_hit_column(stable_position_cells, tt=2)
+    probe_percentage_hits_stable_distance_grid_cells = get_percentage_hit_column(stable_distance_cells, tt=2)
 
     colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
 
@@ -6843,6 +8076,69 @@ def plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path):
     ax.tick_params(axis='both', which='both', labelsize=25)
     #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/percentage_hits_for_stable_grid_cells.png', dpi=300)
+    plt.close()
+    return
+
+def plot_percentage_hits_for_stable_encoding_non_grid_cells(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    Position_cells = non_grid_cells[non_grid_cells["Lomb_classifier_"] == "Position"]
+    Distance_cells = non_grid_cells[non_grid_cells["Lomb_classifier_"] == "Distance"]
+
+    stable_position_cells = Position_cells[Position_cells["rolling:proportion_encoding_position"] > 0.85]
+    stable_distance_cells = Distance_cells[Distance_cells["rolling:proportion_encoding_distance"] > 0.85]
+
+    stable_position_cells = drop_duplicate_sessions(stable_position_cells)
+    stable_distance_cells = drop_duplicate_sessions(stable_distance_cells)
+
+    print("n session for stable position cells, n = ", str(len(stable_position_cells)))
+    print("n session for stable distance cells, n = ", str(len(stable_distance_cells)))
+
+
+    fig, ax = plt.subplots(1,1, figsize=(8,6))
+
+    beaconed_percentage_hits_stable_position_cells = get_percentage_hit_column(stable_position_cells, tt=0)
+    non_beaconed_percentage_hits_stable_position_cells = get_percentage_hit_column(stable_position_cells, tt=1)
+    beaconed_percentage_hits_stable_distance_cells = get_percentage_hit_column(stable_distance_cells, tt=0)
+    non_beaconed_percentage_hits_stable_distance_cells = get_percentage_hit_column(stable_distance_cells, tt=1)
+    probe_percentage_hits_stable_position_cells = get_percentage_hit_column(stable_position_cells, tt=2)
+    probe_percentage_hits_stable_distance_cells = get_percentage_hit_column(stable_distance_cells, tt=2)
+
+    colors = [Settings.allocentric_color, Settings.egocentric_color,  Settings.allocentric_color, Settings.egocentric_color, Settings.allocentric_color, Settings.egocentric_color]
+
+    data = [beaconed_percentage_hits_stable_position_cells, beaconed_percentage_hits_stable_distance_cells,
+            non_beaconed_percentage_hits_stable_position_cells, non_beaconed_percentage_hits_stable_distance_cells,
+            probe_percentage_hits_stable_position_cells, probe_percentage_hits_stable_distance_cells]
+
+    print("comping % hits between postion and distance encoding cells for beaconed trials, df=",str(len(beaconed_percentage_hits_stable_position_cells)+len(beaconed_percentage_hits_stable_distance_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_cells,beaconed_percentage_hits_stable_distance_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(beaconed_percentage_hits_stable_position_cells,beaconed_percentage_hits_stable_distance_cells)[0]))
+    print("comping % hits between postion and distance encoding cells for non beaconed trials, df=",str(len(non_beaconed_percentage_hits_stable_position_cells)+len(non_beaconed_percentage_hits_stable_distance_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_cells,non_beaconed_percentage_hits_stable_distance_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(non_beaconed_percentage_hits_stable_position_cells,non_beaconed_percentage_hits_stable_distance_cells)[0]))
+    print("comping % hits between postion and distance encoding cells for probe trials, df=",str(len(probe_percentage_hits_stable_position_cells)+len(probe_percentage_hits_stable_distance_cells)-2), ", p= ", str(scipy.stats.mannwhitneyu(probe_percentage_hits_stable_position_cells,probe_percentage_hits_stable_distance_cells)[1]), ", t= ", str(scipy.stats.mannwhitneyu(probe_percentage_hits_stable_position_cells,probe_percentage_hits_stable_distance_cells)[0]))
+
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2,4,5, 7,8], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=-1)
+    for i, x in enumerate([1,2,4,5, 7,8]):
+        ax.scatter((np.ones(len( data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xticks([1,2,4,5,7,8])
+    ax.set_xticklabels(["B", "B", "NB", "NB", "P", "P"])
+    #ax.set_yticks([-1, 0, 1])
+    #ax.set_ylim([0, 100])
+    ax.set_xlim([0, 9])
+    #ax.set_xlabel("Encoding grid cells", fontsize=20)
+    #ax.set_ylabel("Percentage hits", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    #plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/percentage_hits_for_stable_non_grid_cells.png', dpi=300)
     plt.close()
 
 
@@ -7276,7 +8572,7 @@ def plot_spatial_information_on_hmt_trials(combined_df, save_path, fig_size):
     return
 
 
-def plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_path, fig_size, suffix="", unlock_y=True):
+def plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_path, fig_size, suffix="", unlock_y=False):
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
     position_scores = grid_cells["rolling:position_mean_firing_rate"]
@@ -7314,7 +8610,8 @@ def plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_pat
     if unlock_y:
         ax.set_ylim(bottom=0)
     else:
-        ax.set_ylim(bottom=0, top=1)
+        ax.set_ylim(bottom=0, top=15)
+        ax.set_yticks([0,5,10,15])
     ax.set_xlim(left=0.5, right=3.5)
     #ax.bar(0, np.nanmean(position_scores))
     #ax.bar(1, np.nanmean(distance_scores))
@@ -7322,7 +8619,7 @@ def plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_pat
     plt.xticks(rotation = 30)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_ylabel("Mean firing rate", fontsize=20)
+    #ax.set_ylabel("Mean firing rate", fontsize=20)
     ax.tick_params(axis='both', which='major', labelsize=25)
     fig.tight_layout()
     plt.savefig(save_path + '/' +'position_vs_distance_trials_mfr_'+suffix+'.png', dpi=300)
@@ -7331,8 +8628,8 @@ def plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_pat
 def plot_spatial_information_on_position_and_distance_trials(combined_df, save_path, fig_size, suffix="", unlock_y=False):
     combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
     grid_cells = combined_df[combined_df["classifier"] == "G"]
-    position_scores = grid_cells["rolling:position_spatial_information_scores"]
-    distance_scores = grid_cells["rolling:distance_spatial_information_scores"]
+    position_scores = grid_cells["rolling:position_spatial_information_scores_Isec"]
+    distance_scores = grid_cells["rolling:distance_spatial_information_scores_Isec"]
     nan_mask = ~np.isnan(position_scores) & ~np.isnan(distance_scores)
     position_scores = position_scores[nan_mask]
     distance_scores = distance_scores[nan_mask]
@@ -7368,15 +8665,17 @@ def plot_spatial_information_on_position_and_distance_trials(combined_df, save_p
     if unlock_y:
         ax.set_ylim(bottom=0)
     else:
-        ax.set_ylim(bottom=0, top=1)
+        ax.set_ylim(bottom=0, top=3)
     ax.set_xlim(left=0.5, right=3.5)
     #ax.bar(0, np.nanmean(position_scores))
     #ax.bar(1, np.nanmean(distance_scores))
     ax.set_xticks([1,2])
+    ax.set_yticks([0,1, 2, 3])
+    ax.set_yticklabels(["00", "01", "02", "03"])
     plt.xticks(rotation = 30)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_ylabel("Spatial info bits/spike", fontsize=20)
+    #ax.set_ylabel("Spatial info bits/s", fontsize=20)
     ax.tick_params(axis='both', which='major', labelsize=25)
     fig.tight_layout()
     plt.savefig(save_path + '/' +'position_vs_distance_trials_spatial_scores_'+suffix+'.png', dpi=300)
@@ -7403,6 +8702,8 @@ def generate_short_form_for_R_by_session(combined_df):
         cluster_id = cluster_row["cluster_id"].iloc[0]
         session_id = cluster_row["session_id"].iloc[0]
         mouse_id = cluster_row["mouse"].iloc[0]
+        classifier = cluster_row["classifier"].iloc[0]
+        grid_cell = cluster_row["grid_cell"].iloc[0]
         Lomb_classifier = cluster_row["Lomb_classifier_"].iloc[0]
 
         if Lomb_classifier == "Position":
@@ -7422,6 +8723,8 @@ def generate_short_form_for_R_by_session(combined_df):
             session_df["mouse_id"] = [mouse_id]
             session_df["session_id"] = [session_id]
             session_df["cluster_id"] = [cluster_id]
+            session_df["classifier"] = [classifier]
+            session_df["grid_cell"] = [grid_cell]
             session_df["session_id_cluster_id"] = [str(session_id) + "_" + str(cluster_id)]
             session_df["trial_type"] = [trial_type]
             session_df["Lomb_classifier"] = [Lomb_classifier]
@@ -7435,6 +8738,143 @@ def generate_short_form_for_R_by_session(combined_df):
 
     return df
 
+def generate_long_form_for_R_by_network_epochs(combined_df):
+    df = pd.DataFrame()
+    # iterate over position_sessions
+    for index, session_row in combined_df.iterrows():
+        session_row = session_row.to_frame().T.reset_index(drop=True)
+        session_id = session_row["session_id"].iloc[0]
+        mouse_id = session_row["mouse"].iloc[0]
+        behaviours = np.array(session_row["behaviour_hit_try_miss"].iloc[0])
+        hits_binary = np.array(behaviours == "hit", dtype=np.int0)
+        trial_types = np.array(session_row["behaviour_trial_types"].iloc[0])
+        trial_numbers = np.array(session_row["behaviour_trial_numbers"].iloc[0])
+        rolling_classifier_network = np.array(session_row["rolling:code_global"].iloc[0])
+
+        # remove rejected trials
+        valid_trials_mask = behaviours != "rejected"
+        behaviours = behaviours[valid_trials_mask]
+        hits_binary = hits_binary[valid_trials_mask]
+        trial_types = trial_types[valid_trials_mask]
+        trial_numbers = trial_numbers[valid_trials_mask]
+        rolling_classifier_network = rolling_classifier_network[valid_trials_mask]
+
+        for i, tn in enumerate(trial_numbers):
+            trial_df = pd.DataFrame()
+            trial_df["mouse_id"] = [mouse_id]
+            trial_df["session_id"] = [session_id]
+            trial_df["trial_type"] = [trial_types[i]]
+            trial_df["rolling_classifier"] = [rolling_classifier_network[i]]
+            trial_df["trial_number"] = [tn]
+            trial_df["hit"] = [hits_binary[i]]
+            trial_df["behavioural_outcome"] = [behaviours[i]]
+            df = pd.concat([df, trial_df], ignore_index=True)
+    return df
+
+def generate_short_form_for_R_by_network_epochs(combined_df):
+    df = pd.DataFrame()
+    # iterate over position_sessions
+    for index, session_row in combined_df.iterrows():
+        session_row = session_row.to_frame().T.reset_index(drop=True)
+        session_id = session_row["session_id"].iloc[0]
+        mouse_id = session_row["mouse"].iloc[0]
+        behaviours = np.array(session_row["behaviour_hit_try_miss"].iloc[0])
+        hits_binary = np.array(behaviours == "hit", dtype=np.int0)
+        trial_types = np.array(session_row["behaviour_trial_types"].iloc[0])
+        trial_numbers = np.array(session_row["behaviour_trial_numbers"].iloc[0])
+        rolling_classifier_network = np.array(session_row["rolling:code_global"].iloc[0])
+
+        # remove rejected trials
+        valid_trials_mask = behaviours != "rejected"
+        behaviours = behaviours[valid_trials_mask]
+        hits_binary = hits_binary[valid_trials_mask]
+        trial_types = trial_types[valid_trials_mask]
+        trial_numbers = trial_numbers[valid_trials_mask]
+        rolling_classifier_network = rolling_classifier_network[valid_trials_mask]
+
+        for trial_type in [0,1,2]:
+            for code in ["P", "D", "N"]:
+                session_df = pd.DataFrame()
+                session_df["mouse_id"] = [mouse_id]
+                session_df["session_id"] = [session_id]
+                session_df["trial_type"] = [trial_type]
+                session_df["rolling_classifier"] = [code]
+                n_hits = np.sum(hits_binary[(rolling_classifier_network == code) & (trial_types == trial_type)])
+                n_trials = np.sum((rolling_classifier_network == code) & (trial_types == trial_type))
+                session_df["n_hits"] = [n_hits]
+                session_df["n_trials"] = [n_trials]
+                df = pd.concat([df, session_df], ignore_index=True)
+    return df
+
+def generate_long_form_for_R_by_network_session(combined_df):
+    position_sessions = combined_df[combined_df["proportion_network_encoding_position"] >= 0.85]
+    distance_sessions = combined_df[combined_df["proportion_network_encoding_distance"] >= 0.85]
+
+    df = pd.DataFrame()
+    # iterate over position_sessions
+    for session_dfs, session_type in zip([position_sessions, distance_sessions], ["Position", "Distance"]):
+        for index, session_row in session_dfs.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            session_id = session_row["session_id"].iloc[0]
+            mouse_id = session_row["mouse"].iloc[0]
+            behaviours = np.array(session_row["behaviour_hit_try_miss"].iloc[0])
+            hits_binary = np.array(behaviours == "hit", dtype=np.int0)
+            trial_types = np.array(session_row["behaviour_trial_types"].iloc[0])
+            trial_numbers = np.array(session_row["behaviour_trial_numbers"].iloc[0])
+
+            # remove rejected trials
+            valid_trials_mask = behaviours != "rejected"
+            behaviours = behaviours[valid_trials_mask]
+            hits_binary = hits_binary[valid_trials_mask]
+            trial_types = trial_types[valid_trials_mask]
+            trial_numbers = trial_numbers[valid_trials_mask]
+
+            for i, tn in enumerate(trial_numbers):
+                trial_df = pd.DataFrame()
+                trial_df["mouse_id"] = [mouse_id]
+                trial_df["session_id"] = [session_id]
+                trial_df["trial_type"] = [trial_types[i]]
+                trial_df["Lomb_classifier"] = [session_type]
+                trial_df["trial_number"] = [tn]
+                trial_df["hit"] = [hits_binary[i]]
+                df = pd.concat([df, trial_df], ignore_index=True)
+    return df
+
+
+def generate_short_form_for_R_by_network_session(combined_df):
+    position_sessions = combined_df[combined_df["proportion_network_encoding_position"] >= 0.85]
+    distance_sessions = combined_df[combined_df["proportion_network_encoding_distance"] >= 0.85]
+
+    df = pd.DataFrame()
+    # iterate over position_sessions
+    for session_dfs, session_type in zip([position_sessions, distance_sessions], ["Position", "Distance"]):
+        for index, session_row in session_dfs.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            session_id = session_row["session_id"].iloc[0]
+            mouse_id = session_row["mouse"].iloc[0]
+            behaviours = np.array(session_row["behaviour_hit_try_miss"].iloc[0])
+            hits_binary = np.array(behaviours == "hit", dtype=np.int0)
+            trial_types = np.array(session_row["behaviour_trial_types"].iloc[0])
+
+            # remove rejected trials
+            valid_trials_mask = behaviours != "rejected"
+            behaviours = behaviours[valid_trials_mask]
+            hits_binary = hits_binary[valid_trials_mask]
+            trial_types = trial_types[valid_trials_mask]
+
+            for trial_type in [0,1,2]:
+                session_df = pd.DataFrame()
+                session_df["mouse_id"] = [mouse_id]
+                session_df["session_id"] = [session_id]
+                session_df["trial_type"] = [trial_type]
+                session_df["Lomb_classifier"] = [session_type]
+                n_hits = np.sum(hits_binary[(trial_types == trial_type)])
+                n_trials = np.sum(trial_types == trial_type)
+                session_df["n_hits"] = [n_hits]
+                session_df["n_trials"] = [n_trials]
+                df = pd.concat([df, session_df], ignore_index=True)
+    return df
+
 def generate_short_form_for_R_by_trial(combined_df):
     df = pd.DataFrame()
     # iterate over clusters
@@ -7442,6 +8882,8 @@ def generate_short_form_for_R_by_trial(combined_df):
         cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
         cluster_id = cluster_row["cluster_id"].iloc[0]
         session_id = cluster_row["session_id"].iloc[0]
+        classifier = cluster_row["classifier"].iloc[0]
+        grid_cell = cluster_row["grid_cell"].iloc[0]
         mouse_id = cluster_row["mouse"].iloc[0]
 
         trial_numbers = np.array(cluster_row["behaviour_trial_numbers"].iloc[0])
@@ -7457,6 +8899,8 @@ def generate_short_form_for_R_by_trial(combined_df):
                 session_df["mouse_id"] = [mouse_id]
                 session_df["session_id"] = [session_id]
                 session_df["cluster_id"] = [cluster_id]
+                session_df["classifier"] = [classifier]
+                session_df["grid_cell"] = [grid_cell]
                 session_df["session_id_cluster_id"] = [str(session_id) + "_" + str(cluster_id)]
                 session_df["trial_type"] = [trial_type]
                 session_df["rolling_classifier"] = [code]
@@ -7470,49 +8914,41 @@ def generate_short_form_for_R_by_trial(combined_df):
     return df
 
 def generate_long_form_for_R_by_session(combined_df):
+    position_sessions = combined_df[combined_df["proportion_network_encoding_position"] >= 0.85]
+    distance_sessions = combined_df[combined_df["proportion_network_encoding_distance"] >= 0.85]
+
     df = pd.DataFrame()
-    # iterate over clusters
-    for index, cluster_row in combined_df.iterrows():
-        cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
-        cluster_id = cluster_row["cluster_id"].iloc[0]
-        session_id = cluster_row["session_id"].iloc[0]
-        mouse_id = cluster_row["mouse"].iloc[0]
-        trial_numbers = np.array(cluster_row["behaviour_trial_numbers"].iloc[0])
-        behaviours = np.array(cluster_row["behaviour_hit_try_miss"].iloc[0])
-        behaviours_numeric = behaviours_classification_to_numeric(behaviours)
-        hits_binary = np.array(behaviours == "hit", dtype=np.int0)
-        trial_types = np.array(cluster_row["behaviour_trial_types"].iloc[0])
-        rolling_classifiers = np.array(cluster_row["rolling:classifier_by_trial_number"].iloc[0])
-        p_coding = np.array(rolling_classifiers == "P", dtype=np.int0)
-        d_coding = np.array(rolling_classifiers == "D", dtype=np.int0)
-        n_coding = np.array(rolling_classifiers == "N", dtype=np.int0)
+    # iterate over position_sessions
+    for session_dfs, session_type in zip([position_sessions, distance_sessions], ["Position", "Distance"]):
+        for index, session_row in session_dfs.iterrows():
+            session_row = session_row.to_frame().T.reset_index(drop=True)
+            session_id = session_row["session_id"].iloc[0]
+            cluster_id = session_row["cluster_id"].iloc[0]
+            mouse_id = session_row["mouse"].iloc[0]
+            behaviours = np.array(session_row["behaviour_hit_try_miss"].iloc[0])
+            hits_binary = np.array(behaviours == "hit", dtype=np.int0)
+            trial_types = np.array(session_row["behaviour_trial_types"].iloc[0])
+            trial_numbers = np.array(session_row["behaviour_trial_numbers"].iloc[0])
 
-        trial_df = pd.DataFrame()
-        for tn, hit_binary, behaviour_numeric, behaviour, tt, code, p_code, d_code, n_code in zip(trial_numbers,
-                                                                                                  hits_binary,
-                                                                                                  behaviours_numeric,
-                                                                                                  behaviours,
-                                                                                                  trial_types,
-                                                                                                  rolling_classifiers,
-                                                                                                  p_coding, d_coding,
-                                                                                                  n_coding):
-            trial_df["trial_number"] = [tn]
-            trial_df["hit"] = [hit_binary]
-            trial_df["behaviour_numeric"] = [behaviour_numeric]
-            trial_df["behavioural_outcome"] = [behaviour]
-            trial_df["trial_type"] = [tt]
-            trial_df["rolling_classifier"] = [code]
-            trial_df["p_coding"] = [p_code]
-            trial_df["d_coding"] = [d_code]
-            trial_df["n_coding"] = [n_code]
-            trial_df["mouse_id"] = [mouse_id]
-            trial_df["session_id"] = [session_id]
-            trial_df["cluster_id"] = [cluster_id]
-            trial_df["session_id_cluster_id"] = [str(session_id) + "_" + str(cluster_id)]
-            df = pd.concat([df, trial_df], ignore_index=True)
+            # remove rejected trials
+            valid_trials_mask = behaviours != "rejected"
+            behaviours = behaviours[valid_trials_mask]
+            hits_binary = hits_binary[valid_trials_mask]
+            trial_types = trial_types[valid_trials_mask]
+            trial_numbers = trial_numbers[valid_trials_mask]
+
+            for i, tn in enumerate(trial_numbers):
+                trial_df = pd.DataFrame()
+                trial_df["mouse_id"] = [mouse_id]
+                trial_df["session_id"] = [session_id]
+                trial_df["cluster_id"] = [cluster_id]
+                trial_df["trial_type"] = [trial_types[i]]
+                trial_df["Lomb_classifier"] = [session_type]
+                trial_df["trial_number"] = [tn]
+                trial_df["hit"] = [hits_binary[i]]
+                trial_df["behavioural_outcome"] = [behaviours[i]]
+                df = pd.concat([df, trial_df], ignore_index=True)
     return df
-
-
 
 def generate_long_form_for_R(combined_df):
     df = pd.DataFrame()
@@ -7521,6 +8957,8 @@ def generate_long_form_for_R(combined_df):
         cluster_row = cluster_row.to_frame().T.reset_index(drop=True)
         cluster_id = cluster_row["cluster_id"].iloc[0]
         session_id = cluster_row["session_id"].iloc[0]
+        classifier = cluster_row["classifier"].iloc[0]
+        grid_cell = cluster_row["grid_cell"].iloc[0]
         mouse_id = cluster_row["mouse"].iloc[0]
         trial_numbers = np.array(cluster_row["behaviour_trial_numbers"].iloc[0])
         behaviours = np.array(cluster_row["behaviour_hit_try_miss"].iloc[0])
@@ -7532,17 +8970,22 @@ def generate_long_form_for_R(combined_df):
         d_coding = np.array(rolling_classifiers == "D", dtype=np.int0)
         n_coding = np.array(rolling_classifiers == "N", dtype=np.int0)
 
-        Lomb_classifier = cluster_row["Lomb_classifier_"].iloc[0]
-        if Lomb_classifier == "Position":
-            rolling_proportion_column = "rolling:proportion_encoding_position"
-        if Lomb_classifier == "Distance":
-            rolling_proportion_column = "rolling:proportion_encoding_distance"
-        if Lomb_classifier == "Null":
-            rolling_proportion_column = "rolling:proportion_encoding_null"
-        proportion_encoding = cluster_row[rolling_proportion_column].iloc[0]
+        # remove rejected trials
+        valid_trials_mask = behaviours != "rejected"
+        trial_numbers = trial_numbers[valid_trials_mask]
+        behaviours = behaviours[valid_trials_mask]
+        behaviours_numeric = behaviours_numeric[valid_trials_mask]
+        hits_binary = hits_binary[valid_trials_mask]
+        trial_types = trial_types[valid_trials_mask]
+        rolling_classifiers = rolling_classifiers[valid_trials_mask]
+        p_coding = p_coding[valid_trials_mask]
+        d_coding = d_coding[valid_trials_mask]
+        n_coding = n_coding[valid_trials_mask]
 
         trial_df = pd.DataFrame()
-        for tn, hit_binary, behaviour_numeric, behaviour, tt, code, p_code, d_code, n_code in zip(trial_numbers, hits_binary, behaviours_numeric, behaviours, trial_types, rolling_classifiers, p_coding, d_coding, n_coding):
+        for tn, hit_binary, behaviour_numeric, behaviour, tt, code, p_code, d_code, n_code in \
+                zip(trial_numbers, hits_binary, behaviours_numeric, behaviours, trial_types, rolling_classifiers, p_coding, d_coding, n_coding):
+            trial_df = pd.DataFrame()
             trial_df["trial_number"] = [tn]
             trial_df["hit"] = [hit_binary]
             trial_df["behaviour_numeric"] = [behaviour_numeric]
@@ -7555,9 +8998,8 @@ def generate_long_form_for_R(combined_df):
             trial_df["mouse_id"] = [mouse_id]
             trial_df["session_id"] = [session_id]
             trial_df["cluster_id"] = [cluster_id]
-            trial_df["Lomb_classifier"] = [Lomb_classifier]
-            trial_df["proportion_encoding_Lomb_classifier_for_session"] = [proportion_encoding]
-            trial_df["session_id_cluster_id"] = [str(session_id)+"_"+str(cluster_id)]
+            trial_df["classifier"] = [classifier]
+            trial_df["grid_cell"] = [grid_cell]
             df = pd.concat([df, trial_df], ignore_index=True)
     return df
 
@@ -7566,13 +9008,36 @@ def plot_odds_ratio(odds_ratio_data, save_path):
     non_beaconed_odds_ratio = odds_ratio_data[odds_ratio_data["trial_type"] == "non_beaconed"]
     probe_odds_ratio = odds_ratio_data[odds_ratio_data["trial_type"] == "probe"]
 
-    fig, ax = plt.subplots(figsize=(4,4))
-    ax.plot([beaconed_odds_ratio["ci_lower"].iloc[0], beaconed_odds_ratio["ci_upper"].iloc[0]], [3,3], color=get_trial_color(0))
-    ax.plot([non_beaconed_odds_ratio["ci_lower"].iloc[0], non_beaconed_odds_ratio["ci_upper"].iloc[0]], [2,2], color=get_trial_color(1))
-    ax.plot([probe_odds_ratio["ci_lower"].iloc[0], probe_odds_ratio["ci_upper"].iloc[0]], [1,1], color=get_trial_color(2))
-    ax.scatter(y=3, x=beaconed_odds_ratio["odds_ratio"].iloc[0],  color=get_trial_color(0))
-    ax.scatter(y=2, x=non_beaconed_odds_ratio["odds_ratio"].iloc[0],  color=get_trial_color(1))
-    ax.scatter(y=1, x=probe_odds_ratio["odds_ratio"].iloc[0],  color=get_trial_color(2))
+    fig, ax = plt.subplots(figsize=(4,6))
+    y = 10
+    y_increment = 0.3
+    linewidth=3
+    s=75
+    cell_types = ["g", "ng", "s", "b", "hd", "ns"]
+    cell_colors = [(255/255,127/255,14/255), (0/255, 154/255, 255/255),(188/255,189/255,35/255), (140/255, 86/255, 75/255), (227/255, 119/255, 194/255), (127/255,127/255,127/255)]
+
+    for cell_type, cell_color in zip(cell_types, cell_colors):
+        ax.plot([beaconed_odds_ratio[beaconed_odds_ratio["cell_type"] == cell_type]["ci_lower"].iloc[0],
+                 beaconed_odds_ratio[beaconed_odds_ratio["cell_type"] == cell_type]["ci_upper"].iloc[0]], [y, y], color=cell_color, linewidth=linewidth)
+        ax.scatter(y=y, x=beaconed_odds_ratio[beaconed_odds_ratio["cell_type"] == cell_type]["odds_ratio"].iloc[0],color=cell_color, s=s)
+        y -= y_increment
+
+    y -= 0.75
+
+    for cell_type, cell_color in zip(cell_types, cell_colors):
+        ax.plot([non_beaconed_odds_ratio[non_beaconed_odds_ratio["cell_type"] == cell_type]["ci_lower"].iloc[0],
+                 non_beaconed_odds_ratio[non_beaconed_odds_ratio["cell_type"] == cell_type]["ci_upper"].iloc[0]], [y, y], color=cell_color, linewidth=linewidth)
+        ax.scatter(y=y, x=non_beaconed_odds_ratio[non_beaconed_odds_ratio["cell_type"] == cell_type]["odds_ratio"].iloc[0],color=cell_color, s=s)
+        y -= y_increment
+
+    y -= 0.75
+
+    for cell_type, cell_color in zip(cell_types, cell_colors):
+        ax.plot([probe_odds_ratio[probe_odds_ratio["cell_type"] == cell_type]["ci_lower"].iloc[0],
+                 probe_odds_ratio[probe_odds_ratio["cell_type"] == cell_type]["ci_upper"].iloc[0]], [y, y], color=cell_color, linewidth=linewidth)
+        ax.scatter(y=y, x=probe_odds_ratio[probe_odds_ratio["cell_type"] == cell_type]["odds_ratio"].iloc[0],color=cell_color, s=s)
+        y -= y_increment
+
 
     ax.tick_params(axis='both', which='major', labelsize=20)
     ax.spines['top'].set_visible(False)
@@ -7584,9 +9049,9 @@ def plot_odds_ratio(odds_ratio_data, save_path):
     ax.set_xscale('log')
     ax.set_xticks([      0.1 , 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,  1,  2,  3,  4,  5,   6,  7,  8,  9,  10])
     ax.set_xticklabels(["0.1",  "",  "",  "","0.5", "",  "",  "",  "", "1","", "", "", "5", "", "", "", "", "10"])
-    ax.set_ylim(0.5, 3.5)
-    ax.set_yticks([1, 2, 3])
-    ax.set_yticklabels(["P", "NB", "B"])
+    #ax.set_ylim(0.5, 10.5)
+    ax.set_yticks([4.9, 7.15, 9.4])
+    ax.set_yticklabels(["P", "N", "B"])
     #ax.set_xlim(left=0, right=9)
     ax.axvline(x=1, color="black",linestyle="dotted")
     #ax.set_ylim(bottom=0, top=100)
@@ -7594,7 +9059,10 @@ def plot_odds_ratio(odds_ratio_data, save_path):
     plt.close()
     return
 
-def plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df, save_path, fig_size):
+def plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df, save_path, fig_size, z_scored=False):
+    # remove putative interneurons
+    combined_df = combined_df[combined_df["mean_firing_rate_vr"]<15]
+
     grid_cells = combined_df[combined_df["classifier"] == "G"]
     non_grid_cells = combined_df[combined_df["classifier"] != "G"]
 
@@ -7640,6 +9108,8 @@ def plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df
                         trial_numbers = behaviour_trial_numbers[mask]
                         fr = fr_binned_in_space_smoothed[trial_numbers-1]
                         avg_fr = np.nanmean(fr, axis=0)
+                        if z_scored:
+                            avg_fr = stats.zscore(avg_fr)
                         avg_firing_rate_maps.append(avg_fr.tolist())
 
                     locations = np.arange(0, len(avg_firing_rate_maps[0]))
@@ -7662,8 +9132,8 @@ def plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df
                 max_fr = max(np.nanmean(np.array(avg_firing_rate_maps), axis=0) + stats.sem(np.array(avg_firing_rate_maps), axis=0))
                 max_fr = max_fr + (0.1 * (max_fr))
                 # ax.set_ylim([0, max_fr])
-                ax.set_yticks([0, np.round(ax.get_ylim()[1], 1)])
-                ax.set_ylim(bottom=0)
+                #ax.set_yticks([0, np.round(ax.get_ylim()[1], 1)])
+                #ax.set_ylim(bottom=0)
                 # Edmond.plot_utility2.style_track_plot(ax, track_length, alpha=0.25)
                 if tt == 1:
                     style_track_plot_no_RZ(ax, 200)
@@ -7768,6 +9238,788 @@ def plot_comparison_grids_vs_non_grids_during_position_and_distance_epochs(combi
 
     return
 
+def get_agreements(cells_1, cells_2, shuffled=False, n_shuffles=2):
+    agreements = []
+    for index, cell_row in cells_1.iterrows():
+        cell_row = cell_row.to_frame().T.reset_index(drop=True)
+        cluster_id = cell_row["cluster_id"].iloc[0]
+        session_id = cell_row["session_id"].iloc[0]
+        cell_rolling_classifiers = np.array(cell_row["rolling:classifier_by_trial_number"].iloc[0])
+
+        cells_2_in_same_session = cells_2[cells_2["session_id"] == session_id]
+        for paired_index, paired_cell_row in cells_2_in_same_session.iterrows():
+            paired_cell_row = paired_cell_row.to_frame().T.reset_index(drop=True)
+            paired_cluster_id = paired_cell_row["cluster_id"].iloc[0]
+            paired_session_id = paired_cell_row["session_id"].iloc[0]
+            paired_cell_rolling_classifiers = np.array(paired_cell_row["rolling:classifier_by_trial_number"].iloc[0])
+
+            if cluster_id != paired_cluster_id:
+                if shuffled:
+                    shuffled_agreements = np.zeros(n_shuffles)
+                    for i in range(n_shuffles):
+                        paired_cell_rolling_classifiers = shuffle_blocks(paired_cell_rolling_classifiers)
+                        shuffled_agreement = np.array(cell_rolling_classifiers==paired_cell_rolling_classifiers, dtype=np.int64)
+                        shuffled_score = np.sum(shuffled_agreement)/len(shuffled_agreement)
+                        shuffled_agreements[i] = shuffled_score
+
+                    agreements.append(np.nanmean(shuffled_agreements))
+                else:
+                    agreement = np.array(cell_rolling_classifiers==paired_cell_rolling_classifiers, dtype=np.int64)
+                    score = np.sum(agreement)/len(agreement)
+                    agreements.append(score)
+
+    return np.array(agreements)
+
+
+def get_agreements_between_grid_and_non_grid_network(cells, shuffled=False, n_shuffles=2):
+    unique_sessions_with_grid_cells = np.unique(cells[cells["classifier"] == "G"]["session_id"])
+
+    agreements=[]
+    for session_id in unique_sessions_with_grid_cells:
+        session_df = cells[cells["session_id"] == session_id]
+        grids = session_df[session_df["classifier"] == "G"]
+        non_grids = session_df[session_df["classifier"] != "G"]
+
+        if len(non_grids)>0:
+            grid_modes = pandas_collumn_to_2d_numpy_array(grids["rolling:classifier_by_trial_number"])
+            non_grid_modes = pandas_collumn_to_2d_numpy_array(non_grids["rolling:classifier_by_trial_number"])
+
+            if shuffled:
+                shuffled_agreements = np.zeros(n_shuffles)
+                for i in range(n_shuffles):
+                    shuffled_non_grid_modes = np.zeros((len(non_grid_modes), len(non_grid_modes[0])), dtype=np.str)
+                    for j in range(len(non_grid_modes)):
+                        shuffled_non_grid_modes[j,:] = shuffle_blocks(non_grid_modes[j])
+
+                    dominant_mode_grid_cells = stats.mode(grid_modes, axis=0)[0][0]
+                    dominant_mode_non_grid_cells_shuffled = stats.mode(shuffled_non_grid_modes, axis=0)[0][0]
+
+                    shuffled_agreement = np.array(dominant_mode_grid_cells == dominant_mode_non_grid_cells_shuffled, dtype=np.int64)
+                    shuffled_score = np.sum(shuffled_agreement) / len(shuffled_agreement)
+                    shuffled_agreements[i] = shuffled_score
+                agreements.append(np.nanmean(shuffled_agreements))
+            else:
+                dominant_mode_grid_cells = stats.mode(grid_modes, axis=0)[0][0]
+                dominant_mode_non_grid_cells = stats.mode(non_grid_modes, axis=0)[0][0]
+
+                agreement = np.array(dominant_mode_grid_cells == dominant_mode_non_grid_cells, dtype=np.int64)
+                score = np.sum(agreement) / len(agreement)
+                agreements.append(score)
+    
+    return np.array(agreements)
+
+def plot_agreement_between_grid_and_non_grids(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+
+    combined_df = combined_df[combined_df["rolling:max_proportion_encoding"] <= 0.85]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    n_shuffles = 10
+
+    gc_ngc_network_agreement_true = get_agreements_between_grid_and_non_grid_network(cells=combined_df, shuffled=False, n_shuffles=n_shuffles)
+    gc_ngc_network_agreement_shuffled = get_agreements_between_grid_and_non_grid_network(cells=combined_df, shuffled=True, n_shuffles=n_shuffles)
+
+    gc_gc_agreement_true = get_agreements(cells_1=grid_cells, cells_2=grid_cells, shuffled=False, n_shuffles=n_shuffles)
+    gc_gc_agreement_shuffle = get_agreements(cells_1=grid_cells, cells_2=grid_cells, shuffled=True, n_shuffles=n_shuffles)
+    ngc_ngc_agreement_true = get_agreements(cells_1=non_grid_cells, cells_2=non_grid_cells, shuffled=False, n_shuffles=n_shuffles)
+    ngc_ngc_agreement_shuffle = get_agreements(cells_1=non_grid_cells, cells_2=non_grid_cells, shuffled=True, n_shuffles=n_shuffles)
+    gc_ngc_agreement_true = get_agreements(cells_1=grid_cells, cells_2=non_grid_cells, shuffled=False, n_shuffles=n_shuffles)
+    gc_ngc_agreement_shuffle = get_agreements(cells_1=grid_cells, cells_2=non_grid_cells, shuffled=True, n_shuffles=n_shuffles)
+
+    x_pos = np.array([0,1,2,4])
+    fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+    ax.bar(x_pos-0.22, [np.nanmean(gc_gc_agreement_true), np.nanmean(ngc_ngc_agreement_true), np.nanmean(gc_ngc_agreement_true), np.nanmean(gc_ngc_network_agreement_true)], 0.4, color="white", edgecolor="black", linewidth=3)
+    ax.bar(x_pos+0.22, [np.nanmean(gc_gc_agreement_shuffle), np.nanmean(ngc_ngc_agreement_shuffle), np.nanmean(gc_ngc_agreement_shuffle), np.nanmean(gc_ngc_network_agreement_shuffled)], 0.4, color="white", edgecolor="red", linewidth=3)
+    ax.errorbar(x_pos-0.22, [np.nanmean(gc_gc_agreement_true), np.nanmean(ngc_ngc_agreement_true), np.nanmean(gc_ngc_agreement_true), np.nanmean(gc_ngc_network_agreement_true)],
+                yerr=[stats.tstd(gc_gc_agreement_true), stats.tstd(ngc_ngc_agreement_true), stats.tstd(gc_ngc_agreement_true), stats.tstd(gc_ngc_network_agreement_true)], capsize=10, color="black", linestyle='', elinewidth=3)
+    ax.errorbar(x_pos+0.22, [np.nanmean(gc_gc_agreement_shuffle), np.nanmean(ngc_ngc_agreement_shuffle),np.nanmean(gc_ngc_agreement_shuffle), np.nanmean(gc_ngc_network_agreement_shuffled)],
+                yerr=[stats.tstd(gc_gc_agreement_shuffle), stats.tstd(ngc_ngc_agreement_shuffle), stats.tstd(gc_ngc_agreement_shuffle), stats.tstd(gc_ngc_network_agreement_shuffled)], capsize=10, color="black", linestyle='', elinewidth=3)
+
+    for i in range(len(gc_gc_agreement_true)):
+        ax.plot([0-0.22, 0+0.22], [gc_gc_agreement_true[i], gc_gc_agreement_shuffle[i]], alpha=0.1, color="black")
+    for i in range(len(ngc_ngc_agreement_true)):
+        ax.plot([1-0.22, 1+0.22], [ngc_ngc_agreement_true[i], ngc_ngc_agreement_shuffle[i]], alpha=0.005, color="black")
+    for i in range(len(gc_ngc_agreement_true)):
+        ax.plot([2-0.22, 2+0.22], [gc_ngc_agreement_true[i], gc_ngc_agreement_shuffle[i]], alpha=0.03, color="black")
+
+    for i in range(len(gc_ngc_network_agreement_true)):
+        ax.plot([4-0.22, 4+0.22], [gc_ngc_network_agreement_true[i], gc_ngc_network_agreement_shuffled[i]], alpha=0.1, color="black")
+
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_ylim(bottom=0, top=1)
+    ax.set_xlabel("", fontsize=20)
+    ax.set_xticks([0,1,2,4])
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    ax.set_yticklabels([0, 25, 50, 75, 100])
+    ax.set_xticklabels(["","","",""])
+    #ax.set_ylabel("Agreement", fontsize=20, labelpad=10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    #ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=25)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/agreements_between_grid_cells_and_non_grid_cells.png',dpi=300)
+    plt.close()
+
+
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+    colors = ["dimgrey", "lightcoral", "dimgrey", "lightcoral", "dimgrey", "lightcoral", "dimgrey", "lightcoral"]
+    data = [gc_gc_agreement_true, gc_gc_agreement_shuffle, ngc_ngc_agreement_true, ngc_ngc_agreement_shuffle,
+            gc_ngc_agreement_true, gc_ngc_agreement_shuffle, gc_ngc_network_agreement_true, gc_ngc_network_agreement_shuffled]
+    #ax.axhline(y=0, color="black",linestyle="dashed")
+    boxprops = dict(linewidth=3, color='k')
+    medianprops = dict(linewidth=3, color='k')
+    capprops = dict(linewidth=3, color='k')
+    whiskerprops = dict(linewidth=3, color='k')
+    box = ax.boxplot(data, positions=[1,2, 4,5, 7,8, 10, 11], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=2)
+    #for i, x in enumerate([1,2]):
+    #    ax.scatter((np.ones(len(data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xticks([1.5, 4.5, 7.5, 10.5])
+    ax.set_xticklabels(["", "", "", ""])
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    ax.set_yticklabels([0, 25, 50, 75, 100])
+    #ax.set_xticklabels(["","","",""])
+    ax.set_ylim([0, 1])
+    ax.set_xlim([0, 12])
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(3)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    #plt.subplots_adjust(hspace = None, wspace = None,  bottom = None, left = 0.4, right =None, top = None)
+    plt.savefig(save_path + '/agreements_between_grid_cells_and_non_grid_cells_boxplot.png', dpi=300)
+    plt.close()
+
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(np.arange(0,11), np.arange(0,11), linestyle="dashed", color="black")
+    ax.scatter(gc_gc_agreement_true, gc_gc_agreement_shuffle, marker="o", s=20, facecolors=np.array([0/255, 154/255, 255/ 255, 1]).reshape(1, 4), linewidths=0.5,edgecolors="black")
+    plot_regression(ax, gc_gc_agreement_true, gc_gc_agreement_shuffle, c="black", y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    ax.set_xticks([0,1])
+    ax.set_yticks([0,1])
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/agreements_between_grid_cells_and_grid_cells_scatter.png', dpi=300)
+    plt.close()
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(np.arange(0,11), np.arange(0,11), linestyle="dashed", color="black")
+    ax.scatter(ngc_ngc_agreement_true, ngc_ngc_agreement_shuffle, marker="o", s=20, facecolors=np.array([255/255,127/255,14/255, 1]).reshape(1,4), linewidths=0.5, edgecolors="black", alpha=0.2)
+    plot_regression(ax, ngc_ngc_agreement_true, ngc_ngc_agreement_shuffle, c="black", y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    ax.set_xticks([0,1])
+    ax.set_yticks([0,1])
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/agreements_between_non_grid_cells_and_non_grid_cells_scatter.png', dpi=300)
+    plt.close()
+
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(np.arange(0,11), np.arange(0,11), linestyle="dashed", color="black")
+    ax.scatter(gc_ngc_agreement_true, gc_ngc_agreement_shuffle, marker="o", s=20, facecolors="black", linewidths=0.5, edgecolors="black", alpha=0.2)
+    plot_regression(ax, gc_ngc_agreement_true, gc_ngc_agreement_shuffle, c="black", y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    ax.set_xticks([0,1])
+    ax.set_yticks([0,1])
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/agreements_between_grid_cells_and_non_grid_cells_scatter.png', dpi=300)
+    plt.close()
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(np.arange(0,11), np.arange(0,11), linestyle="dashed", color="black")
+    ax.scatter(gc_ngc_network_agreement_true, gc_ngc_network_agreement_shuffled, marker="o", s=20, facecolors="black", linewidths=0.5, edgecolors="black", alpha=0.2)
+    plot_regression(ax, gc_ngc_network_agreement_true, gc_ngc_network_agreement_shuffled, c="black", y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    ax.set_xticks([0,1])
+    ax.set_yticks([0,1])
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/agreements_between_network_grid_cells_and_non_grid_cells_scatter.png', dpi=300)
+    plt.close()
+    return
+
+def plot_firing_rate_position_to_distance_epochs(combined_df, save_path, transition_from="", transition_to=""):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    for cells, cells_str in zip([grid_cells, non_grid_cells], ["grid_cells", "non_grid_cells"]):
+
+        fr_profiles_all_cells = []
+        for index, cell_row in cells.iterrows():
+            cell_row = cell_row.to_frame().T.reset_index(drop=True)
+            rolling_classifiers = np.array(cell_row["rolling:classifier_by_trial_number"].iloc[0])
+            firing_rates = np.array(cell_row["avg_z_scored_firing_rates"].iloc[0])
+
+            if np.nansum(firing_rates)>0:
+                transition_indices = get_transition_trial_numbers(rolling_classifiers, transition_from=transition_from, transition_to=transition_to)
+
+                last_and_first_5_frs_after_transition = np.zeros((len(transition_indices), 10))
+                last_and_first_5_frs_after_transition[:,:] = np.nan
+
+                for i in range(len(transition_indices)):
+                    for j in range(len(last_and_first_5_frs_after_transition[0])):
+                        speed_index = transition_indices[i]+j-5
+                        if (speed_index<len(firing_rates)) and (speed_index>0):
+                            last_and_first_5_frs_after_transition[i,j] = firing_rates[speed_index]
+                last_and_first_5_frs_after_transition = np.nanmean(last_and_first_5_frs_after_transition, axis=0)
+                fr_profiles_all_cells.append(last_and_first_5_frs_after_transition.tolist())
+        fr_profiles_all_cells = np.array(fr_profiles_all_cells)
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        ax.plot(np.arange(-4,6), np.nanmean(fr_profiles_all_cells, axis=0), color="black", linewidth=3)
+        ax.fill_between(np.arange(-4, 6), np.nanmean(fr_profiles_all_cells, axis=0)+stats.sem(fr_profiles_all_cells, axis=0, nan_policy="omit"),
+                        np.nanmean(fr_profiles_all_cells, axis=0)-stats.sem(fr_profiles_all_cells, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.set_xlim([0, 9])
+        ax.set_ylim(bottom=0)
+        ax.set_xlabel("Trial relative to transition", fontsize=20)
+        ax.set_ylabel("Firing rate (Hz)", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='both', labelsize=25)
+        # plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/z_scored_firing_rates_between_transition_from_'+transition_from+'_to_'+transition_to+'_'+cells_str+'.png', dpi=300)
+        plt.close()
+    return
+
+def get_transition_trial_numbers(rolling_classifiers, transition_from="", transition_to=""):
+    transition_indices = []
+    for i in range(len(rolling_classifiers)-1):
+        if (rolling_classifiers[i] == transition_from) and (rolling_classifiers[i+1] == transition_to):
+            transition_indices.append(i)
+    return np.array(transition_indices)
+
+def plot_speeds_between_position_and_distance_epochs(combined_df, save_path):
+    print('plotting lomb classifers proportions...')
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    for cells, cells_str in zip([grid_cells, non_grid_cells], ["grid_cells", "non_grid_cells"]):
+
+        P_speeds = []
+        D_speeds = []
+        for index, cell_row in cells.iterrows():
+            cell_row = cell_row.to_frame().T.reset_index(drop=True)
+            rolling_classifiers = np.array(cell_row["rolling:classifier_by_trial_number"].iloc[0])
+            running_speeds = np.array(cell_row["avg_z_scored_running_speeds"].iloc[0])
+
+            if np.nansum(running_speeds) > 0:
+                P_speeds_cell = running_speeds[rolling_classifiers == "P"]
+                D_speeds_cell = running_speeds[rolling_classifiers == "D"]
+
+                P_speeds.append(np.nanmean(P_speeds_cell))
+                D_speeds.append(np.nanmean(D_speeds_cell))
+
+        P_speeds = np.array(P_speeds)
+        D_speeds = np.array(D_speeds)
+        P_not_nan_mask = ~np.isnan(P_speeds)
+        D_not_nan_mask = ~np.isnan(D_speeds)
+        non_nan_mask = P_not_nan_mask*D_not_nan_mask
+
+        print("comping samples for agreement plot, p = ", str(stats.wilcoxon(x=P_speeds[non_nan_mask],
+                                                                             y=D_speeds[non_nan_mask])[1]),
+              ", t = ", str(stats.wilcoxon(x=P_speeds[non_nan_mask],
+                                           y=D_speeds[non_nan_mask])[0]), ", df = ",
+              str(len(P_speeds[non_nan_mask]) - 1))
+
+        _, p = stats.wilcoxon(P_speeds[non_nan_mask],
+                              D_speeds[non_nan_mask])
+
+        fig, ax = plt.subplots(figsize=(4, 6))
+        for i in range(len(P_speeds[non_nan_mask])):
+            ax.scatter([0, 1], [P_speeds[non_nan_mask][i], D_speeds[non_nan_mask][i]], marker="o", color="black")
+            ax.plot([0, 1], [P_speeds[non_nan_mask][i], D_speeds[non_nan_mask][i]], color="black")
+        ax.set_xticks([0, 1])
+        #ax.set_yticks([0, 0.5, 1])
+        ax.set_xlim([-0.5, 1.5])
+        ax.set_ylim(bottom=0)
+        plt.xticks(rotation=30)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.set_xticklabels(["P", "D"])
+        ax.set_ylabel("Avg trial speed during epoch", fontsize=20)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        fig.tight_layout()
+        plt.savefig(save_path + '/' + 'Avg_speed_during_position_and_distance_coding_epoch_'+cells_str+'.png', dpi=300)
+        plt.close()
+    return
+
+def plot_running_speed_position_to_distance_epochs(combined_df, save_path, transition_from="", transition_to=""):
+    print('plotting lomb classifers proportions...')
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    for cells, cells_str in zip([grid_cells, non_grid_cells], ["grid_cells", "non_grid_cells"]):
+
+        speed_profiles_all_cells = []
+        for index, cell_row in cells.iterrows():
+            cell_row = cell_row.to_frame().T.reset_index(drop=True)
+            rolling_classifiers = np.array(cell_row["rolling:classifier_by_trial_number"].iloc[0])
+            running_speeds = np.array(cell_row["avg_z_scored_running_speeds"].iloc[0])
+            if np.nansum(running_speeds) > 0:
+                transition_indices = get_transition_trial_numbers(rolling_classifiers, transition_from=transition_from, transition_to=transition_to)
+
+                last_and_first_5_speeds_after_transition = np.zeros((len(transition_indices), 10))
+                last_and_first_5_speeds_after_transition[:,:] = np.nan
+
+                for i in range(len(transition_indices)):
+                    for j in range(len(last_and_first_5_speeds_after_transition[0])):
+                        speed_index = transition_indices[i]+j-5
+                        if (speed_index<len(running_speeds)) and (speed_index>0):
+                            last_and_first_5_speeds_after_transition[i,j] = running_speeds[speed_index]
+                last_and_first_5_speeds_after_transition = np.nanmean(last_and_first_5_speeds_after_transition, axis=0)
+                speed_profiles_all_cells.append(last_and_first_5_speeds_after_transition.tolist())
+        speed_profiles_all_cells = np.array(speed_profiles_all_cells)
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        ax.plot(np.arange(-4,6), np.nanmean(speed_profiles_all_cells, axis=0), color="black", linewidth=3)
+        ax.fill_between(np.arange(-4, 6), np.nanmean(speed_profiles_all_cells, axis=0)+stats.sem(speed_profiles_all_cells, axis=0, nan_policy="omit"),
+                        np.nanmean(speed_profiles_all_cells, axis=0)-stats.sem(speed_profiles_all_cells, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        #ax.set_xlim([0, 9])
+        ax.set_ylim(bottom=0)
+        ax.set_xlabel("Trial relative to transition", fontsize=20)
+        ax.set_ylabel("Avg trial speed (cm/s)", fontsize=20, labelpad=10)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.xaxis.set_tick_params(length=0)
+        ax.tick_params(axis='both', which='both', labelsize=25)
+        # plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+        plt.savefig(save_path + '/z_scored_speeds_between_transition_from_'+transition_from+'_to_'+transition_to+'_'+cells_str+'.png', dpi=300)
+        plt.close()
+    return
+
+def plot_trial_types_vs_modes(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    for cells, cells_str in zip([grid_cells, non_grid_cells], ["grid_cells", "non_grid_cells"]):
+        fig, ax = plt.subplots(figsize=(4,6))
+        groups = ["P", "D", "N"]
+        colors_lm = [Settings.allocentric_color,  Settings.egocentric_color, Settings.null_color]
+        objects = [0, 1, 2]
+        x_pos = np.arange(len(objects))
+        for object, x in zip(objects, x_pos):
+            bottom=0
+            for color, group in zip(colors_lm, groups):
+                trial_types = pandas_collumn_to_numpy_array(cells["behaviour_trial_types"])
+                rolling_classifiers = pandas_collumn_to_numpy_array(cells["rolling:classifier_by_trial_number"])
+                nan_mask = rolling_classifiers == "nan"
+                trial_types = trial_types[~nan_mask]
+                rolling_classifiers = rolling_classifiers[~nan_mask]
+
+                valid_rolling_classifiers = rolling_classifiers[trial_types == object]
+
+                count = len(valid_rolling_classifiers[valid_rolling_classifiers == group])
+                percent = (count/len(valid_rolling_classifiers))*100
+                ax.bar(x, percent, bottom=bottom, color=color, edgecolor=color)
+                bottom = bottom + percent
+
+        plt.xticks(x_pos, np.array(objects, dtype=np.str0), fontsize=15)
+        plt.ylabel("Percent of trials",  fontsize=25)
+        plt.xlim((-0.5, len(objects)-0.5))
+        plt.ylim((0,100))
+        ax.set_yticks([0,25,50,75,100])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        #plt.tight_layout()
+        plt.subplots_adjust(left=0.4)
+        ax.tick_params(axis='both', which='major', labelsize=30)
+        plt.savefig(save_path + '/trial_types_vs_modes_' + cells_str + '.png', dpi=200)
+        plt.close()
+    return
+
+
+def add_correlations_of_avg_rate_maps_during_GCnetwork_modes(combined_df):
+    correlations = []
+    for i in range(len(combined_df)):
+        global_grid_code = np.array(combined_df["rolling:grid_code_global"].iloc[i])
+        p_mask = global_grid_code=="P"
+        d_mask = global_grid_code=="D"
+        firing_rates = np.asarray(combined_df["fr_binned_in_space_smoothed"].iloc[i])
+
+        p_firing_rates_avg = np.nanmean(firing_rates[p_mask, :], axis=0)
+        d_firing_rates_avg = np.nanmean(firing_rates[d_mask, :], axis=0)
+        p_firing_rates_avg[np.isnan(p_firing_rates_avg)] = 0
+        d_firing_rates_avg[np.isnan(d_firing_rates_avg)] = 0
+
+        if np.shape(p_firing_rates_avg) == np.shape(d_firing_rates_avg):
+            corr = stats.pearsonr(p_firing_rates_avg.flatten(), d_firing_rates_avg.flatten())[0]
+            correlations.append(corr)
+        else:
+            correlations.append(np.nan)
+    combined_df["correlations_of_avg_rate_maps_during_GCnetwork_modes"] = correlations
+    return combined_df
+
+def plot_correlations_of_avg_rate_maps_during_GCnetwork_modes(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+
+    grid_fr_correlations = []
+    non_grid_fr_correlations = []
+    for session_id in np.unique(grid_cells["session_id_vr"]):
+        session_df = combined_df[combined_df["session_id_vr"] == session_id]
+        global_grid_code = np.array(session_df["rolling:grid_code_global"].iloc[0])
+        p_mask = global_grid_code=="P"
+        d_mask = global_grid_code=="D"
+        session_grid_cells = session_df[session_df["classifier"] == "G"]
+        session_non_grid_cells = session_df[session_df["classifier"] != "G"]
+
+        grid_cell_firing_rates = pandas_collumn_to_2d_numpy_array(session_grid_cells["fr_binned_in_space_smoothed"])
+        non_grid_cell_firing_rates = pandas_collumn_to_2d_numpy_array(session_non_grid_cells["fr_binned_in_space_smoothed"])
+
+
+        for i in range(len(grid_cell_firing_rates)):
+            p_firing_rates_avg = np.nanmean(grid_cell_firing_rates[i, p_mask, :], axis=0)
+            d_firing_rates_avg = np.nanmean(grid_cell_firing_rates[i, d_mask, :], axis=0)
+            p_firing_rates_avg[np.isnan(p_firing_rates_avg)] = 0
+            d_firing_rates_avg[np.isnan(d_firing_rates_avg)] = 0
+
+            if np.shape(p_firing_rates_avg) == np.shape(d_firing_rates_avg):
+                corr = stats.pearsonr(p_firing_rates_avg.flatten(), d_firing_rates_avg.flatten())[0]
+                grid_fr_correlations.append(corr)
+
+        for i in range(len(non_grid_cell_firing_rates)):
+            p_firing_rates_avg = np.nanmean(non_grid_cell_firing_rates[i, p_mask, :], axis=0)
+            d_firing_rates_avg = np.nanmean(non_grid_cell_firing_rates[i, d_mask, :], axis=0)
+            p_firing_rates_avg[np.isnan(p_firing_rates_avg)] = 0
+            d_firing_rates_avg[np.isnan(d_firing_rates_avg)] = 0
+
+            if np.shape(p_firing_rates_avg) == np.shape(d_firing_rates_avg):
+                corr = stats.pearsonr(p_firing_rates_avg.flatten(), d_firing_rates_avg.flatten())[0]
+                non_grid_fr_correlations.append(corr)
+
+    grid_fr_correlations = np.array(grid_fr_correlations)
+    non_grid_fr_correlations = np.array(non_grid_fr_correlations)
+
+    grid_fr_correlations = grid_fr_correlations[~np.isnan(grid_fr_correlations)]
+    non_grid_fr_correlations = non_grid_fr_correlations[~np.isnan(non_grid_fr_correlations)]
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.hist(grid_fr_correlations, bins=20, range=(-1,1), color="blue", density=True, alpha=0.5)
+    ax.hist(non_grid_fr_correlations, bins=20, range=(-1, 1), color="red", density=True, alpha=0.5)
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.xaxis.set_tick_params(labelbottom=False)
+    #ax.yaxis.set_tick_params(labelleft=False)
+    #ax.set_xticks([0,5,10])
+    #ax.set_yticks([0,5,10])
+    ax.set_xlim([-1,1])
+    #ax.set_ylim([0,10])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/correlation_hist_avg_rate_maps_during_GCnetwork_mode.png', dpi=300)
+    plt.close()
+
+    print("comping _correlation of avg rate maps_on_position_and_distance_trials according to grid cells, between grid and non grid cells"+
+          " p = ", str(stats.mannwhitneyu(x=grid_fr_correlations, y=non_grid_fr_correlations)[1]),
+          " t = ", str(stats.mannwhitneyu(x=grid_fr_correlations, y=non_grid_fr_correlations)[0]),
+          ", df1 = ",str(len(grid_fr_correlations)),
+          ", df2 = ",str(len(non_grid_fr_correlations)))
+
+    print("comping _correlation of avg rate maps_on_position_and_distance_trials according to grid cells, between grid and non grid cells, GC test vs 0"+
+          " p = ", str(stats.wilcoxon(x=grid_fr_correlations)[1]),
+          " t = ", str(stats.wilcoxon(x=grid_fr_correlations)[0]),
+          ", df = ",str(len(grid_fr_correlations)-1))
+
+    print(
+        "comping _correlation of avg rate maps_on_position_and_distance_trials according to grid cells, between grid and non grid cells, NGC test vs 0" +
+        " p = ", str(stats.wilcoxon(x=non_grid_fr_correlations)[1]),
+        " t = ", str(stats.wilcoxon(x=non_grid_fr_correlations)[0]),
+        ", df = ", str(len(non_grid_fr_correlations) - 1))
+
+    return
+
+def plot_proportion_change_in_si_between_PandD_vs_correlations_between_PandD(combined_df, save_path):
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    spatial_info_P_G = grid_cells["spatial_information_during_P"]
+    spatial_info_D_G = grid_cells["spatial_information_during_D"]
+    spatial_info_P_NG = non_grid_cells["spatial_information_during_P"]
+    spatial_info_D_NG = non_grid_cells["spatial_information_during_D"]
+
+    rate_map_correlations_G = grid_cells["correlations_of_avg_rate_maps_during_GCnetwork_modes"]
+    rate_map_correlations_NG = non_grid_cells["correlations_of_avg_rate_maps_during_GCnetwork_modes"]
+
+    proportion_change_in_SI_G = (spatial_info_P_G - spatial_info_D_G) / spatial_info_P_G
+    proportion_change_in_SI_NG = (spatial_info_P_NG - spatial_info_D_NG) / spatial_info_P_NG
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    #ax.plot(np.arange(-4,4), np.arange(-4,4), linestyle="dashed", color="black")
+    ax.scatter(proportion_change_in_SI_NG, rate_map_correlations_NG, marker="o", s=40, facecolors=np.array([255/256, 127/256, 14/256, 0.75]).reshape(1,4), linewidths=0.5, edgecolors="black")
+    ax.scatter(proportion_change_in_SI_G, rate_map_correlations_G, marker="o", s=40, facecolors=np.array([31/256, 119/256, 180/256, 0.75]).reshape(1,4), linewidths=0.5,  edgecolors="black")
+    #plot_regression(ax, spatial_info_P_NG[not_nan_mask_NG], spatial_info_D_NG[not_nan_mask_NG], c="tab:orange", y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    #plot_regression(ax, spatial_info_P_G[not_nan_mask_G], spatial_info_D_G[not_nan_mask_G], c="tab:blue", y_text_pos=0.8, x_test_min=0, x_test_max=10)
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.xaxis.set_tick_params(labelbottom=False)
+    #ax.yaxis.set_tick_params(labelleft=False)
+    #ax.set_xticks([0,5,10])
+    #ax.set_yticks([0,5,10])
+    #ax.set_xlim([0,10])
+    ax.set_ylim([-1,1])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/proportion_change_in_si_between_PandD_vs_correlations_between_PandD.png', dpi=300)
+    plt.close()
+    return
+
+
+
+
+def plot_spatial_information_during_dominant_PandD_grid_modes(combined_df, save_path):
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    non_grid_cells = combined_df[combined_df["classifier"] != "G"]
+
+    spatial_info_P_G = grid_cells["spatial_information_during_P"]
+    spatial_info_D_G = grid_cells["spatial_information_during_D"]
+    spatial_info_P_NG = non_grid_cells["spatial_information_during_P"]
+    spatial_info_D_NG = non_grid_cells["spatial_information_during_D"]
+
+    not_nan_mask_G = ~np.isnan(spatial_info_P_G) & ~np.isnan(spatial_info_D_G)
+    not_nan_mask_NG = ~np.isnan(spatial_info_P_NG) & ~np.isnan(spatial_info_D_NG)
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(np.arange(0,11), np.arange(0,11), linestyle="dashed", color="black")
+    ax.scatter(spatial_info_P_NG[not_nan_mask_NG], spatial_info_D_NG[not_nan_mask_NG], marker="o", s=40, facecolors=np.array([255/255,127/255,14/255, 1]).reshape(1,4), linewidths=0.5, edgecolors="black")
+    ax.scatter(spatial_info_P_G[not_nan_mask_G], spatial_info_D_G[not_nan_mask_G], marker="o", s=40, facecolors=np.array([0/255, 154/255, 255/255, 1]).reshape(1,4), linewidths=0.5,  edgecolors="black")
+    #plot_regression(ax, spatial_info_P_NG[not_nan_mask_NG], spatial_info_D_NG[not_nan_mask_NG], c=np.array([255/255,127/255,14/255, 1]).reshape(1,4), y_text_pos=0.9, x_test_min=0, x_test_max=10)
+    #plot_regression(ax, spatial_info_P_G[not_nan_mask_G], spatial_info_D_G[not_nan_mask_G], c=np.array([0/255, 154/255, 255/255, 1]).reshape(1,4), y_text_pos=0.8, x_test_min=0, x_test_max=10)
+
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.xaxis.set_tick_params(labelbottom=False)
+    #ax.yaxis.set_tick_params(labelleft=False)
+    ax.set_xticks([0,5,10])
+    ax.set_yticks([0,5,10])
+    ax.set_xlim([0,10])
+    ax.set_ylim([0,10])
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    plt.savefig(save_path + '/spatial_info_P_vs_spatial_info_D.png', dpi=300)
+    plt.close()
+
+    print("comping _spatial_information_on_position_and_distance_trials according to grid cells, NG"+
+          " p = ", str(stats.wilcoxon(x=spatial_info_P_NG[not_nan_mask_NG], y=spatial_info_D_NG[not_nan_mask_NG])[1]),
+          " t = ", str(stats.wilcoxon(x=spatial_info_P_NG[not_nan_mask_NG], y=spatial_info_D_NG[not_nan_mask_NG])[0]),
+          ", df = ",str(len(spatial_info_P_NG[not_nan_mask_NG])-1))
+
+    print("comping _spatial_information_on_position_and_distance_trials according to grid cells, G"+
+          " p = ", str(stats.wilcoxon(x=spatial_info_P_G[not_nan_mask_G], y=spatial_info_D_G[not_nan_mask_G])[1]),
+          " t = ", str(stats.wilcoxon(x=spatial_info_P_G[not_nan_mask_G], y=spatial_info_D_G[not_nan_mask_G])[0]),
+          ", df = ",str(len(spatial_info_P_NG[not_nan_mask_NG])-1))
+
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    hist_G, bin_edges = np.histogram((spatial_info_P_G[not_nan_mask_G]-spatial_info_D_G[not_nan_mask_G])/spatial_info_P_G[not_nan_mask_G], density=True, bins=20, range=(-2,2))
+    hist_NG, bin_edges = np.histogram((spatial_info_P_NG[not_nan_mask_NG]-spatial_info_D_NG[not_nan_mask_NG])/spatial_info_P_NG[not_nan_mask_NG], density=True, bins=20, range=(-2,2))
+    bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+    ax.axvline(x=0, color="black")
+    ax.plot(bin_centres, hist_G, color="blue")
+    ax.plot(bin_centres, hist_NG, color="red")
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    plt.savefig(save_path + '/proportion_of_spatial_information_during_D_over_P.png', dpi=300)
+    plt.close()
+
+
+
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(2.5, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+
+    G_hist, bin_edges = np.histogram((spatial_info_P_G[not_nan_mask_G]-spatial_info_D_G[not_nan_mask_G])/spatial_info_P_G[not_nan_mask_G], bins=10000, density=True, range=(-5,5))
+    G_hist, bin_edges = np.histogram(spatial_info_P_G[not_nan_mask_G]-spatial_info_D_G[not_nan_mask_G], bins=10000, density=True, range=(-5,5))
+    dx = bin_edges[1] - bin_edges[0]
+    G_hist = np.cumsum(G_hist) * dx
+    ax.plot(bin_edges[1:], G_hist, linewidth=2, color=np.array([0/255, 154/255, 255/255, 1]).reshape(1,4))
+
+    NG_hist, bin_edges = np.histogram((spatial_info_P_NG[not_nan_mask_NG]-spatial_info_D_NG[not_nan_mask_NG])/spatial_info_P_NG[not_nan_mask_NG], bins=10000, density=True, range=(-5,5))
+    NG_hist, bin_edges = np.histogram(spatial_info_P_NG[not_nan_mask_NG]-spatial_info_D_NG[not_nan_mask_NG], bins=10000, density=True, range=(-5,5))
+    dx = bin_edges[1] - bin_edges[0]
+    NG_hist = np.cumsum(NG_hist) * dx
+    ax.plot(bin_edges[1:], NG_hist, linewidth=2, color=np.array([255/255,127/255,14/255, 1]).reshape(1,4))
+
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    #ax.set_xticks([0,1,2])
+    ax.axvline(x=0, color="black", linestyle="dashed")
+    ax.set_yticks([0,1])
+    ax.set_xlim([-5,5])
+    ax.set_ylim([0,1])
+    # change all spines
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.savefig(save_path + '/spatial_info_P_vs_spatial_info_D_hist.png', dpi=300)
+    plt.close()
+
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(2.5, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+
+    colors = [np.array([0/255, 154/255, 255/255, 1]).reshape(1,4), np.array([255/255,127/255,14/255, 1]).reshape(1,4)]
+    data = [np.asarray((spatial_info_P_G[not_nan_mask_G] - spatial_info_D_G[not_nan_mask_G])*100 / spatial_info_P_G[not_nan_mask_G]),
+            np.asarray((spatial_info_P_NG[not_nan_mask_NG]-spatial_info_D_NG[not_nan_mask_NG])*100 / spatial_info_P_NG[not_nan_mask_NG])]
+    ax.axhline(y=0, color="black",linestyle="dashed")
+    boxprops = dict(linewidth=2, color='k')
+    medianprops = dict(linewidth=2, color='k')
+    capprops = dict(linewidth=2, color='k')
+    whiskerprops = dict(linewidth=2, color='k')
+    box = ax.boxplot(data, positions=[1,3], widths=1, boxprops=boxprops, medianprops=medianprops,
+                     whiskerprops=whiskerprops, capprops=capprops, patch_artist=True, showfliers=False, zorder=2)
+    #for i, x in enumerate([1,2]):
+    #    ax.scatter((np.ones(len(data[i]))*x)+np.random.uniform(low=-0.1, high=+0.1,size=len(data[i])), data[i], color="black", alpha=0.3,zorder=1)
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xticks([1,3])
+    ax.set_xticklabels(["G", "NG"])
+    ax.set_yticks([-100, 0, 100])
+    ax.set_ylim([-150, 150])
+    ax.set_xlim([0, 4])
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(2)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.xaxis.set_tick_params(length=0)
+    ax.tick_params(axis='both', which='both', labelsize=15)
+    plt.subplots_adjust(hspace = None, wspace = None,  bottom = None, left = 0.4, right =None, top = None)
+    plt.savefig(save_path + '/spatial_info_P_vs_spatial_info_D_boxplot.png', dpi=300)
+    plt.close()
+
+    print("comparing % change in si position_vs_distance according to grid cells, G vs NG"+
+          " p = ", str(stats.mannwhitneyu(x=data[0], y=data[1])[1]),
+          " t = ", str(stats.mannwhitneyu(x=data[0], y=data[1])[0]),
+          ", df1 = ",str(len(data[0])),
+          ", df2 = ",str(len(data[0])))
+
+    print("comparing % change in si position_vs_distance according to grid cells, G vs null"+
+          " p = ", str(stats.wilcoxon(x=data[0])[1]),
+          " t = ", str(stats.wilcoxon(x=data[0])[0]),
+          ", df = ",str(len(data[0])-1))
+
+    print("comparing % change in si position_vs_distance according to grid cells, NG vs null"+
+          " p = ", str(stats.wilcoxon(x=data[1])[1]),
+          " t = ", str(stats.wilcoxon(x=data[1])[0]),
+          ", df = ",str(len(data[1])-1))
+    return
+
+def plot_field_distributions(combined_df, save_path):
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    combined_df = combined_df[combined_df["classifier"] == "G"]
+
+    field_dist = []
+    for i in range(len(combined_df)):
+        field_locations = np.array(combined_df["field_locations"].iloc[i])
+        hist, bin_edges = np.histogram(field_locations, bins=200, range=(0,200), density=True)
+        field_dist.append(hist)
+    bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+
+    field_dist = np.array(field_dist)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    ax.plot(bin_centres, np.nanmean(field_dist, axis=0), color="black", linewidth=3)
+    ax.fill_between(bin_centres, np.nanmean(field_dist, axis=0) - stats.sem(field_dist, axis=0, nan_policy="omit"),
+                                 np.nanmean(field_dist, axis=0) + stats.sem(field_dist, axis=0, nan_policy="omit"), color="black", alpha=0.3)
+    style_track_plot(ax, 200)
+    plt.xlim(0, 200)
+    tick_spacing = 100
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    Edmond.plot_utility2.style_vr_plot(ax)
+    #ax.set_ylim([-0.05, 0.15])
+    #ax.set_yticks([0, 0.1])
+    plt.locator_params(axis='y', nbins=3)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.2, left=0.2)
+    plt.savefig(save_path + '/field_dist.png',dpi=300)
+    plt.close()
+    return
+
+def add_network_stability(cells_df):
+    proportion_network_encoding_position = []
+    proportion_network_encoding_distance = []
+    proportion_network_encoding_null = []
+    for index, cell_row in cells_df.iterrows():
+        cell_row = cell_row.to_frame().T.reset_index(drop=True)
+        network_code = cell_row["rolling:code_global"].iloc[0]
+        network_code = network_code[network_code != ""]
+
+        proportion_encoding_position = len(network_code[network_code == "P"]) / len(network_code)
+        proportion_encoding_distance = len(network_code[network_code == "D"]) / len(network_code)
+        proportion_encoding_null = len(network_code[network_code == "N"]) / len(network_code)
+
+        proportion_network_encoding_position.append(proportion_encoding_position)
+        proportion_network_encoding_distance.append(proportion_encoding_distance)
+        proportion_network_encoding_null.append(proportion_encoding_null)
+
+    cells_df["proportion_network_encoding_position"] = proportion_network_encoding_position
+    cells_df["proportion_network_encoding_distance"] = proportion_network_encoding_distance
+    cells_df["proportion_network_encoding_null"] = proportion_network_encoding_null
+    return cells_df
+
 def main():
     print('-------------------------------------------------------------')
     print("hello")
@@ -7775,52 +10027,86 @@ def main():
     odds_ratio_data = pd.read_csv("/mnt/datastore/Harry/Vr_grid_cells/odds_ratio_glmer_model.csv")
     plot_odds_ratio(odds_ratio_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/fast_hit_analysis")
 
-
     combined_df = pd.DataFrame()
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
     combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
 
-    #combined_df = combined_df[combined_df["session_id"] == "M11_D36_2021-06-28_12-04-36"]
-
-    #combined_df = pd.DataFrame()
-    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort6.pkl")], ignore_index=True)
-    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort7.pkl")], ignore_index=True)
-    #combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/test_concats/combined_cohort8.pkl")], ignore_index=True)
-
+    # remove artefacts, low firing rates in the open field, sessions with non 200cm track lengths and sessions with less than 10 trials
     combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
+    combined_df = combined_df[combined_df["mean_firing_rate_of"] > 0.2] # Hz
     combined_df = combined_df[combined_df["track_length"] == 200]
     combined_df = combined_df[combined_df["n_trials"] >= 10]
     combined_df = add_lomb_classifier(combined_df,suffix="")
     combined_df = add_peak_width(combined_df)
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
 
     # remove mice without any grid cells
     combined_df = combined_df[combined_df["mouse"] != "M2"]
     combined_df = combined_df[combined_df["mouse"] != "M4"]
     combined_df = combined_df[combined_df["mouse"] != "M15"]
+
+    # count how many clusters are in each recording
+    for recording in np.unique(combined_df["session_id_vr"]):
+        print(recording, " has ", str(len(combined_df[combined_df["session_id_vr"] == recording])), " clusters")
+
+    grid_cells = combined_df[combined_df["classifier"] == "G"]
+    print("There is ", len(np.unique(combined_df["mouse"])), " mice in the dataset")
+    print(np.unique(combined_df["mouse"]))
     print("There is ", len(combined_df), " clusters in the dataset")
     print("There is ", len(np.unique(combined_df["session_id"])), " sessions in this dataset")
+
+    print("There is ", len(grid_cells), " grid clusters in the dataset")
+    print("There is ", len(np.unique(grid_cells["session_id"])), " sessions in this dataset with grid cells")
+
+    combined_df = add_network_stability(combined_df)
+    all_networks_df = drop_duplicate_sessions(combined_df)
+    stable_networks_df = all_networks_df[((all_networks_df["proportion_network_encoding_position"] >= 0.85) |
+                                          (all_networks_df["proportion_network_encoding_distance"] >= 0.85))]
+    unstable_networks_df = all_networks_df[((all_networks_df["proportion_network_encoding_position"] < 0.85) &
+                                          (all_networks_df["proportion_network_encoding_distance"] < 0.85))]
+
+    #================ for R =============================================================#
+    stable_networks_for_R_shortform = generate_short_form_for_R_by_network_session(stable_networks_df)
+    stable_networks_for_R_longform = generate_long_form_for_R_by_network_session(stable_networks_df)
+    stable_networks_for_R_shortform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/stable_networks_for_R_shortform.pkl")
+    stable_networks_for_R_longform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/stable_networks_for_R_longform.pkl")
+    unstable_networks_for_R_shortform = generate_short_form_for_R_by_network_epochs(unstable_networks_df)
+    unstable_networks_for_R_longform = generate_long_form_for_R_by_network_epochs(unstable_networks_df)
+    unstable_networks_for_R_shortform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/unstable_networks_for_R_shortform.pkl")
+    unstable_networks_for_R_longform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/unstable_networks_for_R_longform.pkl")
+    all_networks_for_R_shortform = generate_short_form_for_R_by_network_epochs(all_networks_df)
+    all_networks_for_R_longform = generate_long_form_for_R_by_network_epochs(all_networks_df)
+    all_networks_for_R_shortform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_networks_for_R_shortform.pkl")
+    all_networks_for_R_longform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_networks_for_R_longform.pkl")
+
+    all_cells_for_R_longform = generate_long_form_for_R(all_networks_df)
+    all_cells_for_R_longform.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_cells_for_R_longform.pkl")
+    all_cells_for_R_longform_by_session = generate_long_form_for_R_by_session(stable_networks_df)
+    all_cells_for_R_longform_by_session.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_cells_for_R_longform_by_session.pkl")
+    #=====================================================================================#
 
     '''
     # ===================== for R ========================================================= #
     combined_for_R = combined_df.copy()
     combined_for_R = combined_for_R[combined_for_R["Lomb_classifier_"] != "Unclassified"]
-    combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
+    #combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
     combined_for_R = generate_long_form_for_R(combined_for_R)
     combined_for_R.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_df_for_R.pkl")
 
     combined_for_R = combined_df.copy()
     combined_for_R = combined_for_R[combined_for_R["Lomb_classifier_"] != "Unclassified"]
-    combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
+    #combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
     combined_for_R = generate_short_form_for_R_by_session(combined_for_R)
     combined_for_R.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_df_for_R_shortform_by_session.pkl")
 
     combined_for_R = combined_df.copy()
     combined_for_R = combined_for_R[combined_for_R["Lomb_classifier_"] != "Unclassified"]
-    combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
+    #combined_for_R = combined_for_R[combined_for_R["classifier"] == "G"]
     combined_for_R = generate_short_form_for_R_by_trial(combined_for_R)
     combined_for_R.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_df_for_R_shortform_by_trial.pkl")
-
+   
+    
     combined_for_R["p_b_hit"] = get_percentage_from_rolling_classification(combined_for_R, code="P", tt=0)
     combined_for_R["d_b_hit"] = get_percentage_from_rolling_classification(combined_for_R, code="D", tt=0)
     combined_for_R["n_b_hit"] = get_percentage_from_rolling_classification(combined_for_R, code="N", tt=0)
@@ -7854,32 +10140,47 @@ def main():
 
 
     save_path = "/mnt/datastore/Harry/Vr_grid_cells/lomb_classifiers/fast_hit_analysis"
+    #plot_agreement_between_grid_and_non_grids(combined_df, save_path=save_path)
+
+    #plot_correlations_of_avg_rate_maps_during_GCnetwork_modes(combined_df,save_path=save_path)
+    #plot_spatial_information_during_dominant_PandD_grid_modes(combined_df, save_path=save_path)
+    #combined_df = add_correlations_of_avg_rate_maps_during_GCnetwork_modes(combined_df)
+    #plot_proportion_change_in_si_between_PandD_vs_correlations_between_PandD(combined_df, save_path=save_path)
+    #plot_trial_types_vs_modes(combined_df,save_path=save_path)
+    #plot_spatial_information_on_position_and_distance_trials(combined_df, save_path=save_path, fig_size=(3.5,6))
+    #plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_path=save_path, fig_size=(3.5,6))
+
+
+
+    #plot_firing_rate_position_to_distance_epochs(combined_df, save_path=save_path, transition_from="P", transition_to="D")
+    #plot_firing_rate_position_to_distance_epochs(combined_df, save_path=save_path, transition_from="D", transition_to="P")
+    #plot_running_speed_position_to_distance_epochs(combined_df, save_path=save_path, transition_from="P", transition_to="D")
+    #plot_running_speed_position_to_distance_epochs(combined_df, save_path=save_path, transition_from="D", transition_to="P")
+    #plot_speeds_between_position_and_distance_epochs(combined_df, save_path=save_path)
     #read_df(combined_df)
     # Figure 2 population level plots
     fig_size = (3.5,6)
-    #plot_mean_firing_rates_on_position_and_distance_trials(combined_df, save_path=save_path, fig_size=fig_size)
-    #plot_spatial_information_on_position_and_distance_trials(combined_df, save_path=save_path, fig_size=fig_size)
+
     #plot_comparison_grids_vs_non_grids_during_position_and_distance_epochs(combined_df, save_path=save_path, fig_size=fig_size)
-    #plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df, save_path=save_path, fig_size=(6,4))
+    #plot_average_firing_rate_map_during_position_and_distance_epochs(combined_df, save_path=save_path, fig_size=(6,4), z_scored=True)
 
     # compare
 
-    plot_lomb_classifiers_proportions(combined_df, suffix="", save_path=save_path)
+    #plot_lomb_classifiers_proportions(combined_df, suffix="", save_path=save_path)
     #plot_lomb_classifiers_vs_shuffle(combined_df, suffix="", save_path=save_path)
     #plot_lomb_classifiers_vs_shuffle_non_grid_cells(combined_df, suffix="", save_path=save_path)
     #plot_lomb_classifiers_vs_shuffle_grid_cells(combined_df, suffix="", save_path=save_path)
 
     #plot_lomb_classifier_powers_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
     #plot_lomb_classifier_mfr_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
-    #plot_lomb_classifier_spatinfo_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
+    #plot_lomb_classifier_spatinfo_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size, score="spatial_information_score_Isec_vr")
+    #plot_lomb_classifier_spatinfo_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size, score="spatial_information_score_Ispike_vr")
     #plot_lomb_classifier_peak_width_vs_groups(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
     #plot_lomb_classifier_mfr_vs_groups_vs_open_field(combined_df, suffix="", save_path=save_path, fig_size=fig_size)
 
     # Figure 3 plots remapping
     #plot_rolling_lomb_block_sizes(combined_df, save_path=save_path)
     #plot_rolling_lomb_block_lengths_vs_shuffled(combined_df, save_path=save_path)
-
-
 
 
     #plot_percentage_encoding_by_trial_category_each_mouse(combined_df, save_path=save_path)
@@ -7891,9 +10192,22 @@ def main():
     #plot_number_of_trials_remapped(combined_df, save_path=save_path, account_for="animal")
 
     # stable cell analysis
-    #plot_p_hit_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_stop_histogram_for_stable_sessions(stable_networks_df, save_path=save_path)
+    plot_percentage_hits_for_stable_sessions(stable_networks_df, save_path=save_path)
+    # remap cell analysis
+    #plot_field_distributions(combined_df, save_path=save_path)
+    #plot_position_coding_predictions_of_first_stop_locations(combined_df,save_path=save_path)
+    plot_percentage_encoding_by_trial_category_each_mouse_from_global(all_networks_df, save_path=save_path)
+    #plot_percentage_encoding_for_trials(combined_df, save_path=save_path)
+
+    plot_stop_histogram_for_trials(unstable_networks_df, save_path=save_path)
+    plot_percentage_hits_for_trials(unstable_networks_df, save_path=save_path)
+
     #plot_stop_histogram_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
-    plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
+    #plot_percentage_hits_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
+    #plot_percentage_hits_for_stable_encoding_non_grid_cells(combined_df, save_path=save_path)
+
+    # plot_p_hit_for_stable_encoding_grid_cells(combined_df, save_path=save_path)
     #plot_stop_variability_stable(combined_df, save_path=save_path)
     #plot_number_of_trials_stable(combined_df, save_path=save_path)
     #plot_stop_peak_stop_location_and_height_stable(combined_df, save_path=save_path)
@@ -7903,13 +10217,14 @@ def main():
     # remap analysis
     #plot_p_hit_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
     plot_percentage_hits_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
-    #plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
+    plot_percentage_hits_for_remapped_encoding_non_grid_cells(combined_df, save_path=save_path)
+    plot_stop_histogram_for_remapped_encoding_grid_cells(combined_df, save_path=save_path)
     #plot_stop_variability_remapped(combined_df, save_path=save_path, account_for="cell")
     #plot_number_of_trials_remapped(combined_df, save_path=save_path, account_for="cell")
     #plot_stop_peak_stop_location_and_height_remapped(combined_df, save_path=save_path)
 
     plot_percentage_encoding_by_trial_category(combined_df, save_path=save_path)
-
+    plot_percentage_encoding_by_trial_category_non_grid_cells(combined_df, save_path=save_path)
     ###
     #for mouse_id in np.unique(combined_df["mouse"]):
     #    print("analysing by mouse ", mouse_id)

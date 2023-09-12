@@ -265,11 +265,24 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("average_rolling_centre_trials_for_multiple_grid_cells")
                     if "fr_binned_in_space_smoothed" in list(spatial_firing):
                         collumn_names_to_keep.append("fr_binned_in_space_smoothed")
+                    if "avg_z_scored_firing_rates" in list(spatial_firing):
+                        collumn_names_to_keep.append("avg_z_scored_firing_rates")
+                    if "avg_z_scored_running_speeds" in list(spatial_firing):
+                        collumn_names_to_keep.append("avg_z_scored_running_speeds")
+                    if "rolling:code_global" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:code_global")
+                    if "rolling:grid_code_global" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:grid_code_global")
+                    if "field_locations" in list(spatial_firing):
+                        collumn_names_to_keep.append("field_locations")
+                    if "field_trial_numbers" in list(spatial_firing):
+                        collumn_names_to_keep.append("field_trial_numbers")
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
                     spatial_firing = spatial_firing.rename(columns={'mean_firing_rate': ('mean_firing_rate_vr')})
-                    spatial_firing = spatial_firing.rename(columns={'spatial_information_score': ('spatial_information_score_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'spatial_information_score_Isec': ('spatial_information_score_Isec_vr')})
+                    spatial_firing = spatial_firing.rename(columns={'spatial_information_score_Ispike': ('spatial_information_score_Ispike_vr')})
                     spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_vr')})
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_vr')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_vr')})

@@ -322,6 +322,30 @@ def adjust_pvals(p_values):
 def main():
 
     print('-------------------------------------------------------------')
+    spatial_firing = pd.read_pickle("/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/mountainsort4/DataFrames/spatial_firing.pkl")
+
+    # index 101 corresponds to cluster id 118
+    # index 0 corresponds to trial number 1
+    fr_time_binned = np.array(spatial_firing['fr_time_binned_smoothed'][101][0])
+    firing_times = np.array(spatial_firing['firing_times'][101])[np.array(spatial_firing['trial_number'][101])==1]
+
+    time_bins = np.arange(0, 20000000, settings.time_bin_size) # 100ms time bins
+
+    spike_times = firing_times/settings.sampling_rate # convert to seconds
+
+    # count the spikes in each time bin and normalise to seconds
+    fr_time_bin_means, bin_edges = np.histogram(spike_times, time_bins)
+    bin_centres = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(3, 3, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    ax.plot(bin_centres[:len(fr_time_binned)], fr_time_binned[:len(fr_time_binned)], color="tab:orange", linewidth=4)
+    ax.plot(bin_centres[:len(fr_time_binned)], fr_time_bin_means[:len(fr_time_binned)]/settings.time_bin_size, color="tab:blue")
+    ax.plot(spike_times, np.zeros(len(spike_times)) + max(fr_time_bin_means[:len(fr_time_binned)]/settings.time_bin_size) + 1, 'k|', alpha=0.5, label='spikes')
+    plt.savefig('/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/mountainsort4/Figures/tmp.png', dpi=300)
+    plt.close()
+
     adjust_pvals(p_values=[0.26, 0.03, 0.001])
 
     plot_waveforms_again(waveform_path="/home/ubuntu/to_sort/recordings/tmp/waveform_arrays",

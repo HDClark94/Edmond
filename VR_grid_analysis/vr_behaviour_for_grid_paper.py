@@ -3642,15 +3642,20 @@ def process_recordings(vr_recording_path_list, all_behaviour, cohort):
             track_length = get_track_length(recording)
             session_number = int(session_id.split("_")[1].split("D")[-1])
 
+            position_data = pd.read_pickle(recording + "/MountainSort/DataFrames/position_data.pkl")
             processed_position_data = pd.read_pickle(recording+"/MountainSort/DataFrames/processed_position_data.pkl")
-            processed_position_data = add_avg_trial_speed(processed_position_data)
-            processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=track_length)
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=track_length)
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=track_length)
+            position_data = add_speed_per_100ms(position_data, track_length=get_track_length(recording))
+            position_data = add_stopped_in_rz(position_data, track_length=get_track_length(recording))
+            position_data = add_bin_time(position_data)
+            processed_position_data = add_hit_according_to_blender(processed_position_data, position_data)
+            processed_position_data = add_avg_track_speed2(processed_position_data, position_data, track_length=get_track_length(recording))
+            processed_position_data, _ = add_hit_miss_try4(processed_position_data, position_data, track_length=get_track_length(recording))
+            processed_position_data = curate_stops(processed_position_data, track_length=get_track_length(recording))
             processed_position_data["session_number"] = session_number
             processed_position_data["mouse_id"] = mouse_id
             processed_position_data["track_length"] = track_length
             processed_position_data["cohort"] = cohort
+            processed_position_data["session_id"] = session_id
 
             all_behaviour = pd.concat([all_behaviour, processed_position_data], ignore_index=True)
             print("successfully processed and saved vr_grid analysis on "+recording)
@@ -4458,10 +4463,10 @@ def plot_speeds(processed_position_data, save_path):
             plt.close()
     return
 
-def add_speed_per_100ms(position_data):
+def add_speed_per_100ms(position_data, track_length):
     positions = np.array(position_data["x_position_cm"])
     trial_numbers = np.array(position_data["trial_number"])
-    distance_travelled = positions+(200*(trial_numbers-1))
+    distance_travelled = positions+(track_length*(trial_numbers-1))
 
     change_in_distance_travelled = np.concatenate([np.zeros(1), np.diff(distance_travelled)], axis=0)
 
@@ -4473,39 +4478,140 @@ def running_mean(x, N):
    cumsum = np.cumsum(np.insert(x, 0, 0))
    return (cumsum[N:] - cumsum[:-N]) / N
 
+def plot_stop_histogram_for_hmt(all_behaviour200cm_tracks, save_path):
+    gauss_kernel = Gaussian1DKernel(2)
+
+    for tt in [0,1,2]:
+        speed_histogram = plt.figure(figsize=(6, 4))
+        ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+
+        trial_type_data = all_behaviour200cm_tracks[all_behaviour200cm_tracks["trial_type"] == tt]
+        for hmt in ["hit", "try", "miss"]:
+            hmt_data = trial_type_data[trial_type_data["hit_miss_try"] == hmt]
+
+
+            stop_counts = np.zeros((len(hmt_data), 200)); stop_counts[:, :] = np.nan
+
+            i = 0
+            for index, trial_row in hmt_data.iterrows():
+                trial_row = trial_row.to_frame().T.reset_index(drop=True)
+                trial_stop_locations = pandas_collumn_to_numpy_array(trial_row['stop_location_cm'])
+
+                stop_in_trial_bins, bin_edges = np.histogram(trial_stop_locations, bins=200,
+                                                             range=[0, 200])
+                stop_counts[i, :] = stop_in_trial_bins
+                i+=1
+
+            average_stops = np.nanmean(stop_counts, axis=0)
+            average_stops_se = stats.sem(stop_counts, axis=0, nan_policy="omit")
+
+            average_stops = convolve(average_stops, gauss_kernel)
+            average_stops_se = convolve(average_stops_se, gauss_kernel)
+
+            bin_centres = np.arange(0.5, 200.5, 1)
+            ax.plot(bin_centres, average_stops, color=get_hmt_color(hmt), linewidth=4)
+            ax.fill_between(bin_centres, average_stops+average_stops_se, average_stops
+                            -average_stops_se, color=get_hmt_color(hmt), alpha=0.3)
+
+        if tt == 0:
+            style_track_plot(ax, 200)
+        else:
+            style_track_plot_no_RZ(ax, 200)
+        plt.xlim(0, 200)
+        plt.ylim(0, 0.2)
+        ax.set_yticks([0,0.1,0.2])
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        tick_spacing = 100
+        plt.xticks(fontsize=25)
+        plt.yticks(fontsize=25)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        #x_max = 0.2
+        Edmond.plot_utility2.style_vr_plot(ax, x_max=None)
+        plt.subplots_adjust(bottom=0.2, left=0.2)
+        plt.savefig(save_path + str(tt)+ 'stop_histogram.png', dpi=300)
+        plt.close()
+    return
+
+def plot_trial_speeds_hmt_2(processed_position_data, save_path):
+    # remove low speed trials
+    processed_position_data = processed_position_data[processed_position_data["hit_miss_try"] != "rejected"]
+    session_avg = []
+    for session_id in np.unique(processed_position_data["session_id"]):
+        session_processed_position_data = processed_position_data[processed_position_data["session_id"] == session_id]
+        session_speed_profiles = pandas_collumn_to_2d_numpy_array(session_processed_position_data['speeds_binned_in_space_smoothed'])
+        avg_session_speed_profile = np.nanmean(session_speed_profiles, axis=0)
+        session_avg.append(avg_session_speed_profile.tolist())
+    session_avg = np.array(session_avg)
+
+    locations = np.array(processed_position_data['position_bin_centres'].iloc[0])
+
+    speed_histogram = plt.figure(figsize=(6, 4))
+    ax = speed_histogram.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    for i in range(len(session_avg)):
+        ax.plot(locations, session_avg[i], color="grey", linewidth=2,alpha=0.5)
+
+    example_session_processed_position_data = processed_position_data[processed_position_data["session_id"] == 'M11_D36_2021-06-28_12-04-36']
+    example_session_speed_profiles = pandas_collumn_to_2d_numpy_array(example_session_processed_position_data['speeds_binned_in_space_smoothed'])
+    example_avg_session_speed_profile = np.nanmean(session_speed_profiles, axis=0)
+    ax.plot(locations, example_avg_session_speed_profile, color="magenta", linewidth=2)
+
+    ax.plot(locations, np.nanmean(session_avg, axis=0), color="black", linewidth=4)
+    ax.axhline(y=4.7, color="black", linestyle="dashed", linewidth=2)
+    #plt.ylabel('Speed (cm/s)', fontsize=25, labelpad=10)
+    #plt.xlabel('Location (cm)', fontsize=25, labelpad=10)
+    plt.xlim(0, 200)
+    ax.set_yticks([0, 50, 100])
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    style_track_plot(ax, 200)
+    tick_spacing = 100
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+    x_max = 115
+    Edmond.plot_utility2.style_vr_plot(ax, x_max)
+    plt.subplots_adjust(bottom=0.2, left=0.2)
+    plt.savefig(save_path + '/avg_session_speed_profile.png', dpi=300)
+    plt.close()
+    return
+
 
 def main():
     print('-------------------------------------------------------------')
 
-    processed_position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/processed_position_data.pkl")
-    position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/position_data.pkl")
-    position_data = add_speed_per_100ms(position_data)
+    #processed_position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/processed_position_data.pkl")
+    #position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/position_data.pkl")
+    #position_data = add_speed_per_100ms(position_data)
 
-    plot_speeds_from_processed_position_data_and_position_data(processed_position_data, position_data,
-                                                               save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
-    plot_speeds(processed_position_data, save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
-    '''
+    #plot_speeds_from_processed_position_data_and_position_data(processed_position_data, position_data,
+    #                                                           save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
+    #plot_speeds(processed_position_data, save_path ="/mnt/datastore/Harry/Vr_grid_cells/behaviour/M11_D36_2021-06-28_12-04-36/")
+
     # give a path for a directory of recordings or path of a single recording
-    all_behaviour = pd.DataFrame()
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=6)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=7)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=8)
-    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M2"]
-    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M4"]
-    all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M15"]
+    #all_behaviour = pd.DataFrame()
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=6)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=7)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=8)
+    #all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M2"]
+    #all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M4"]
+    #all_behaviour = all_behaviour[all_behaviour["mouse_id"] != "M15"]
 
-    # save dataframes
-    all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
-    all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
-    '''
+    #save dataframes
+    #all_behaviour[all_behaviour["track_length"] == 200].to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
+    #all_behaviour.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
 
     # load dataframe
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
-    meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
+    #meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
 
+    plot_trial_speeds_hmt_2(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/")
+
+
+    plot_stop_histogram_for_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/")
     plot_performance_between_different_trial_type_schemes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
 
     plot_performance_between_session_with_probes_vs_session_without_probes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")

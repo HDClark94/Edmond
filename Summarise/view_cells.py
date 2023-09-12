@@ -307,13 +307,71 @@ def plot_snrs_by_hmt(vr_paths, save_path, condition, combined_df):
     plt.close()
 
 
+def plot_fig4_combined(vr_paths, save_path, condition=None, combined_df=None):
+    rc = {"axes.spines.left" : False,
+          "axes.spines.right" : False,
+          "axes.spines.bottom" : False,
+          "axes.spines.top" : False,
+          "xtick.bottom" : False,
+          "xtick.labelbottom" : False,
+          "ytick.labelleft" : False,
+          "ytick.left" : False}
+    plt.rcParams.update(rc)
+
+    if condition is not None:
+        combined_df = combined_df[combined_df["classifier"] == condition]
+
+    for index, cell in combined_df.iterrows():
+        cell = cell.to_frame().T.reset_index(drop=True)
+        session_id = cell["session_id_vr"].iloc[0]
+        cluster_id = cell["cluster_id"].iloc[0]
+        track_length = cell["track_length"].iloc[0]
+
+        if track_length == 200:
+            vr_path = [s for s in vr_paths if session_id in s][0]
+            figure_vr_path = vr_path+"/MountainSort/Figures/combined_fig4/stop_histograms_and_and_codes.png"\
+
+            try:
+                fig = plt.figure(figsize=(6, 6))
+                im = mpimg.imread(figure_vr_path)
+                plt.title(session_id+"_"+str(int(cluster_id)))
+                plt.imshow(im)
+                plot_path = save_path + '/'+condition+'_stop_histograms_and_codes_'+session_id+'_'+str(cluster_id)+'.png'
+                fig.savefig(plot_path, dpi=300)
+                plt.close()
+            except Exception as ex:
+                print('No file')
+    return
+
+
 
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort8_may2021/vr") if f.is_dir()]
-    of_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/Cohort8_may2021/of") if f.is_dir()]
+    # get cells for paper
+    combined_df = pd.DataFrame()
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
+    combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
+    combined_df = combined_df[combined_df["track_length"] == 200]
+    combined_df = combined_df[combined_df["n_trials"] >= 10]
+    combined_df = combined_df[combined_df["mouse"] != "M2"]
+    combined_df = combined_df[combined_df["mouse"] != "M4"]
+    combined_df = combined_df[combined_df["mouse"] != "M15"]
+
+    vr_path_list = []; of_path_list = []
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()])
+    vr_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/vr") if f.is_dir()])
+
+    plot_fig4_combined(vr_path_list, save_path ="/mnt/datastore/Harry/Vr_grid_cells/summary/fig4/", condition="G", combined_df=combined_df)
+
+
     combined_df = pd.read_pickle("/mnt/datastore/Harry/VR_grid_cells/combined_cohort8.pkl")
     #plot_snrs_by_hmt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
     #plot_snrs_by_tt(vr_path_list, save_path ="/mnt/datastore/Harry/Cohort8_may2021/summary/combined_grid_cells_figures/", condition="G", combined_df=combined_df)
