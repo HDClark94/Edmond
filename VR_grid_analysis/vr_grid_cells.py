@@ -2583,7 +2583,7 @@ def curate_stops_spike_data(spike_data, track_length):
 def get_stop_histogram(cells_df, tt, coding_scheme=None, shuffle=False, track_length=None,
                        remove_last_and_first_from_streak=False, use_first_stops=False, account_for="", drop_bb_stops=False, rolling_classsifier_collumn_name="rolling:classifier_by_trial_number"):
     if shuffle:
-        iterations = 100
+        iterations = 10
     else:
         iterations = 1
     gauss_kernel = Gaussian1DKernel(2)

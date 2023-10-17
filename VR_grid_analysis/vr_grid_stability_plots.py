@@ -6861,6 +6861,108 @@ def plot_combined_figure4_plot(spike_data, processed_position_data, output_path,
     plt.close()
     return
 
+def plot_firing_rate_maps_for_trials(spike_data, processed_position_data, output_path, track_length, trial_types_to_plot=[0,1,2], rewarded=True, smoothen=True):
+    def style_vr_plot(ax):
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(True)
+        ax.spines['bottom'].set_visible(True)
+        ax.tick_params(
+            axis='both',  # changes apply to the x-axis
+            which='both',  # both major and minor ticks are affected
+            bottom=True,  # ticks along the bottom edge are off
+            top=False,  # ticks along the top edge are off
+            right=False,
+            left=True,
+            labelleft=True,
+            labelbottom=True,
+            labelsize=18,
+            length=5,
+            width=1.5)  # labels along the bottom edge are off
+
+        # ax.set_aspect('equal')
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.spines['left'].set_linewidth(2)
+        ax.spines['bottom'].set_linewidth(2)
+        return ax
+
+    def style_track_plot(ax, bins):
+        divider = 1
+        ax.axvspan(90 / divider, (90 + 20) / divider, facecolor='DarkGreen', alpha=.15, linewidth=0)
+        ax.axvspan(0, 30 / divider, facecolor='k', linewidth=0, alpha=.15)  # black box
+        ax.axvspan((200 - 30) / divider, 200 / divider, facecolor='k', linewidth=0, alpha=.15)  # black box
+
+    def get_trial_color(trial_type):
+        if trial_type == 0:
+            return "black"
+        elif trial_type == 1:
+            return "blue"
+        elif trial_type == 2:
+            return (31/255, 181/255, 178/255)
+        else:
+            print("invalid trial-type passed to get_trial_color()")
+
+    tt_str = "".join(np.array(trial_types_to_plot, np.str0).tolist())
+
+    if smoothen:
+        firing_rate_column_name = "fr_binned_in_space_smoothed"
+    else:
+        firing_rate_column_name = "fr_binned_in_space"
+
+    if "paired_cell_type_classification" in list(spike_data):
+        print('I am plotting firing rate maps for trials...')
+
+        for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+            cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+            session_id = cluster_spike_data["session_id"].iloc[0]
+            open_field_classifier = cluster_spike_data["paired_cell_type_classification"].iloc[0]
+            cluster_firing_maps = np.array(cluster_spike_data[firing_rate_column_name].iloc[0])
+            cluster_firing_maps[np.isnan(cluster_firing_maps)] = np.nan
+            cluster_firing_maps[np.isinf(cluster_firing_maps)] = np.nan
+
+            if open_field_classifier == "G":
+                save_path = output_path + 'grid_cells/avg_firing_rates/'
+            else:
+                save_path = output_path + 'non_grid_cells/avg_firing_rates/'
+
+            avg_spikes_on_track = plt.figure(figsize=(5, 5/3))
+            ax = avg_spikes_on_track.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+            locations = np.arange(0.5, track_length + 0.5, 1)
+            subset_processed_position_data = processed_position_data[np.isin(processed_position_data["trial_type"], trial_types_to_plot)]
+            if rewarded:
+                subset_processed_position_data = subset_processed_position_data[subset_processed_position_data["hit_miss_try"] == "hit"]
+                rewarded_str = "rewarded"
+            else:
+                rewarded_str = ""
+            for tt in np.unique(subset_processed_position_data["trial_type"]):
+                trial_numbers = np.array(subset_processed_position_data[subset_processed_position_data["trial_type"] == tt]["trial_number"])
+                ax.fill_between(locations,
+                                np.nanmean(cluster_firing_maps[trial_numbers - 1], axis=0) - stats.sem(cluster_firing_maps[trial_numbers - 1], axis=0, nan_policy="omit"),
+                                np.nanmean(cluster_firing_maps[trial_numbers - 1], axis=0) + stats.sem(cluster_firing_maps[trial_numbers - 1], axis=0, nan_policy="omit"),
+                                facecolor=get_trial_color(tt), alpha=0.2)
+                ax.plot(locations, np.nanmean(cluster_firing_maps[trial_numbers - 1], axis=0), '-', color=get_trial_color(tt))
+
+            style_track_plot(ax, 200)
+            style_vr_plot(ax)
+            plt.ylabel('FR (Hz)', fontsize=25, labelpad=10)
+            plt.xlabel('Location (cm)', fontsize=25, labelpad=10)
+            plt.xlim(0, 200)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            ax.set_xlim([0, 200])
+            ax.set_yticks([0, np.round(ax.get_ylim()[1], 1)])
+            ax.set_ylim(bottom=0)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.3, right=0.87, top=0.92)
+            plt.savefig(save_path + '' + session_id + '_rate_map_Cluster_' + str(cluster_id) + '_' + firing_rate_column_name + '_tt' + tt_str + '_' + rewarded_str + '.png', dpi=200)
+            plt.close()
+    return
+
+
 
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     #vr_recording_path_list.sort()
@@ -6903,7 +7005,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="hit")
                 #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="miss")
                 #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="try")
-                plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
+                #plot_speed_histogram_with_error_all_trials(processed_position_data, output_path, track_length=get_track_length(recording), hmt="rejected")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=2, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=0, hmt="hit")
                 #plot_speed_histogram_with_error(processed_position_data, output_path, track_length=get_track_length(recording), tt=1, hmt="hit")
@@ -6920,17 +7022,17 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 # ANALYSIS OVER ALL TRIALS
                 #plot_spatial_information_across_the_session(spike_data=spike_data, position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
 
-                spike_data = calculate_spatial_information(spike_data, position_data, track_length=get_track_length(recording))
-                spike_data = add_vmax_for_firing_rate_plot(spike_data)
-                spike_data = add_agreement_between_cell_and_global(spike_data)
-                spike_data = add_grid_code_global(spike_data, processed_position_data=processed_position_data)
-                spike_data = add_code_global(spike_data, processed_position_data=processed_position_data)
+                #spike_data = calculate_spatial_information(spike_data, position_data, track_length=get_track_length(recording))
+                #spike_data = add_vmax_for_firing_rate_plot(spike_data)
+                #spike_data = add_agreement_between_cell_and_global(spike_data)
+                #spike_data = add_grid_code_global(spike_data, processed_position_data=processed_position_data)
+                #spike_data = add_code_global(spike_data, processed_position_data=processed_position_data)
                 #plot_all_firing_rates(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
-                plot_all_periodograms(spike_data=spike_data, output_path=output_path, track_length=get_track_length(recording), position_data=position_data, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
+                #plot_all_periodograms(spike_data=spike_data, output_path=output_path, track_length=get_track_length(recording), position_data=position_data, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
                 #plot_all_firing_rates_compact(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
-                plot_coding_schemes_vs_hits(spike_data=spike_data, output_path=output_path, track_length=get_track_length(recording), processed_position_data=processed_position_data, position_data=position_data, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
-                plot_stops_and_histograms(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
+                #plot_coding_schemes_vs_hits(spike_data=spike_data, output_path=output_path, track_length=get_track_length(recording), processed_position_data=processed_position_data, position_data=position_data, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
+                #plot_stops_and_histograms(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
 
                 #if len(spike_data[spike_data["paired_cell_type_classification"]=="G"])>0:
@@ -6953,7 +7055,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_snr(spike_data, processed_position_data, output_path, track_length =get_track_length(recording))
                 #plot_spatial_autocorrelogram_fr(spike_data, output_path, track_length=get_track_length(recording), suffix="")
                 #plot_field_distributions(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
-                plot_field_location(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
+                #plot_field_location(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_first_field_location_vs_first_stop_location(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
                 #plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording), plot_codes=False)
                 #plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
@@ -6994,6 +7096,18 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
 
                 # misc analysis
+                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=True, smoothen=True)
+                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=True, smoothen=True)
+                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=False, smoothen=True)
+                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=False, smoothen=True)
                 #plot_power_spectra_of_spikes(spike_data=spike_data, output_path=output_path)
                 print("This session has, ", str(len(spike_data)), " clusters")
                 print("complete for ", recording)
@@ -7078,7 +7192,6 @@ def main():
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D2DF142_2021-06-08_10-55-28",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50",
                               "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05",
@@ -7111,6 +7224,111 @@ def main():
     #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
     #                           "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49"]
     """
+    # all sessions with grid cells
+    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D8_2020-08-12_15-06-01",
+                                "/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20",
+                                "/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D22_2020-11-27_16-11-24",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M6_D23_2020-11-28_17-01-43",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D17_2020-11-20_16-15-32",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D26_2020-12-03_14-51-03",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D25_2020-11-30_16-24-49",
+                                "/mnt/datastore/Harry/Cohort7_october2020/vr/M7_D15_2020-11-16_16-16-33",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D27_2021-06-15_11-43-42",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D17_2021-06-01_10-36-53",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D35_2021-06-25_12-41-16",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D28_2021-06-16_11-45-54",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M10_D5_2021-05-14_08-59-54",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D24_2021-06-10_10-45-20",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D26_2021-06-14_10-34-14",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D24_2021-06-10_12-01-54",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D25_2021-06-11_12-03-07",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D29_2021-06-17_11-50-37",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D25_2021-06-11_12-36-04",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D7_2021-05-18_09-51-25",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D20_2021-06-04_10-38-58",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D11_2021-05-24_10-00-53",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D16_2021-05-31_12-01-35",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D17_2021-06-01_12-47-02",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M12_D15_2021-05-28_11-15-04",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D19_2021-06-03_12-45-13",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D32_2021-06-22_11-08-56",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D4_2021-05-13_09-56-11",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D11_2021-05-24_11-44-50",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D43_2021-07-07_11-51-08",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D15_2021-05-28_12-29-15",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D28_2021-06-16_12-26-51",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D20_2021-06-04_12-20-57",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D34_2021-06-24_11-52-48",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D44_2021-07-08_12-03-21",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D23_2021-06-09_12-04-16",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D28_2021-06-16_10-34-52",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58",
+                                "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58"]
+    vr_recording_path_list = np.unique(np.array(vr_recording_path_list)).tolist()
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30"]
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
@@ -7123,15 +7341,15 @@ def main():
     #vr_recording_path_list = list(filter(lambda k: 'M14' in k, vr_recording_path_list))
     #vr_recording_path_list = ["/mnt/datastore/Harry/cohort7_october2020/vr/M3_D28_2020-12-05_15-05-24"]
 
-    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
-                              "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39",
-                              "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
-                              "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
-                              "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24"]
-    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
+    #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39",
+    #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D45_2021-07-09_11-39-02",
+    #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
+    #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24"]
+    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     process_recordings(vr_recording_path_list, of_recording_path_list)
     print("look now")
 

@@ -3786,7 +3786,6 @@ def get_trial_type_scheme(trial_types):
 
 def generate_metadata(behaviour_df):
     meta = pd.DataFrame()
-
     for cohort in np.unique(behaviour_df["cohort"]):
         cohort_data = behaviour_df[behaviour_df["cohort"] == cohort]
         for mouse_id in np.unique(cohort_data["mouse_id"]):
@@ -3794,76 +3793,78 @@ def generate_metadata(behaviour_df):
             for session_number in np.unique(mouse_data["session_number"]):
                 session_data = mouse_data[(mouse_data["session_number"] == session_number)]
 
-                n_trials = len(session_data)
-                n_probe_trials = len(session_data[session_data["trial_type"] == 2])
-                n_beaconed_trials = len(session_data[session_data["trial_type"] == 0])
-                n_nonbeaconed_trials = len(session_data[session_data["trial_type"] == 1])
-                n_probe_trials_correct = len(session_data[(session_data["trial_type"] == 2) & (session_data["hit_miss_try"] == "hit")])
-                n_beaconed_trials_correct = len(session_data[(session_data["trial_type"] == 0) & (session_data["hit_miss_try"] == "hit")])
-                n_nonbeaconed_trials_correct = len(session_data[(session_data["trial_type"] == 1) & (session_data["hit_miss_try"] == "hit")])
-                track_length = session_data["track_length"].iloc[0]
-                mouse_id = session_data["mouse_id"].iloc[0]
-                session_number = session_data["session_number"].iloc[0]
-                reward_ratio = add_reward_ratio(session_data)
-                cohort = session_data["cohort"].iloc[0]
-                cohort_mouse = str(cohort)+"_"+mouse_id
+                if len(session_data) >= 10: # at least 10 trials
 
-                trial_type_scheme = get_trial_type_scheme(np.array(session_data["trial_type"]))
+                    n_trials = len(session_data)
+                    n_probe_trials = len(session_data[session_data["trial_type"] == 2])
+                    n_beaconed_trials = len(session_data[session_data["trial_type"] == 0])
+                    n_nonbeaconed_trials = len(session_data[session_data["trial_type"] == 1])
+                    n_probe_trials_correct = len(session_data[(session_data["trial_type"] == 2) & (session_data["hit_miss_try"] == "hit")])
+                    n_beaconed_trials_correct = len(session_data[(session_data["trial_type"] == 0) & (session_data["hit_miss_try"] == "hit")])
+                    n_nonbeaconed_trials_correct = len(session_data[(session_data["trial_type"] == 1) & (session_data["hit_miss_try"] == "hit")])
+                    track_length = session_data["track_length"].iloc[0]
+                    mouse_id = session_data["mouse_id"].iloc[0]
+                    session_number = session_data["session_number"].iloc[0]
+                    reward_ratio = add_reward_ratio(session_data)
+                    cohort = session_data["cohort"].iloc[0]
+                    cohort_mouse = str(cohort)+"_"+mouse_id
 
-                # search for the ratio used out of 4:1, 3:1, 2:1, 3:2
-                trial_types = np.array(session_data["trial_type"])
-                trial_types[trial_types==2] =1 # replace 2s with 1s for the trial type ratio
-                if len(search_sequence_numpy(trial_types, np.array([0,0,0,0,1])))>0:
-                    ratio= "4:1"
-                    ratio_numeric = 4/5
-                elif len(search_sequence_numpy(trial_types, np.array([0,0,0,1])))>0:
-                    ratio= "3:1"
-                    ratio_numeric = 3/4
-                elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0])))>0:
-                    ratio= "2:1"
-                    ratio_numeric = 2/3
-                elif len(search_sequence_numpy(trial_types, np.array([0,1,0,1,0,1])))>0:
-                    ratio = "1:1"
-                    ratio_numeric = 1/2
-                elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1])))>0:
-                    ratio = "3:7"
-                    ratio_numeric =3/10
-                elif len(search_sequence_numpy(trial_types, np.array([0,1,1,0,1,1,0])))>0:
-                    ratio = "1:2"
-                    ratio_numeric = 1/3
-                elif len(search_sequence_numpy(trial_types, np.array([0,1,1,1])))>0:
-                    ratio = "1:3"
-                    ratio_numeric = 1/4
-                else:
-                    ratio= ""
-                    ratio_numeric = np.nan
+                    trial_type_scheme = get_trial_type_scheme(np.array(session_data["trial_type"]))
 
-                non_beaconed_expected_reward_session = add_nb_expected_reward_from_the_session(ratio_numeric, reward_ratio)
+                    # search for the ratio used out of 4:1, 3:1, 2:1, 3:2
+                    trial_types = np.array(session_data["trial_type"])
+                    trial_types[trial_types==2] =1 # replace 2s with 1s for the trial type ratio
+                    if len(search_sequence_numpy(trial_types, np.array([0,0,0,0,1])))>0:
+                        ratio= "4:1"
+                        ratio_numeric = 4/5
+                    elif len(search_sequence_numpy(trial_types, np.array([0,0,0,1])))>0:
+                        ratio= "3:1"
+                        ratio_numeric = 3/4
+                    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,0])))>0:
+                        ratio= "2:1"
+                        ratio_numeric = 2/3
+                    elif len(search_sequence_numpy(trial_types, np.array([0,1,0,1,0,1])))>0:
+                        ratio = "1:1"
+                        ratio_numeric = 1/2
+                    elif len(search_sequence_numpy(trial_types, np.array([0,0,1,1,1])))>0:
+                        ratio = "3:7"
+                        ratio_numeric =3/10
+                    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,0,1,1,0])))>0:
+                        ratio = "1:2"
+                        ratio_numeric = 1/3
+                    elif len(search_sequence_numpy(trial_types, np.array([0,1,1,1])))>0:
+                        ratio = "1:3"
+                        ratio_numeric = 1/4
+                    else:
+                        ratio= ""
+                        ratio_numeric = np.nan
 
-                # make the session meta data and concatenate
-                session_meta = pd.DataFrame()
-                session_meta["n_trials"] = [n_trials]
-                session_meta["n_probe_trials"] = [n_probe_trials]
-                session_meta["n_beaconed_trials"] = [n_beaconed_trials]
-                session_meta["n_nonbeaconed_trials"] = [n_nonbeaconed_trials]
-                session_meta["n_probe_trials_correct"] =[n_probe_trials_correct]
-                session_meta["n_beaconed_trials_correct"] = [n_beaconed_trials_correct]
-                session_meta["n_nonbeaconed_trials_correct"] = [n_nonbeaconed_trials_correct]
-                session_meta["percent_probe_trials_correct"] =[100*pass_div_by_zero(n_probe_trials_correct, n_probe_trials)]
-                session_meta["percent_beaconed_trials_correct"] = [100*pass_div_by_zero(n_beaconed_trials_correct, n_beaconed_trials)]
-                session_meta["percent_nonbeaconed_trials_correct"] = [100*pass_div_by_zero(n_nonbeaconed_trials_correct, n_nonbeaconed_trials)]
-                session_meta["trial_type_ratio"] = [ratio]
-                session_meta["trial_type_ratio_numeric"] = [ratio_numeric]
-                session_meta["reward_ratio"] = [reward_ratio]
-                session_meta["non_beaconed_expected_reward_session"] = [non_beaconed_expected_reward_session]
-                session_meta["track_length"] = [track_length]
-                session_meta["mouse_id"] = [mouse_id]
-                session_meta["session_number"] = [session_number]
-                session_meta["cohort"] = [cohort]
-                session_meta["cohort_mouse"] = [cohort_mouse]
-                session_meta["trial_type_scheme"] = [trial_type_scheme]
+                    non_beaconed_expected_reward_session = add_nb_expected_reward_from_the_session(ratio_numeric, reward_ratio)
 
-                meta = pd.concat([meta, session_meta], ignore_index=True)
+                    # make the session meta data and concatenate
+                    session_meta = pd.DataFrame()
+                    session_meta["n_trials"] = [n_trials]
+                    session_meta["n_probe_trials"] = [n_probe_trials]
+                    session_meta["n_beaconed_trials"] = [n_beaconed_trials]
+                    session_meta["n_nonbeaconed_trials"] = [n_nonbeaconed_trials]
+                    session_meta["n_probe_trials_correct"] =[n_probe_trials_correct]
+                    session_meta["n_beaconed_trials_correct"] = [n_beaconed_trials_correct]
+                    session_meta["n_nonbeaconed_trials_correct"] = [n_nonbeaconed_trials_correct]
+                    session_meta["percent_probe_trials_correct"] =[100*pass_div_by_zero(n_probe_trials_correct, n_probe_trials)]
+                    session_meta["percent_beaconed_trials_correct"] = [100*pass_div_by_zero(n_beaconed_trials_correct, n_beaconed_trials)]
+                    session_meta["percent_nonbeaconed_trials_correct"] = [100*pass_div_by_zero(n_nonbeaconed_trials_correct, n_nonbeaconed_trials)]
+                    session_meta["trial_type_ratio"] = [ratio]
+                    session_meta["trial_type_ratio_numeric"] = [ratio_numeric]
+                    session_meta["reward_ratio"] = [reward_ratio]
+                    session_meta["non_beaconed_expected_reward_session"] = [non_beaconed_expected_reward_session]
+                    session_meta["track_length"] = [track_length]
+                    session_meta["mouse_id"] = [mouse_id]
+                    session_meta["session_number"] = [session_number]
+                    session_meta["cohort"] = [cohort]
+                    session_meta["cohort_mouse"] = [cohort_mouse]
+                    session_meta["trial_type_scheme"] = [trial_type_scheme]
+
+                    meta = pd.concat([meta, session_meta], ignore_index=True)
 
     for track_length in np.unique(meta["track_length"]):
         track_length_meta = meta[meta["track_length"] == track_length]
@@ -4263,11 +4264,14 @@ def plot_performance_between_different_trial_type_schemes(meta_behaviour_data, s
         for scheme, x_pos_i in zip(x_labels, x_pos):
             scheme_meta = meta_behaviour_data[meta_behaviour_data["trial_type_scheme"] == scheme]
             if tt == 0:
-                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_beaconed_trials_correct"]), stats.sem(scheme_meta["percent_beaconed_trials_correct"], nan_policy="omit"), color="black")
+                ax.scatter(x_pos_i, np.nanmean(scheme_meta["percent_beaconed_trials_correct"]), color="black")
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_beaconed_trials_correct"]), stats.sem(scheme_meta["percent_beaconed_trials_correct"], nan_policy="omit"), color="black", capsize=8)
             elif tt == 1:
-                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_nonbeaconed_trials_correct"]), stats.sem(scheme_meta["percent_nonbeaconed_trials_correct"], nan_policy="omit"), color="black")
+                ax.scatter(x_pos_i, np.nanmean(scheme_meta["percent_nonbeaconed_trials_correct"]), color="black")
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_nonbeaconed_trials_correct"]), stats.sem(scheme_meta["percent_nonbeaconed_trials_correct"], nan_policy="omit"), color="black", capsize=8)
             elif tt == 2:
-                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_probe_trials_correct"]), stats.sem(scheme_meta["percent_probe_trials_correct"], nan_policy="omit"),color="black")
+                ax.scatter(x_pos_i, np.nanmean(scheme_meta["percent_probe_trials_correct"]), color="black")
+                ax.errorbar(x_pos_i, np.nanmean(scheme_meta["percent_probe_trials_correct"]), stats.sem(scheme_meta["percent_probe_trials_correct"], nan_policy="omit"),color="black", capsize=8)
 
         ax.set_xticks(x_pos)
         ax.set_xticklabels(x_labels, rotation = 45)
@@ -4290,9 +4294,12 @@ def plot_performance_between_session_with_probes_vs_session_without_probes(meta_
 
     x_pos = [0, 1, 2]
     x_labels = ["pre-P NB", "post-P NB", "post-P P"]
-
+    colors = [u'#1f77b4', u'#ff7f0e', u'#2ca02c', u'#d62728', u'#9467bd', u'#8c564b', u'#e377c2', u'#7f7f7f', u'#bcbd22', u'#17becf']
     fig, ax = plt.subplots(figsize=(6, 4))
-    for mouse in np.unique(meta_behaviour_data["mouse_id"]):
+    pre_probe_non_beaconed_hits = []
+    post_probe_non_beaconed_hits = []
+    post_probe_probe_hits = []
+    for i, mouse in enumerate(np.unique(meta_behaviour_data["mouse_id"])):
         mouse_meta_data = meta_behaviour_data[meta_behaviour_data["mouse_id"] == mouse]
         if np.sum(mouse_meta_data['n_probe_trials']) > 0:
             first_probe_day = min(mouse_meta_data[mouse_meta_data["n_probe_trials"]>0]["session_number"])
@@ -4300,10 +4307,17 @@ def plot_performance_between_session_with_probes_vs_session_without_probes(meta_
                                                          (mouse_meta_data["session_number"]>=first_probe_day-5)]
             five_post_probe_trials_meta = mouse_meta_data[(mouse_meta_data["session_number"]>=first_probe_day) &
                                                           (mouse_meta_data["session_number"]<first_probe_day+5)]
-
-            ax.plot(x_pos, [np.nanmean(five_pre_probe_trials_meta['percent_nonbeaconed_trials_correct']),
+            ys = [np.nanmean(five_pre_probe_trials_meta['percent_nonbeaconed_trials_correct']),
                             np.nanmean(five_post_probe_trials_meta['percent_nonbeaconed_trials_correct']),
-                            np.nanmean(five_post_probe_trials_meta['percent_probe_trials_correct'])], label=str(mouse))
+                            np.nanmean(five_post_probe_trials_meta['percent_probe_trials_correct'])]
+            ax.plot(x_pos, ys, label=str(mouse), color=colors[i])
+            pre_probe_non_beaconed_hits.append(ys[0])
+            post_probe_non_beaconed_hits.append(ys[1])
+            post_probe_probe_hits.append(ys[2])
+
+    pre_probe_non_beaconed_hits = np.array(pre_probe_non_beaconed_hits)
+    post_probe_non_beaconed_hits = np.array(post_probe_non_beaconed_hits)
+    post_probe_probe_hits = np.array(post_probe_probe_hits)
 
     ax.set_xticks(x_pos)
     ax.set_xticklabels(x_labels)
@@ -4318,20 +4332,20 @@ def plot_performance_between_session_with_probes_vs_session_without_probes(meta_
     plt.subplots_adjust(left=0.2, bottom=0.2, right=0.8, top=0.8)
     plt.savefig(save_path + '/percentage_hits_before_and_after_the_introduction_of_probe_trials.png', dpi=300)
     plt.close()
-    """
-        print("comparing column " + column_str + " across expected_reward conditions Default vs TTR, df=",
-              str(len(Default) + len(TTR) - 2), ", p= ",
-              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[1]), ", t= ",
-              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR[column_str]))[0]))
-        print("comparing column " + column_str + " across expected_reward conditions Default vs TTR_R, df=",
-              str(len(Default) + len(TTR_R) - 2), ", p= ",
-              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ",
-              str(stats.mannwhitneyu(np.array(Default[column_str]), np.array(TTR_R[column_str]))[0]))
-        print("comparing column " + column_str + " across expected_reward conditions TTR vs TTR_R, df=",
-              str(len(TTR) + len(TTR_R) - 2), ", p= ",
-              str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[1]), ", t= ",
-              str(stats.mannwhitneyu(np.array(TTR[column_str]), np.array(TTR_R[column_str]))[0]))
-    """
+
+    mask1 = ~np.isnan(pre_probe_non_beaconed_hits) & ~np.isnan(post_probe_non_beaconed_hits)
+    mask2 = ~np.isnan(post_probe_non_beaconed_hits) & ~np.isnan(post_probe_probe_hits)
+    mask3 = ~np.isnan(pre_probe_non_beaconed_hits) & ~np.isnan(post_probe_probe_hits)
+
+    print("comparing pre and post probe non_beaconed hits, df=",
+          str(len(pre_probe_non_beaconed_hits[mask1])-1), ", p= ", str(stats.wilcoxon(pre_probe_non_beaconed_hits[mask1], post_probe_non_beaconed_hits[mask1])[1]),
+          ", t= ", str(stats.wilcoxon(pre_probe_non_beaconed_hits[mask1], post_probe_non_beaconed_hits[mask1])[0]))
+    print("comparing post probe nb and post probe probe hits, df=",
+          str(len(post_probe_non_beaconed_hits[mask2])-1), ", p= ", str(stats.wilcoxon(post_probe_non_beaconed_hits[mask2], post_probe_probe_hits[mask2])[1]),
+          ", t= ", str(stats.wilcoxon(post_probe_non_beaconed_hits[mask2], post_probe_probe_hits[mask2])[0]))
+    print("comparing pre and post probe non_beaconed hits, df=",
+          str(len(pre_probe_non_beaconed_hits[mask3])-1), ", p= ", str(stats.wilcoxon(pre_probe_non_beaconed_hits[mask3], post_probe_probe_hits[mask3])[1]),
+          ", t= ", str(stats.wilcoxon(pre_probe_non_beaconed_hits[mask3], post_probe_probe_hits[mask3])[0]))
     return
 
 def plot_speeds_from_processed_position_data_and_position_data(processed_position_data, position_data,save_path):
@@ -4580,6 +4594,25 @@ def plot_trial_speeds_hmt_2(processed_position_data, save_path):
 def main():
     print('-------------------------------------------------------------')
 
+    # get cell-row dataframe to confirm which sessions to use in behavioural analysis
+    combined_df = pd.DataFrame()
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")], ignore_index=True)
+    combined_df = pd.concat([combined_df, pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")], ignore_index=True)
+    # remove artefacts, low firing rates in the open field, sessions with non 200cm track lengths and sessions with less than 10 trials
+    combined_df = combined_df[combined_df["snippet_peak_to_trough"] < 500] # uV
+    combined_df = combined_df[combined_df["mean_firing_rate_of"] > 0.2] # Hz
+    combined_df = combined_df[combined_df["track_length"] == 200]
+    combined_df = combined_df[combined_df["n_trials"] >= 10]
+    combined_df = add_lomb_classifier(combined_df,suffix="")
+    combined_df = combined_df[combined_df["Lomb_classifier_"] != "Unclassified"]
+    # remove mice without any grid cells
+    combined_df = combined_df[combined_df["mouse"] != "M2"]
+    combined_df = combined_df[combined_df["mouse"] != "M4"]
+    combined_df = combined_df[combined_df["mouse"] != "M15"]
+    print("There is ", len(np.unique(combined_df["session_id"])), " sessions in this dataset")
+
+
     #processed_position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/processed_position_data.pkl")
     #position_data = pd.read_pickle("/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36/MountainSort/DataFrames/position_data.pkl")
     #position_data = add_speed_per_100ms(position_data)
@@ -4606,16 +4639,14 @@ def main():
 
     # load dataframe
     all_behaviour200cm_tracks = pd.read_pickle("/mnt/datastore/Harry/Vr_grid_cells/all_behaviour_200cm_for_grid_paper.pkl")
-    #meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
+    meta_behaviour_data = generate_metadata(all_behaviour200cm_tracks)
+    plot_performance_between_different_trial_type_schemes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
+    plot_performance_between_session_with_probes_vs_session_without_probes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
 
     plot_trial_speeds_hmt_2(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/")
 
 
     plot_stop_histogram_for_hmt(all_behaviour200cm_tracks, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/")
-    plot_performance_between_different_trial_type_schemes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
-
-    plot_performance_between_session_with_probes_vs_session_without_probes(meta_behaviour_data,  save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")
-
 
     # plot performance by default, improvement (trial type ratio), improvement (trial type ratio and reward)
     plot_performance_against_improvements(meta_behaviour_data, save_path="/mnt/datastore/Harry/Vr_grid_cells/behaviour/meta_analysis")

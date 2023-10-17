@@ -6,7 +6,7 @@ import sys
 import PostSorting.parameters
 import file_utility
 import settings
-
+from Edmond.utility_functions.array_manipulations import *
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
 prm.set_pixel_ratio(440)
@@ -149,6 +149,14 @@ def check_for_tag_name(running_parameter_tags, tag_name):
                 tag_in_file = str(tag.split("=")[1]).split(',')[0]
     return tag_in_file
 
+def add_processed_position_data_column_to_spatial_firing(spatial_firing, processed_position, columns=[]):
+    for column in columns:#
+        column_values = []
+        for index, row in spatial_firing.iterrows():
+            processed_position_values = pandas_collumn_to_2d_numpy_array(processed_position[column])
+            column_values.append(processed_position_values)
+        spatial_firing[column] = column_values
+    return spatial_firing
 
 def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=None, suffix=""):
 
@@ -171,6 +179,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                 spatial_firing = pd.read_pickle(data_frame_path)
                 processed_position = pd.read_pickle(processed_position_path)
                 spatial_firing = add_full_session_id(spatial_firing, path)
+                spatial_firing = add_processed_position_data_column_to_spatial_firing(spatial_firing, processed_position, columns=['speeds_binned_in_space_smoothed'])
                 spatial_firing = add_peaks_to_troughs(spatial_firing)
                 spatial_firing["track_length"] = get_track_length(path)
 
@@ -180,18 +189,6 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     collumn_names_to_keep.append("random_snippets")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
-                    if "n_pi_trials_by_hmt" in list(spatial_firing):
-                        collumn_names_to_keep.append("n_pi_trials_by_hmt")
-                    if "fields_jitter_hmt_by_trial_type" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type")
-                    if "fields_jitter_hmt_by_trial_type_pre_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type_pre_rz")
-                    if "fields_jitter_hmt_by_trial_type_post_rz" in list(spatial_firing):
-                        collumn_names_to_keep.append("fields_jitter_hmt_by_trial_type_post_rz")
-                    if "avg_correlations_hmt_by_trial_type" in list(spatial_firing):
-                        collumn_names_to_keep.append("avg_correlations_hmt_by_trial_type")
-                    if "field_realignments_hmt_by_trial_type" in list(spatial_firing):
-                        collumn_names_to_keep.append("field_realignments_hmt_by_trial_type")
                     if "percentage_hits" in list(spatial_firing):
                         collumn_names_to_keep.append("percentage_hits")
                     if "stop_locations" in list(spatial_firing):
@@ -234,25 +231,6 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     #    collumn_names_to_keep.append("MOVING_LOMB_all_powers")
                     #if "MOVING_LOMB_all_centre_trials" in list(spatial_firing):
                     #    collumn_names_to_keep.append("MOVING_LOMB_all_centre_trials")
-
-                    if "hit_spatial_periodogram_tt0" in list(spatial_firing):
-                        collumn_names_to_keep.append("hit_spatial_periodogram_tt0")
-                    if "hit_spatial_periodogram_tt1" in list(spatial_firing):
-                        collumn_names_to_keep.append("hit_spatial_periodogram_tt1")
-                    if "hit_spatial_periodogram_tt2" in list(spatial_firing):
-                        collumn_names_to_keep.append("hit_spatial_periodogram_tt2")
-                    if "try_spatial_periodogram_tt0" in list(spatial_firing):
-                        collumn_names_to_keep.append("try_spatial_periodogram_tt0")
-                    if "try_spatial_periodogram_tt1" in list(spatial_firing):
-                        collumn_names_to_keep.append("try_spatial_periodogram_tt1")
-                    if "try_spatial_periodogram_tt2" in list(spatial_firing):
-                        collumn_names_to_keep.append("try_spatial_periodogram_tt2")
-                    if "miss_spatial_periodogram_tt0" in list(spatial_firing):
-                        collumn_names_to_keep.append("miss_spatial_periodogram_tt0")
-                    if "miss_spatial_periodogram_tt1" in list(spatial_firing):
-                        collumn_names_to_keep.append("miss_spatial_periodogram_tt1")
-                    if "miss_spatial_periodogram_tt2" in list(spatial_firing):
-                        collumn_names_to_keep.append("miss_spatial_periodogram_tt2")
                     if "rolling:spatial_info_by_other_P" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:spatial_info_by_other_P")
                     if "rolling:spatial_info_by_other_D" in list(spatial_firing):
@@ -277,6 +255,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("field_locations")
                     if "field_trial_numbers" in list(spatial_firing):
                         collumn_names_to_keep.append("field_trial_numbers")
+                    if "speeds_binned_in_space_smoothed" in list(spatial_firing):
+                        collumn_names_to_keep.append("speeds_binned_in_space_smoothed")
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
