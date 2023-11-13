@@ -1099,15 +1099,19 @@ def plot_lomb_demo(save_path, mode="allo"):
     f1 = 2
     f2 = 2.5
     f3 = 3
-    x = np.arange(0.5, track_length+0.5)
     if mode == "allo":
         color = Settings.allocentric_color
+        x = np.arange(0.5, track_length + 0.5)
         y = np.sin(f * np.pi * 2 * (x+offset) / track_length)
         y = np.tile(y, n_trials)
     elif mode == "ego":
         x = np.arange(0.5, n_trials * track_length + 0.5)
         y = np.sin(f * np.pi * 2 * (x + offset) / track_length)
         color = Settings.egocentric_color
+
+    # create the non-varying reference signal
+    sd = 1
+    ref_y = np.random.normal(0, sd, len(y))
 
     x = np.arange(0.5, n_trials*track_length + 0.5)
     f1_sine_1 = Edmond.plot_utility2.min_max_normlise(np.sin(f1 * np.pi * 2 * (x + 45) / track_length), 0, 1)
@@ -1145,17 +1149,21 @@ def plot_lomb_demo(save_path, mode="allo"):
     plt.savefig(save_path + '/lomb_demo_'+mode+'.png', dpi=300)
     plt.close()
 
+    # calcalate chi sqaured errors
+    min_chi_squared = []
+    min_chi_squared_ref = []
+    frequencies = np.arange(0.02, 5+0.02, 0.02)
+    for f in frequencies:
+        min_chi_squared.append(np.min(get_chi_square_assayed(x, y, f, track_length)))
+        min_chi_squared_ref.append(np.min(get_chi_square_assayed(x, ref_y, f, track_length)))
+    min_chi_squared = np.array(min_chi_squared)
+    min_chi_squared_ref = np.array(min_chi_squared_ref)
+
 
     fig = plt.figure(figsize=(6,2))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
     for f in range(1,6):
         ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
-
-    min_chi_squared = []
-    frequencies = np.arange(0.02, 5+0.02, 0.02)
-    for f in frequencies:
-        min_chi_squared.append(np.min(get_chi_square_assayed(x, y, f, track_length)))
-    min_chi_squared = np.array(min_chi_squared)
     ax.plot(frequencies, min_chi_squared, color=color, linewidth=3)
     plt.ylabel('Min $\u03C7^2$', fontsize=25, labelpad = 10)
     plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
@@ -1173,10 +1181,52 @@ def plot_lomb_demo(save_path, mode="allo"):
     plt.savefig(save_path + '/minimum_chi_square_vs_spatial_frequency_' + mode + '.png', dpi=300)
     plt.close()
 
+    fig = plt.figure(figsize=(6,2))
+    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    for f in range(1,6):
+        ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+    ax.plot(frequencies, min_chi_squared_ref, color=color, linewidth=3)
+    plt.ylabel('Power', fontsize=25, labelpad = 10)
+    plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
+    plt.xlim(0,5.05)
+    #ax.set_xticks([0,5])
+    #ax.set_yticks([0, 1])
+    #ax.set_ylim(bottom=0, top=1)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/minimum_chi_square_ref_vs_spatial_frequency_' + mode + '.png', dpi=300)
+    plt.close()
+
+    fig = plt.figure(figsize=(6,2))
+    ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
+    for f in range(1,6):
+        ax.axvline(x=f, color="gray", linewidth=2,linestyle="solid", alpha=0.5)
+    ax.plot(frequencies, ((min_chi_squared_ref- min_chi_squared)/min_chi_squared_ref), color=color, linewidth=3)
+    plt.ylabel('Power', fontsize=25, labelpad = 10)
+    plt.xlabel("Track Frequency", fontsize=25, labelpad = 10)
+    plt.xlim(0,5.05)
+    #ax.set_xticks([0,5])
+    #ax.set_yticks([0, 1])
+    #ax.set_ylim(bottom=0, top=1)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xticks(fontsize=20)
+    plt.yticks(fontsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/standardised_power_vs_spatial_frequency_' + mode + '.png', dpi=300)
+    plt.close()
+
     # plot spatial periodogram via lomb
-    plot_cell_avg_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length), color=color)
-    plot_cell_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length))
-    plot_cell_spatial_autocorrelogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial=y.reshape(n_trials, track_length))
+    #plot_cell_avg_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length), color=color)
+    #plot_cell_spatial_periodogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial= y.reshape(n_trials, track_length))
+    #plot_cell_spatial_autocorrelogram(cell_type=mode, save_path=save_path, firing_rate_map_by_trial=y.reshape(n_trials, track_length))
     return
 
 
@@ -1236,8 +1286,8 @@ def main():
 
 
     # for lomb demo supp
-    #plot_lomb_demo(save_path, mode="ego")
-    #plot_lomb_demo(save_path, mode="allo")
+    plot_lomb_demo(save_path, mode="allo")
+    plot_lomb_demo(save_path, mode="ego")
     print("look now")
 
     # supp

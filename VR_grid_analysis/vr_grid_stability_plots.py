@@ -272,7 +272,7 @@ def curate_stops(session_df, track_length):
     return session_df
 
 
-def plot_stops_on_track(processed_position_data, output_path, track_length=200):
+def plot_stops_on_track(processed_position_data, output_path, track_length=200, plot_rewarded=False):
     print('I am plotting stop rasta...')
     save_path = output_path+'/Figures/behaviour'
     if os.path.exists(save_path) is False:
@@ -287,10 +287,26 @@ def plot_stops_on_track(processed_position_data, output_path, track_length=200):
         trial_type = trial_row["trial_type"].iloc[0]
         trial_number = trial_row["trial_number"].iloc[0]
         trial_stop_color = get_trial_color(trial_type)
+        stop_locations = np.array(trial_row["stop_location_cm"].iloc[0])
+        rz_stop_locations = stop_locations[(stop_locations>90) & (stop_locations<110)]
 
         # do not plot probe trials
         if trial_type != 2:
-            ax.plot(np.array(trial_row["stop_location_cm"].iloc[0]), trial_number*np.ones(len(trial_row["stop_location_cm"].iloc[0])), 'o', color=trial_stop_color, markersize=4)
+            ax.plot(stop_locations, trial_number*np.ones(len(stop_locations)), 'o', color=trial_stop_color, markersize=4)
+            ax.plot(stop_locations, trial_number * np.ones(len(stop_locations)), 'o', color="black",markersize=4)
+
+    # plot rewarded trials
+    for index, trial_row in processed_position_data.iterrows():
+        trial_row = trial_row.to_frame().T.reset_index(drop=True)
+        trial_type = trial_row["trial_type"].iloc[0]
+        trial_number = trial_row["trial_number"].iloc[0]
+        trial_stop_color = get_trial_color(trial_type)
+        stop_locations = np.array(trial_row["stop_location_cm"].iloc[0])
+        rz_stop_locations = stop_locations[(stop_locations>90) & (stop_locations<110)]
+        # do not plot probe trials
+        if trial_type != 2:
+            if len(rz_stop_locations)>0:
+                ax.plot(rz_stop_locations[0], trial_number, 'x', color="green", markersize=4)
 
     plt.ylabel('Stops on trials', fontsize=25, labelpad = 10)
     plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
@@ -7015,7 +7031,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_trial_types(processed_position_data, output_path)
-                #plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording))
+                plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording),plot_rewarded=True)
                 #plot_streak_vs_trial_types(processed_position_data, output_path)
                 #plot_streak_vs_trial_types_with_rolling_classification(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
@@ -7057,8 +7073,8 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_field_distributions(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_field_location(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_first_field_location_vs_first_stop_location(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
-                #plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording), plot_codes=False)
-                #plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
+                plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording), plot_codes=True)
+                plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
                 #plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=True, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
@@ -7096,18 +7112,18 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_snr_by_hmt_tt(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
 
                 # misc analysis
-                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
-                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
-                                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=True, smoothen=True)
-                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
-                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
-                                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=True, smoothen=True)
-                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
-                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
-                                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=False, smoothen=True)
-                plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
-                                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
-                                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=False, smoothen=True)
+                #plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                #                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                #                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=True, smoothen=True)
+                #plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                ##                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                #                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=True, smoothen=True)
+                #plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                #                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                #                                 track_length=get_track_length(recording), trial_types_to_plot=[0,1], rewarded=False, smoothen=True)
+                #plot_firing_rate_maps_for_trials(spike_data=spike_data, processed_position_data=processed_position_data,
+                #                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
+                #                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=False, smoothen=True)
                 #plot_power_spectra_of_spikes(spike_data=spike_data, output_path=output_path)
                 print("This session has, ", str(len(spike_data)), " clusters")
                 print("complete for ", recording)
@@ -7330,7 +7346,7 @@ def main():
                                 "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D27_2021-06-15_12-21-58"]
     vr_recording_path_list = np.unique(np.array(vr_recording_path_list)).tolist()
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D14_2021-05-27_11-46-30"]
-    #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M13_D18_2021-06-02_11-50-48"]
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D31_2021-06-21_12-07-01"]
@@ -7339,7 +7355,7 @@ def main():
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M17_D6_2023-05-29_15-02-14"]
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27"]
     #vr_recording_path_list = list(filter(lambda k: 'M14' in k, vr_recording_path_list))
-    #vr_recording_path_list = ["/mnt/datastore/Harry/cohort7_october2020/vr/M3_D28_2020-12-05_15-05-24"]
+    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49"]
 
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
     #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",

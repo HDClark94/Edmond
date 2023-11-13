@@ -24,3 +24,7 @@ def pandas_collumn_to_2d_numpy_array(pandas_series):
             new_array.append(element)
 
     return np.array(new_array)
+
+def bool_to_int_array(bool_array):
+    int_array = np.array(bool_array, dtype=np.int64)
+    return int_array

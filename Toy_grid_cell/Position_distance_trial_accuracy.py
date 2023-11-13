@@ -1,7 +1,9 @@
 import numpy as np
 from matplotlib.ticker import MaxNLocator
 from Edmond.Toy_grid_cell.plot_example_periodic_cells import *
+from Edmond.utility_functions.array_manipulations import *
 import scipy
+from scipy.stats.stats import pearsonr
 from Edmond.VR_grid_analysis.vr_grid_cells import get_max_SNR, distance_from_integer, get_lomb_classifier, get_rolling_lomb_classifier_for_centre_trial, \
     compress_rolling_stats, get_rolling_lomb_classifier_for_centre_trial2, get_rolling_lomb_classifier_for_centre_trial_frequentist
 '''
@@ -80,6 +82,40 @@ def switch_grid_cells(switch_coding_mode, grid_stability, grid_spacings, n_cells
         true_classifications_all_cells.append(true_classifications)
 
     return powers_all_cells, centre_trials, track_length, true_classifications_all_cells
+
+def switch_grid_cells_alt_method(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability, field_noise_std, p_scalar=Settings.sim_p_scalar):
+    # generate n switch grid cells
+    # generated n positional grid cells
+    correlations_all_cells = []
+    true_classifications_all_cells = []
+    for i in range(n_cells):
+        grid_spacing = grid_spacings[i]
+        _, _, _, firing_rate_map_by_trial_smoothed, true_classifications = get_switch_cluster_firing(switch_coding_mode=switch_coding_mode,
+                                                                                                     grid_stability=grid_stability,
+                                                                                                     field_spacing=grid_spacing,
+                                                                                                     trial_switch_probability=trial_switch_probability,
+                                                                                                     field_noise_std=field_noise_std,
+                                                                                                     p_scalar=p_scalar)
+
+        template = np.nanmean(firing_rate_map_by_trial_smoothed, axis=0)
+        trial_correlations = correlation_with_template(firing_rate_map_by_trial_smoothed, template)
+
+        correlations_all_cells.append(trial_correlations)
+        true_classifications_all_cells.append(true_classifications)
+
+    return correlations_all_cells, true_classifications_all_cells
+
+def correlation_with_template(firing_rate_map_by_trial_smoothed, template):
+    correlations = []
+    for i in range(len(firing_rate_map_by_trial_smoothed)):
+        nonnanmask = np.array(bool_to_int_array(~np.isnan(template)) * bool_to_int_array(~np.isnan(firing_rate_map_by_trial_smoothed[i])), dtype=np.bool8)
+        if ((len(template[nonnanmask]) == len(firing_rate_map_by_trial_smoothed[i][nonnanmask])) and (len(template[nonnanmask]) > 0)):
+            corr = pearsonr(template[nonnanmask], firing_rate_map_by_trial_smoothed[i][nonnanmask])[0]
+        else:
+            corr = np.nan
+        correlations.append(corr)
+    return np.array(correlations)
+
 
 def perfect_grid_cells(grid_spacings, n_cells, field_noise_std):
 
@@ -545,6 +581,107 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
     return
 
 
+def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, grid_spacing_low, grid_spacing_high, n_cells, trial_switch_probability, freq_thres=0.05, plot_suffix=""):
+    grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
+    correlation_thresholds = np.array([-1, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])
+
+    field_noise_stds = [0, 10, 20]
+    p_scalars=[0.01, 0.1, 1]
+
+    Biases_in_coding = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
+    overall_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
+    position_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
+    distance_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
+
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
+
+            # first lets generate n cells
+            correlations_all_cells, true_classifications = \
+                switch_grid_cells_alt_method(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability,
+                                  field_noise_std=noise, p_scalar=p_scalar)
+
+            for m in range(len(correlation_thresholds)):
+                for i in range(n_cells):
+
+                    correlations = correlations_all_cells[i]
+                    anchored = correlations >= correlation_thresholds[m]
+                    predicted_classifications = np.empty(len(correlations), dtype=np.str0)
+                    predicted_classifications[anchored] = "P"
+                    predicted_classifications[~anchored] = "D"
+
+                    # compare the true classifications to the estimated classifications
+                    cell_true_classifications = true_classifications[i]
+
+                    total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
+                    total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
+
+                    total_number_of_predicted_position_trials = len(predicted_classifications[predicted_classifications=="P"])
+                    total_number_of_predicted_distance_trials = len(predicted_classifications[predicted_classifications=="D"])
+
+                    actual_difference_of_position_and_distance_trials = total_number_of_position_trials-total_number_of_distance_trials
+                    predicted_difference_of_position_and_distance_trials = total_number_of_predicted_position_trials-total_number_of_predicted_distance_trials
+
+                    bias = (actual_difference_of_position_and_distance_trials-predicted_difference_of_position_and_distance_trials)
+                    position_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="P"] == cell_true_classifications[cell_true_classifications=="P"])/total_number_of_position_trials)
+                    distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
+                    accuracy_trial = 100*(np.sum(predicted_classifications == cell_true_classifications)/len(cell_true_classifications))
+
+                    Biases_in_coding[j,n,m,i] = bias
+                    overall_coding_accuracy[j,n,m,i] = accuracy_trial
+                    position_coding_accuracy[j,n,m,i] = position_trial_accuracy
+                    distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
+
+    fig = plt.figure()
+    fig.set_size_inches(5, 5, forward=True)
+    ax = fig.add_subplot(1, 1, 1)
+    alphas = [0.333, 0.666, 1]
+    linestyles = ["solid", "dashed", "dashdot", "dotted"]
+    ax.axhline(y=0, color="black", linewidth=3, linestyle="solid", alpha=0.1)
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
+            ax.plot(correlation_thresholds, np.nanmean(Biases_in_coding[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color="black",
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+    ax.set_ylabel('bias', fontsize=20, labelpad = 10)
+    ax.set_xlabel('correlation thresholds', fontsize=20, labelpad = 10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_xlim([-1,1])
+    ax.set_ylim([-100, 100])
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.xaxis.set_tick_params(labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/bias_trial'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
+    plt.close()
+
+
+    fig = plt.figure()
+    fig.set_size_inches(5, 5, forward=True)
+    ax = fig.add_subplot(1, 1, 1)
+    alphas = [0.333, 0.666, 1]
+    linestyles = ["solid", "dashed", "dashdot", "dotted"]
+    ax.axhline(y=50, color="red", linewidth=3, linestyle="dashed")
+    for j, p_scalar in enumerate(np.unique(p_scalars)):
+        for n, noise in enumerate(np.unique(field_noise_stds)):
+            ax.plot(correlation_thresholds, np.nanmean(position_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=Settings.allocentric_color,
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+            ax.plot(correlation_thresholds, np.nanmean(distance_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=np.array([109/255, 217/255, 255/255]),
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+            ax.plot(correlation_thresholds, np.nanmean(overall_coding_accuracy[j, n], axis=1),label="s=" + str(noise) + ",ps=" + str(p_scalar), color="black",
+                    clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
+
+    ax.set_ylabel('accuracy', fontsize=20, labelpad = 10)
+    ax.set_xlabel('correlation thresholds', fontsize=20, labelpad = 10)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_xlim([-1,1])
+    ax.set_ylim([0, 100])
+    ax.yaxis.set_tick_params(labelsize=20)
+    ax.xaxis.set_tick_params(labelsize=20)
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
+    plt.savefig(save_path + '/accuracy_trial'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
+    plt.close()
+    return
 
 def main():
     print('-------------------------------------------------------------')
@@ -559,9 +696,12 @@ def main():
     for switch_coding in ["block", "by_trial"]:
         for freq_thres in [0.05]:
             np.random.seed(0)
-            run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
+            #run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
+            #               n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
+            #                            plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
+            run_bias_assay_alt_method(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
                            n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
-                                        plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
+                                        plot_suffix="alt_method_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
 
 
 if __name__ == '__main__':

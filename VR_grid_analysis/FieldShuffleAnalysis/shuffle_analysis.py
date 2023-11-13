@@ -120,7 +120,7 @@ def find_neighbouring_minima(firing_rate_map, local_maximum_idx):
 
 def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kernel_std=Settings.rate_map_gauss_kernel_std,
                                            extra_smooth_gauss_kernel_std= Settings.rate_map_extra_smooth_gauss_kernel_std,
-                                           peak_min_distance=Settings.minimum_peak_distance):
+                                           peak_min_distance=Settings.minimum_peak_distance, compute_ls=True):
 
     firing_rate_map_by_trial_flattened = firing_rate_map_by_trial.flatten()
     gauss_kernel_extra = Gaussian1DKernel(stddev=extra_smooth_gauss_kernel_std)
@@ -145,34 +145,35 @@ def field_shuffle_and_get_false_alarm_rate(firing_rate_map_by_trial, gauss_kerne
     fr = fill_rate_map(firing_rate_map_by_trial, peaks_i, field_array, peak_fill_order)
     fr_smoothed = convolve(fr, gauss_kernel)
 
-    powers = []
-    rolling_peak_powers = []
-    rolling_peak_sizes = []
-    for m in indices_to_test:
-        ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
-        power = ls.power(frequency)
-        powers.append(power.tolist())
+    if compute_ls:
+        powers = []
+        rolling_peak_powers = []
+        rolling_peak_sizes = []
+        for m in indices_to_test:
+            ls = LombScargle(elapsed_distance[m:m+sliding_window_size], fr_smoothed[m:m+sliding_window_size])
+            power = ls.power(frequency)
+            powers.append(power.tolist())
 
-        # calculate rolling_peak powers and sizes
-        if len(powers) % 100 == 0:
-            rolling_powers = np.array(powers)
-            avg_rolling_powers = np.nanmean(rolling_powers, axis=0)
-            shuffle_peak_rolling_power = np.nanmax(avg_rolling_powers)
-            rolling_peak_powers.append(shuffle_peak_rolling_power)
-            rolling_peak_sizes.append(len(powers))
-    rolling_peak_powers = np.array(rolling_peak_powers)
-    rolling_peak_sizes = np.array(rolling_peak_sizes)
+            # calculate rolling_peak powers and sizes
+            if len(powers) % 100 == 0:
+                rolling_powers = np.array(powers)
+                avg_rolling_powers = np.nanmean(rolling_powers, axis=0)
+                shuffle_peak_rolling_power = np.nanmax(avg_rolling_powers)
+                rolling_peak_powers.append(shuffle_peak_rolling_power)
+                rolling_peak_sizes.append(len(powers))
+        rolling_peak_powers = np.array(rolling_peak_powers)
+        rolling_peak_sizes = np.array(rolling_peak_sizes)
 
-    powers = np.array(powers)
-    avg_powers = np.nanmean(powers, axis=0)
-    shuffle_peak_power = np.nanmax(avg_powers)
-
-    return shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, np.reshape(fr, (n_trials, track_length))
-
+        powers = np.array(powers)
+        avg_powers = np.nanmean(powers, axis=0)
+        shuffle_peak_power = np.nanmax(avg_powers)
+        return shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, np.reshape(fr, (n_trials, track_length)), np.reshape(fr_smoothed, (n_trials, track_length))
+    else:
+        return [], [], [], np.reshape(fr, (n_trials, track_length)), np.reshape(fr_smoothed, (n_trials, track_length))
 
 def run_shuffle(cluster_spike_data):
     firing_rate_map = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
-    shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, shuffled_rate_map = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
+    shuffle_peak_power, rolling_peak_powers, rolling_peak_sizes, shuffled_rate_map, _ = field_shuffle_and_get_false_alarm_rate(firing_rate_map)
     cluster_spike_data["peak_power"] = [shuffle_peak_power]
     cluster_spike_data["rolling_peak_powers"] = [rolling_peak_powers]
     cluster_spike_data["rolling_peak_sizes"] = [rolling_peak_sizes]

@@ -3,6 +3,7 @@ import pandas as pd
 from statsmodels.stats.anova import AnovaRM
 from numpy import inf
 import matplotlib.colors as colors
+from Edmond.VR_grid_analysis.FieldShuffleAnalysis.shuffle_analysis import field_shuffle_and_get_false_alarm_rate
 from scipy.ndimage import uniform_filter1d
 import PostSorting.parameters
 import PostSorting.vr_stop_analysis
@@ -3665,6 +3666,94 @@ def get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, 
     field_trial_numbers = np.array(field_trial_numbers, dtype=np.int64)
     return field_coms, field_trial_numbers
 
+def add_rolling_stats_by_trial_number_using_trial_to_trial_correlation_scores(spike_data, processed_position_data, position_data, track_length, output_path, threshold=0.1):
+    def corr2classification(corr, threshold):
+        if np.isnan(corr):
+            trial_classification = "U"
+        elif corr > threshold:
+            trial_classification = "P"
+        else:
+            trial_classification = "NP"
+        return trial_classification
+
+    rolling_position_correlations_all_clusters = []
+    rolling_correlations_all_clusters = []
+    for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
+        firing_rate_map = np.array(cluster_spike_data["fr_binned_in_space"].iloc[0])
+        firing_rate_map_smoothed = np.array(cluster_spike_data["fr_binned_in_space_smoothed"].iloc[0])
+        rolling_classification_by_trial_number = np.array(cluster_spike_data["rolling:classifier_by_trial_number"].iloc[0]) # for debugging purposes
+
+        # extract template and TA template
+        position_encoding_mask = rolling_classification_by_trial_number == "P"
+        aperiodic_encoding_mask = rolling_classification_by_trial_number == "N"
+        position_template = np.nanmean(firing_rate_map_smoothed[position_encoding_mask], axis=0)
+        template = np.nanmean(firing_rate_map_smoothed, axis=0)
+
+        """
+        # calculate the 99th percentile of trial to trial correlations
+        shuffled_t2t_correlations = []
+        n_shuffles = 10
+        for j in range(n_shuffles):
+            _, _, _, _, shuffled_rate_map_smoothed = field_shuffle_and_get_false_alarm_rate(firing_rate_map, compute_ls=False)
+
+            for i in range(len(shuffled_rate_map_smoothed)):
+                if i == 0:
+                    shuffled_t2t_correlations.append(np.nan)
+                else:
+                    nonnanmask = np.array(bool_to_int_array(~np.isnan(shuffled_rate_map_smoothed[i - 1]))*bool_to_int_array(~np.isnan(shuffled_rate_map_smoothed[i])), dtype=np.bool8)
+                    corr = pearsonr(shuffled_rate_map_smoothed[i -1 ][nonnanmask], shuffled_rate_map_smoothed[i][nonnanmask])[0]
+                    shuffled_t2t_correlations.append(corr)
+
+        shuffled_t2t_correlations = np.array(shuffled_t2t_correlations)
+        percentile_99th = np.nanpercentile(shuffled_t2t_correlations, 75)"""
+
+        # calculate  trial to trial correlations and classify based on the 99th percentile
+        t2t_correlations = []
+        t2t_position_correlations = []
+        t2t_classifications = []
+        for i in range(len(firing_rate_map_smoothed)):
+            if aperiodic_encoding_mask[i]: # if trial is already marked as aperiodic
+                corr1=np.nan
+            elif np.sum(position_encoding_mask) > 0:
+                position_nonnanmask = np.array(bool_to_int_array(~np.isnan(position_template))*bool_to_int_array(~np.isnan(firing_rate_map_smoothed[i])), dtype=np.bool8)
+                if ((len(position_template[position_nonnanmask]) == len(firing_rate_map_smoothed[i][position_nonnanmask])) and (len(position_template[position_nonnanmask])>0)):
+                    corr1 = pearsonr(position_template[position_nonnanmask], firing_rate_map_smoothed[i][position_nonnanmask])[0]
+                else:
+                    corr1 = np.nan
+            else:
+                corr1 = 0 # marked as independent encoding by default
+            t2t_position_correlations.append(corr1)
+
+            nonnanmask = np.array(bool_to_int_array(~np.isnan(template)) * bool_to_int_array(~np.isnan(firing_rate_map_smoothed[i])),dtype=np.bool8)
+            if aperiodic_encoding_mask[i]: # if trial is already marked as aperiodic
+                corr=np.nan
+            elif ((len(template[nonnanmask]) == len(firing_rate_map_smoothed[i][nonnanmask])) and (len(template[nonnanmask])>0)):
+                corr = pearsonr(template[nonnanmask], firing_rate_map_smoothed[i][nonnanmask])[0]
+            else:
+                corr = np.nan
+            t2t_correlations.append(corr)
+
+        t2t_correlations = np.array(t2t_correlations)
+        t2t_position_correlations=np.array(t2t_position_correlations)
+
+        save_path = output_path + '/Figures/correlations_against_template'
+        if os.path.exists(save_path) is False:
+            os.makedirs(save_path)
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.plot(t2t_correlations)
+        ax.axhline(y=threshold, color="red", linestyle="dashed")
+        plt.subplots_adjust(hspace=.1, wspace=.1, bottom=None, left=None, right=None, top=None)
+        plt.savefig(save_path + '/correlations_against_template_'+str(cluster_id)+'.png', dpi=400)
+        plt.close()
+
+
+        rolling_position_correlations_all_clusters.append(t2t_position_correlations)
+        rolling_correlations_all_clusters.append(t2t_correlations)
+    spike_data["rolling:position_correlation_by_trial_number_t2tmethod"] = rolling_position_correlations_all_clusters
+    spike_data["rolling:correlation_by_trial_number_t2tmethod"] = rolling_correlations_all_clusters
+    return spike_data
+
 def process_recordings(vr_recording_path_list, of_recording_path_list):
     vr_recording_path_list.sort()
     for recording in vr_recording_path_list:
@@ -3679,14 +3768,14 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             spike_data = pd.read_pickle(recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
 
             if len(spike_data) != 0:
-                if paired_recording is not None:
-                    paired_spike_data = pd.read_pickle(paired_recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
-                    spike_data = add_open_field_classifier(spike_data, paired_spike_data)
-                    spike_data = add_open_field_firing_rate(spike_data, paired_spike_data)
-                    spike_data = add_spatial_imformation_during_dominant_modes(spike_data, output_path=output_path,
-                                                                               track_length=get_track_length(recording),
-                                                                               position_data=position_data,
-                                                                               n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
+                #if paired_recording is not None:
+                #    paired_spike_data = pd.read_pickle(paired_recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
+                #    spike_data = add_open_field_classifier(spike_data, paired_spike_data)
+                #    spike_data = add_open_field_firing_rate(spike_data, paired_spike_data)
+                #    spike_data = add_spatial_imformation_during_dominant_modes(spike_data, output_path=output_path,
+                #                                                               track_length=get_track_length(recording),
+                #                                                               position_data=position_data,
+                #                                                               n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
                 spike_data = delete_unused_columns(spike_data)
                 # remake the spike locations and firing rate maps
@@ -3738,8 +3827,12 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #spike_data = add_coding_by_trial_number(spike_data, processed_position_data)
                 #spike_data = add_rolling_stats_percentage_hits(spike_data, processed_position_data) # requires add_rolling_stats
 
+                # Rolling classification trial-to-trial correlations
+                spike_data = add_rolling_stats_by_trial_number_using_trial_to_trial_correlation_scores(spike_data, processed_position_data, position_data, track_length=get_track_length(recording), output_path=output_path)
+
+
                 #spike_data = add_mean_firing_rate_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
-                spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
+                #spike_data = add_spatial_information_during_position_and_distance_trials(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=0)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=1)
                 #spike_data = calculate_spatial_periodogram_for_hmt_trials(spike_data, processed_position_data, tt=2)
@@ -3786,7 +3879,7 @@ def main():
     of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
     #of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort9_february2023/of") if f.is_dir()])
 
-    #vr_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D18_2021-06-02_10-36-39']
+    #vr_path_list = ['/mnt/datastore/Harry/cohort6_july2020/vr/M2_D15_2020-08-21_17-00-41']
     #vr_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D23_2020-11-28_15-13-28",
     #                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49",
     #                "/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D22_2020-11-27_15-01-24"]
@@ -3796,7 +3889,7 @@ def main():
     #                '/mnt/datastore/Harry/cohort8_may2021/vr/M13_D17_2021-06-01_11-45-20','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D15_2021-05-28_10-42-15','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D12_2021-05-25_09-49-23','/mnt/datastore/Harry/cohort8_may2021/vr/M11_D3_2021-05-12_09-37-41',
     #                '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D16_2021-05-31_10-21-05', '/mnt/datastore/Harry/cohort8_may2021/vr/M11_D13_2021-05-26_09-46-36']
     #vr_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M11_D22_2021-06-08_10-55-28"]
-    #vr_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21"]
+    #vr_path_list=["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D19_2021-06-03_10-50-41"]
     #vr_path_list= ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D14_2021-05-27_10-34-15"]
     #vr_path_list=["/mnt/datastore/Harry/Cohort6_july2020/vr/M1_D11_2020-08-17_14-57-20"]
     '''
