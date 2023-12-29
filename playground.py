@@ -104,20 +104,25 @@ def get_n_closest_waveforms(waveforms, number_of_channels, primary_channel, prob
     else: # presume cambridge neurotech P1 probes
         probegroup = ProbeGroup()
         n_probes = int(number_of_channels/64)
+        device_channel_indices = []
         for i in range(n_probes):
             probe = get_probe('cambridgeneurotech', 'ASSY-236-P-1')
+            probe.wiring_to_device('cambridgeneurotech_mini-amp-64', channel_offset=int(i*64))
             probe.move([i*2000, 0]) # move the probes far away from eachother
-            probe.set_device_channel_indices(np.arange(64)+(64*i))
-            probe.set_contact_ids(np.array(probe.to_dataframe()["contact_ids"].values, dtype=np.int64)+(64*i))
+            #probe.set_device_channel_indices(np.arange(64)+(64*i))
+            probe.set_contact_ids(np.array(probe.to_dataframe()["contact_ids"].values, dtype=np.int64)+int(64*i))
             probegroup.add_probe(probe)
+            device_channel_indices.extend(probe.device_channel_indices.tolist())
+
+        device_channel_indices = np.array(device_channel_indices)+1
         probe_df = probegroup.to_dataframe()
         probe_df["probe_index"] = np.asarray(probe_df["probe_index"])+1
         probe_df["shank_ids"] = np.asarray(probe_df["shank_ids"], dtype=np.uint8)+1
         probe_df = probe_df.astype({"probe_index": str})
         probe_df = probe_df.astype({"shank_ids": str})
-        probe_df = probe_df[(probe_df["probe_index"] == probe_id) & (probe_df["shank_ids"] == shank_id)]
-        probe_df["channel"] = np.arange(1,len(probe_df)+1)
+        probe_df["channel"] = device_channel_indices
 
+    probe_df = probe_df[(probe_df["probe_index"] == probe_id) & (probe_df["shank_ids"] == shank_id)]
     primary_x = probe_df[probe_df["channel"] == primary_channel]["x"].iloc[0]
     primary_y = probe_df[probe_df["channel"] == primary_channel]["y"].iloc[0]
 
@@ -222,22 +227,107 @@ def plot_waveforms_from_sever(waveform_path, save_path, load_closest_channels=Fa
         plt.close()
     return
 
+import spikeinterface.preprocessing as spre
+from spikeinterface.postprocessing import compute_correlograms
 
 def plot_waveforms_from_sever_using_probe_geometry(waveform_path, save_path, load_closest_channels=False, n_spikes=30):
-    a = pi.get_available_pathways()
+    for probe_id in [1,2]:
+        for shank_id in [1,2,3,4]:
+            Sorter = si.load_extractor(settings.temp_storage_path + '/sorter_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
 
-    #probe.wiring_to_device('H32>RHD2132')
+            Recording = si.load_extractor(settings.temp_storage_path + '/processed_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
+            Recording = spre.common_reference(Recording, reference="local", operator="median")
+            Recording = spre.bandpass_filter(Recording, freq_min=300, freq_max=2000)
+
+            we = si.extract_waveforms(Recording, Sorter, folder=settings.temp_storage_path + '/waveforms_probe' + str(
+                probe_id) + '_shank' + str(shank_id) + '_segment0', ms_before=1, ms_after=2, load_if_exists=False, overwrite=True, max_spikes_per_unit=100)
+            unit_ids = Sorter.unit_ids[:10]
+            ax = sw.plot_unit_waveforms(we, unit_ids=unit_ids, plot_templates=True, alpha_waveforms=0.3, alpha_templates=1, lw_waveforms=0.3, lw_templates=0.5, max_spikes_per_unit=100,
+                                        unit_colors = {1: 'blue', 2: 'red', 3: 'green', 4: 'yellow', 5: 'magenta', 6: 'cyan', 7: 'orange', 8: 'purple', 9: 'brown', 10: 'pink'})
+            #sw.plot_unit_templates(we, unit_ids=unit_ids, unit_colors={1: 'black', 2: 'black', 3: 'black', 4: 'black', 5: 'black', 6: 'black'})
+            for i in range(len(ax.axes)):
+                for j in range(len(ax.axes[0])):
+                    if ax.axes[i,j] is not None:
+                        ax.axes[i,j].spines['top'].set_visible(False)
+                        ax.axes[i,j].spines['right'].set_visible(False)
+                        ax.axes[i,j].spines['bottom'].set_visible(False)
+                        ax.axes[i,j].spines['left'].set_visible(False)
+                        ax.axes[i, j].xaxis.set_tick_params(labelbottom=False)
+                        ax.axes[i, j].yaxis.set_tick_params(labelleft=False)
+                        ax.axes[i, j].set_xticks([])
+                        ax.axes[i, j].set_yticks([])
+                        ax.axes[i, j].set_title("")
+            plt.savefig(save_path + '/by_geometry_waveforms_probe'+str(probe_id)+'_shank'+str(shank_id)+'.png', dpi=1000)
+            plt.close()
+
+            ax = sw.plot_autocorrelograms(Sorter, window_ms=100.0, bin_ms=2.0, unit_ids=unit_ids, unit_colors={1: 'black', 2: 'black', 3: 'black', 4: 'black', 5: 'black',
+                                                                                                               6: 'black', 7: 'black', 8: 'black', 9: 'black', 10: 'black'})
+            for i in range(len(ax.axes)):
+                for j in range(len(ax.axes[0])):
+                    if ax.axes[i,j] is not None:
+                        ax.axes[i,j].spines['top'].set_visible(False)
+                        ax.axes[i,j].spines['right'].set_visible(False)
+                        ax.axes[i,j].spines['bottom'].set_visible(False)
+                        ax.axes[i,j].spines['left'].set_visible(False)
+                        ax.axes[i, j].xaxis.set_tick_params(labelbottom=False)
+                        ax.axes[i, j].yaxis.set_tick_params(labelleft=False)
+                        ax.axes[i, j].set_xticks([])
+                        ax.axes[i, j].set_yticks([])
+                        ax.axes[i, j].set_title("")
+            plt.savefig(save_path + '/by_geometry_crosscorr_probe'+str(probe_id)+'_shank'+str(shank_id)+'.png', dpi=1000)
+            plt.close()
+    print("hi")
 
 
 
 
+    for probe_id in [1,2]:
+        for shank_id in [1,2,3,4]:
+            Sorter = si.load_extractor(settings.temp_storage_path + '/sorter_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
 
+            Recording = si.load_extractor(settings.temp_storage_path + '/processed_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
+            Recording = spre.common_reference(Recording, reference="local", operator="median")
+            Recording = spre.bandpass_filter(Recording, freq_min=300, freq_max=2000)
 
+            we = si.extract_waveforms(Recording, Sorter, folder=settings.temp_storage_path + '/waveforms_probe' + str(
+                probe_id) + '_shank' + str(shank_id) + '_segment0', ms_before=1, ms_after=2, load_if_exists=False, overwrite=True, max_spikes_per_unit=10000)
+            unit_ids = Sorter.unit_ids[:10]
+            ax = sw.plot_unit_waveforms(we, unit_ids=unit_ids, plot_templates=True)
+            #sw.plot_unit_templates(we, unit_ids=unit_ids, unit_colors={1: 'black', 2: 'black', 3: 'black', 4: 'black', 5: 'black', 6: 'black'})
+            for i in range(len(ax.axes)):
+                for j in range(len(ax.axes[0])):
+                    if ax.axes[i,j] is not None:
+                        ax.axes[i,j].spines['top'].set_visible(False)
+                        ax.axes[i,j].spines['right'].set_visible(False)
+                        ax.axes[i,j].spines['bottom'].set_visible(False)
+                        ax.axes[i,j].spines['left'].set_visible(False)
+                        ax.axes[i, j].xaxis.set_tick_params(labelbottom=False)
+                        ax.axes[i, j].yaxis.set_tick_params(labelleft=False)
+                        ax.axes[i, j].set_xticks([])
+                        ax.axes[i, j].set_yticks([])
+                        ax.axes[i, j].set_title("")
+            plt.savefig(save_path + '/by_geometry_waveforms_probe'+str(probe_id)+'_shank'+str(shank_id)+'.png', dpi=1000)
+            plt.close()
 
+            ax = sw.plot_autocorrelograms(Sorter, window_ms=100.0, bin_ms=2.0, unit_ids=unit_ids)
+            for i in range(len(ax.axes)):
+                for j in range(len(ax.axes[0])):
+                    if ax.axes[i,j] is not None:
+                        ax.axes[i,j].spines['top'].set_visible(False)
+                        ax.axes[i,j].spines['right'].set_visible(False)
+                        ax.axes[i,j].spines['bottom'].set_visible(False)
+                        ax.axes[i,j].spines['left'].set_visible(False)
+                        ax.axes[i, j].xaxis.set_tick_params(labelbottom=False)
+                        ax.axes[i, j].yaxis.set_tick_params(labelleft=False)
+                        ax.axes[i, j].set_xticks([])
+                        ax.axes[i, j].set_yticks([])
+                        ax.axes[i, j].set_title("")
+            plt.savefig(save_path + '/by_geometry_crosscorr_probe'+str(probe_id)+'_shank'+str(shank_id)+'.png', dpi=1000)
+            plt.close()
+    print("hi")
 
     import os
     waveform_paths = [f for f in os.listdir(waveform_path) if f.endswith('.npy')]
-    #waveform_paths = ["waveforms_112.npy"]
     for sub_path in waveform_paths:
         cluster_id = sub_path.split("_")[1].split(".npy")[0]
         probe_id= cluster_id[0]
@@ -246,15 +336,16 @@ def plot_waveforms_from_sever_using_probe_geometry(waveform_path, save_path, loa
 
         Sorter = si.load_extractor(settings.temp_storage_path + '/sorter_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
         Recording = si.load_extractor(settings.temp_storage_path + '/processed_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0')
-        we = si.extract_waveforms(Recording, Sorter,folder=settings.temp_storage_path + '/waveforms_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0', ms_before=1, ms_after=1, load_if_exists=False, overwrite=True)
-
+        we = si.extract_waveforms(Recording, Sorter,folder=settings.temp_storage_path + '/waveforms_probe' + str(probe_id) + '_shank' + str(shank_id) + '_segment0', ms_before=1, ms_after=2, load_if_exists=False, overwrite=True)
         sw.plot_unit_waveforms(we, unit_ids=np.array([int(on_shank_id)]))
-        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_2.png', dpi=300)
+        plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '.png', dpi=300)
         plt.close()
+    return
 
+"""
         primary_channel_ids = si.get_template_extremum_channel(we)
         primary_channel = primary_channel_ids[int(on_shank_id)]
-
+            
         waveforms = np.load(waveform_path+"/"+sub_path)
         _, closest_channel_ids, probe_df = get_n_closest_waveforms(waveforms, 128, primary_channel+1, probe_id, shank_id, n=16)
 
@@ -273,9 +364,7 @@ def plot_waveforms_from_sever_using_probe_geometry(waveform_path, save_path, loa
             ax.plot(x+(np.linspace(-1, 1, len(waveforms_to_plot[j,:]))*x_stretch_factor), y+(np.nanmean(waveforms_to_plot, axis=0)*y_stretch_factor), color="red")
 
         plt.savefig(save_path + '/by_geometry_waveforms_' + str(cluster_id) + '_plot_waveforms_from_sever_using_probe_geometry.png', dpi=300)
-        plt.close()
-
-    return
+        plt.close()"""
 
 def plot_waveforms_again(waveform_path, save_path):
     import os
@@ -322,6 +411,10 @@ def adjust_pvals(p_values):
 def main():
 
     print('-------------------------------------------------------------')
+    plot_waveforms_from_sever_using_probe_geometry(waveform_path="/home/ubuntu/to_sort/recordings/tmp/waveform_arrays",
+                              save_path="/mnt/datastore/Harry/test_recording/M18_D1_2023-10-30_12-38-29/Figures",
+                              load_closest_channels=False)
+
     spatial_firing = pd.read_pickle("/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27/mountainsort4/DataFrames/spatial_firing.pkl")
 
     # index 101 corresponds to cluster id 118

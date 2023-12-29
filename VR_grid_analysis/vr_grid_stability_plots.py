@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
+from matplotlib.ticker import FormatStrFormatter
 import Edmond.VR_grid_analysis.analysis_settings as Settings
 from matplotlib.markers import TICKDOWN
 import PostSorting.parameters
@@ -288,25 +289,25 @@ def plot_stops_on_track(processed_position_data, output_path, track_length=200, 
         trial_number = trial_row["trial_number"].iloc[0]
         trial_stop_color = get_trial_color(trial_type)
         stop_locations = np.array(trial_row["stop_location_cm"].iloc[0])
-        rz_stop_locations = stop_locations[(stop_locations>90) & (stop_locations<110)]
 
         # do not plot probe trials
         if trial_type != 2:
             ax.plot(stop_locations, trial_number*np.ones(len(stop_locations)), 'o', color=trial_stop_color, markersize=4)
-            ax.plot(stop_locations, trial_number * np.ones(len(stop_locations)), 'o', color="black",markersize=4)
+            #ax.plot(stop_locations, trial_number * np.ones(len(stop_locations)), 'o', color="black",markersize=4)
 
-    # plot rewarded trials
-    for index, trial_row in processed_position_data.iterrows():
-        trial_row = trial_row.to_frame().T.reset_index(drop=True)
-        trial_type = trial_row["trial_type"].iloc[0]
-        trial_number = trial_row["trial_number"].iloc[0]
-        trial_stop_color = get_trial_color(trial_type)
-        stop_locations = np.array(trial_row["stop_location_cm"].iloc[0])
-        rz_stop_locations = stop_locations[(stop_locations>90) & (stop_locations<110)]
-        # do not plot probe trials
-        if trial_type != 2:
-            if len(rz_stop_locations)>0:
-                ax.plot(rz_stop_locations[0], trial_number, 'x', color="green", markersize=4)
+    if plot_rewarded:
+        # plot rewarded trials
+        for index, trial_row in processed_position_data.iterrows():
+            trial_row = trial_row.to_frame().T.reset_index(drop=True)
+            trial_type = trial_row["trial_type"].iloc[0]
+            trial_number = trial_row["trial_number"].iloc[0]
+            trial_stop_color = get_trial_color(trial_type)
+            stop_locations = np.array(trial_row["stop_location_cm"].iloc[0])
+            rz_stop_locations = stop_locations[(stop_locations>90) & (stop_locations<110)]
+            # do not plot probe trials
+            if trial_type != 2:
+                if len(rz_stop_locations)>0:
+                    ax.plot(rz_stop_locations[0], trial_number, 'x', color="green", markersize=4)
 
     plt.ylabel('Stops on trials', fontsize=25, labelpad = 10)
     plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
@@ -5091,6 +5092,149 @@ def plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_da
 
     return
 
+def ceiling_with_precision(a, precision=0):
+    return np.round(a + 0.5 * 10**(-precision), precision)
+
+def plot_stop_histogram_between_coding_epochs_across_session(spike_data, processed_position_data, output_path, track_length):
+    def parse_nan(array1d):
+        parsed_array = []
+        for i in range(len(array1d)):
+            if np.isnan(array1d[i]):
+                parsed_array.append(0)
+            else:
+                parsed_array.append(array1d[i])
+        return np.array(parsed_array)
+
+    spike_data = spike_data[spike_data["paired_cell_type_classification"] == "G"]
+    if len(spike_data)>0:
+        print('plotting stopping histograms for coding epochs...')
+        save_path = output_path + '/Figures/stop_histogram_for_coding_epochs'
+        if os.path.exists(save_path) is False:
+            os.makedirs(save_path)
+
+        fig, ax = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), gridspec_kw={'height_ratios': [0.25, 0.25, 0.5]})
+
+        remapped_position_grid_cells_stop_histogram_0, _, bin_centres, n_trials_p, _, _ = get_stop_histogram(spike_data, tt=0, coding_scheme="P", shuffle=False, track_length=track_length)
+        remapped_distance_grid_cells_stop_histogram_0, _, bin_centres, n_trials_d, _, _ = get_stop_histogram(spike_data, tt=0, coding_scheme="D", shuffle=False, track_length=track_length)
+        remapped_position_grid_cells_stop_histogram_0 = np.array(remapped_position_grid_cells_stop_histogram_0)
+        remapped_distance_grid_cells_stop_histogram_0 = np.array(remapped_distance_grid_cells_stop_histogram_0)
+        p_nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_0)[:, 0]
+        d_nan_mask = ~np.isnan(remapped_distance_grid_cells_stop_histogram_0)[:, 0]
+        P_weigths_0 = get_session_weights(spike_data, tt=0, coding_scheme="P")[p_nan_mask]
+        D_weigths_0 = get_session_weights(spike_data, tt=0, coding_scheme="D")[d_nan_mask]
+        remapped_position_grid_cells_stop_histogram_0 = remapped_position_grid_cells_stop_histogram_0[p_nan_mask,:]
+        remapped_distance_grid_cells_stop_histogram_0 = remapped_distance_grid_cells_stop_histogram_0[d_nan_mask,:]
+
+        remapped_position_grid_cells_stop_histogram_1, _, bin_centres, n_trials_p, _, _ = get_stop_histogram(spike_data, tt=1, coding_scheme="P", shuffle=False, track_length=track_length)
+        remapped_distance_grid_cells_stop_histogram_1, _, bin_centres, n_trials_d, _, _ = get_stop_histogram(spike_data, tt=1, coding_scheme="D", shuffle=False, track_length=track_length)
+        remapped_position_grid_cells_stop_histogram_1 = np.array(remapped_position_grid_cells_stop_histogram_1)
+        remapped_distance_grid_cells_stop_histogram_1 = np.array(remapped_distance_grid_cells_stop_histogram_1)
+        p_nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_1)[:, 0]
+        d_nan_mask = ~np.isnan(remapped_distance_grid_cells_stop_histogram_1)[:, 0]
+        P_weigths_1 = get_session_weights(spike_data, tt=1, coding_scheme="P")[p_nan_mask]
+        D_weigths_1 = get_session_weights(spike_data, tt=1, coding_scheme="D")[d_nan_mask]
+        remapped_position_grid_cells_stop_histogram_1 = remapped_position_grid_cells_stop_histogram_1[p_nan_mask, :]
+        remapped_distance_grid_cells_stop_histogram_1 = remapped_distance_grid_cells_stop_histogram_1[d_nan_mask, :]
+
+        y_max=0
+        if len(P_weigths_0)>0:
+            y_max = max([max(np.average(remapped_position_grid_cells_stop_histogram_0, weights=P_weigths_0, axis=0) + parse_nan(scipy.stats.sem(remapped_position_grid_cells_stop_histogram_0, axis=0, nan_policy="omit"))), y_max])
+        if len(D_weigths_0) > 0:
+            y_max = max([max(np.average(remapped_distance_grid_cells_stop_histogram_0, weights=D_weigths_0, axis=0) + parse_nan(scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_0, axis=0, nan_policy="omit"))), y_max])
+        if len(P_weigths_1)>0:
+            y_max = max([max(np.average(remapped_position_grid_cells_stop_histogram_1, weights=P_weigths_0, axis=0) + parse_nan(scipy.stats.sem(remapped_position_grid_cells_stop_histogram_1, axis=0, nan_policy="omit"))), y_max])
+        if len(D_weigths_1) > 0:
+            y_max = max([max(np.average(remapped_distance_grid_cells_stop_histogram_1, weights=D_weigths_0,axis=0) + parse_nan(scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_1, axis=0, nan_policy="omit"))), y_max])
+        y_max = ceiling_with_precision(y_max, precision=1)
+
+        for tt in [0, 1]:
+            remapped_position_grid_cells_stop_histogram_tt, _, bin_centres, n_trials_p, _, _ = get_stop_histogram(spike_data, tt=tt,coding_scheme="P",shuffle=False, track_length=track_length)
+            remapped_distance_grid_cells_stop_histogram_tt, _, bin_centres, n_trials_d, _, _ = get_stop_histogram(spike_data, tt=tt,coding_scheme="D",shuffle=False, track_length=track_length)
+            remapped_position_grid_cells_stop_histogram_tt = np.array(remapped_position_grid_cells_stop_histogram_tt)
+            remapped_distance_grid_cells_stop_histogram_tt = np.array(remapped_distance_grid_cells_stop_histogram_tt)
+            p_nan_mask = ~np.isnan(remapped_position_grid_cells_stop_histogram_tt)[:, 0]
+            d_nan_mask = ~np.isnan(remapped_distance_grid_cells_stop_histogram_tt)[:, 0]
+            P_weigths = get_session_weights(spike_data, tt=tt, coding_scheme="P")
+            D_weigths = get_session_weights(spike_data, tt=tt, coding_scheme="D")
+
+            # apply mask
+            remapped_position_grid_cells_stop_histogram_tt = remapped_position_grid_cells_stop_histogram_tt[p_nan_mask,:]
+            remapped_distance_grid_cells_stop_histogram_tt = remapped_distance_grid_cells_stop_histogram_tt[d_nan_mask,:]
+            P_weigths = P_weigths[p_nan_mask]
+            D_weigths = D_weigths[d_nan_mask]
+
+            if len(P_weigths)>0:
+                ax[tt].plot(bin_centres, np.average(remapped_position_grid_cells_stop_histogram_tt, weights=P_weigths, axis=0),color=Settings.allocentric_color, linewidth=3)
+                ax[tt].fill_between(bin_centres,
+                                np.average(remapped_position_grid_cells_stop_histogram_tt, weights=P_weigths,axis=0) - parse_nan(scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit")),
+                                np.average(remapped_position_grid_cells_stop_histogram_tt, weights=P_weigths, axis=0) + parse_nan(scipy.stats.sem(remapped_position_grid_cells_stop_histogram_tt, axis=0,nan_policy="omit")),
+                                color=Settings.allocentric_color, alpha=0.3)
+
+            if len(D_weigths) > 0:
+                # plot distance grid cell session stop histogram
+                ax[tt].plot(bin_centres, np.average(remapped_distance_grid_cells_stop_histogram_tt, weights=D_weigths, axis=0),color=Settings.egocentric_color, linewidth=3)
+                ax[tt].fill_between(bin_centres,
+                                np.average(remapped_distance_grid_cells_stop_histogram_tt, weights=D_weigths, axis=0) - parse_nan(scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit")),
+                                np.average(remapped_distance_grid_cells_stop_histogram_tt, weights=D_weigths, axis=0) + parse_nan(scipy.stats.sem(remapped_distance_grid_cells_stop_histogram_tt, axis=0, nan_policy="omit")),
+                                color=Settings.egocentric_color, alpha=0.3)
+
+            if tt == 0:
+                style_track_plot(ax[tt], 200)
+            else:
+                style_track_plot_no_RZ(ax[tt], 200)
+
+            ax[tt].text(x=0.7, y=0.7, s="P:"+str(np.round(np.nanmean(n_trials_p), decimals=1))+" +- "+str(np.round(np.nanstd(n_trials_p), decimals=1)), horizontalalignment='center', verticalalignment='center', transform = ax[tt].transAxes, fontsize="x-small")
+            ax[tt].text(x=0.7, y=0.9, s="D:"+str(np.round(np.nanmean(n_trials_d), decimals=0))+" +- "+str(np.round(np.nanstd(n_trials_d), decimals=1)), horizontalalignment='center', verticalalignment='center', transform = ax[tt].transAxes, fontsize="x-small")
+            plt.xlim(0, 200)
+            tick_spacing = 100
+            ax[tt].set_xlim([0,200])
+            ax[tt].yaxis.set_tick_params(labelsize=25)
+            ax[tt].set_xticks([0, 100, 200])
+            ax[tt].set_xticklabels(["", "", ""])
+            ax[tt].xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+            ax[tt].yaxis.set_ticks_position('left')
+            ax[tt].xaxis.set_ticks_position('bottom')
+            Edmond.plot_utility2.style_vr_plot(ax[tt])
+            #ax.set_ylim([0,0.2])
+            if (~np.isinf(y_max) & ~np.isnan(y_max)):
+                ax[tt].set_ylim(bottom=0, top=y_max)
+                ax[tt].set_yticks([0, y_max])
+            #plt.locator_params(axis = 'y', nbins  = 3)
+
+        spike_data = curate_stops_spike_data(spike_data, track_length)
+        stop_locations = np.array(spike_data["stop_locations"].iloc[0])
+        stop_trial_numbers = np.array(spike_data["stop_trial_numbers"].iloc[0])
+        for index, trial_row in processed_position_data.iterrows():
+            trial_row = trial_row.to_frame().T.reset_index(drop=True)
+            trial_type = trial_row["trial_type"].iloc[0]
+            trial_number = trial_row["trial_number"].iloc[0]
+            trial_stop_color = get_trial_color(trial_type)  #
+            if trial_stop_color == "lightcoral":
+                alpha = 0
+            else:
+                alpha = 1
+            ax[2].plot(stop_locations[stop_trial_numbers == trial_number],
+                      trial_number * np.ones(len(stop_locations[stop_trial_numbers == trial_number])), 'o',
+                      color=trial_stop_color, markersize=3, alpha=alpha)
+
+        ax[2].set_xlim(0, track_length)
+        tick_spacing = 100
+        ax[2].xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        ax[2].yaxis.set_ticks_position('left')
+        ax[2].xaxis.set_ticks_position('bottom')
+        ax[2].xaxis.set_tick_params(labelsize=25)
+        ax[2].yaxis.set_tick_params(labelsize=25)
+        Edmond.plot_utility2.style_track_plot(ax[2], track_length)
+        n_trials = len(processed_position_data)
+        x_max = n_trials + 0.5
+        for axis in ['top', 'bottom', 'left', 'right']:
+            ax[2].spines[axis].set_linewidth(3)
+        Edmond.plot_utility2.style_vr_plot(ax[2], x_max)
+        plt.subplots_adjust(hspace=0.2, wspace=None, bottom=None, left=0.3, right=None, top=None)
+        plt.savefig(save_path + '/stops_and_histograms_for_grid_cells_png', dpi=200)
+        plt.close()
+    return
+
 def plot_shuffled_firing_rate_map_and_spatial_periodogram(spike_data, processed_position_data, output_path, track_length, plot_rolling_marker, n_window_size_for_rolling_window, suffix):
     print('plotting trial firing rate maps...')
     save_path = output_path + '/Figures/shuffled_trials_plots'
@@ -5383,7 +5527,7 @@ def plot_field_distributions(spike_data, processed_position_data, position_data,
             # find peaks and trough indices
             peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=Settings.minimum_peak_distance)[0]
             peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
-            field_coms, field_trial_numbers = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
+            field_coms, field_trial_numbers, field_sizes = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
 
             for tt in [0,1,2]:
                 trial_type_processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
@@ -5443,7 +5587,7 @@ def plot_field_location(spike_data, processed_position_data, position_data, outp
             # find peaks and trough indices
             peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=Settings.minimum_peak_distance)[0]
             peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
-            field_coms, field_trial_numbers = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
+            field_coms, field_trial_numbers, field_sizes = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
 
             for tt in [0,1,2]:
                 trial_type_processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
@@ -5504,7 +5648,7 @@ def plot_first_field_location_vs_first_stop_location(spike_data, processed_posit
             # find peaks and trough indices
             peaks_i = find_peaks(firing_rate_map_by_trial_flattened_extra_smooth, distance=Settings.minimum_peak_distance)[0]
             peaks_indices = get_peak_indices(firing_rate_map_by_trial_flattened_extra_smooth, peaks_i)
-            field_coms, field_trial_numbers = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
+            field_coms, field_trial_numbers, field_sizes = get_field_centre_of_mass(firing_rate_map_by_trial_flattened, peaks_indices, track_length)
 
             for tt in [0,1,2]:
                 trial_type_processed_position_data = processed_position_data[processed_position_data["trial_type"] == tt]
@@ -5553,7 +5697,7 @@ def plot_first_field_location_vs_first_stop_location(spike_data, processed_posit
 
 def plot_coding_schemes_vs_hits(spike_data, output_path, track_length, processed_position_data, position_data, n_window_size_for_rolling_window,plot_spatial_information=False):
     spike_data["grid_cell"] = spike_data["paired_cell_type_classification"] == "G"
-    spike_data = spike_data.sort_values(by=["grid_cell", "agreement_between_cell_and_global"], ascending=False)
+    spike_data = spike_data.sort_values(by=["grid_cell", "agreement_between_cell_and_grid_global"], ascending=False)
     print('plotting moving lomb_scargle periodogram...')
     save_path = output_path + '/Figures/moving_lomb_scargle_periodograms'
     if os.path.exists(save_path) is False:
@@ -5603,38 +5747,19 @@ def plot_coding_schemes_vs_hits(spike_data, output_path, track_length, processed
     if not len(rolling_classifiers_grid_cells)>0:
         return
 
-    dominant_mode_all_cells = stats.mode(rolling_classifiers_all_cells, axis=0)[0][0]
-    dominant_mode_grid_cells = stats.mode(rolling_classifiers_grid_cells, axis=0)[0][0]
-    dominant_mode_non_grid_cells = stats.mode(rolling_classifiers_non_grid_cells, axis=0)[0][0]
-
     # plot the cell coding
-    fig, ax = plt.subplots(ncols=2, nrows=1, figsize=(6, 5), gridspec_kw={'width_ratios': [2, 1]})
+    fig, ax = plt.subplots(ncols=2, nrows=1, figsize=(5.5, 5), gridspec_kw={'width_ratios': [0.7, 2]})
     cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
     boundaries = [0, 1, 2, 3, 4]
     norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
 
     legend_freq = np.arange(0, 0.95, 0.01)
-
-    for i in range(len(rolling_classifiers_grid_cells)):
-        legend_freq +=1
-        Y, X = np.meshgrid(trial_numbers, legend_freq)
-        grid_cell_classifier_tiled = np.tile(rolling_classifiers_grid_cells[i], (len(legend_freq), 1))
-        ax[0].pcolormesh(X, Y, grid_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
-
-    #legend_freq += 1
-    for i in range(len(rolling_classifiers_non_grid_cells)):
-        legend_freq +=1
-        Y, X = np.meshgrid(trial_numbers, legend_freq)
-        nongrid_cell_classifier_tiled = np.tile(rolling_classifiers_non_grid_cells[i], (len(legend_freq), 1))
-        ax[0].pcolormesh(X, Y, nongrid_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
-
-    legend_freq += 1
     cmap = colors.ListedColormap(["tab:blue", "tab:red", "tab:red"])
     boundaries = [-1, 0.5, 1.5, 2.5]
     norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
     trial_types_tiled = np.tile(trial_types, (len(legend_freq), 1))
     Y, X = np.meshgrid(trial_numbers, legend_freq)
-    ax[1].pcolormesh(X, Y, trial_types_tiled, cmap=cmap, norm=norm, shading="flat")
+    ax[0].pcolormesh(X, Y, trial_types_tiled, cmap=cmap, norm=norm, shading="flat")
 
     cmap = colors.ListedColormap(["white", "green"])
     boundaries = [0, 0.9, 2]
@@ -5642,16 +5767,27 @@ def plot_coding_schemes_vs_hits(spike_data, output_path, track_length, processed
     legend_freq += 1
     engaged_cued_tiled = np.tile(engaged_cued, (len(legend_freq), 1))
     Y, X = np.meshgrid(trial_numbers, legend_freq)
-    ax[1].pcolormesh(X, Y, engaged_cued_tiled, cmap=cmap, norm=norm, shading="flat")
+    ax[0].pcolormesh(X, Y, engaged_cued_tiled, cmap=cmap, norm=norm, shading="flat")
 
     legend_freq += 1
     engaged_pi_tiled = np.tile(engaged_pi, (len(legend_freq), 1))
     Y, X = np.meshgrid(trial_numbers, legend_freq)
-    ax[1].pcolormesh(X, Y, engaged_pi_tiled, cmap=cmap, norm=norm, shading="flat")
+    ax[0].pcolormesh(X, Y, engaged_pi_tiled, cmap=cmap, norm=norm, shading="flat")
 
     cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
     boundaries = [0, 1, 2, 3, 4]
     norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
+    for i in range(len(rolling_classifiers_grid_cells)):
+        legend_freq +=1
+        Y, X = np.meshgrid(trial_numbers, legend_freq)
+        grid_cell_classifier_tiled = np.tile(rolling_classifiers_grid_cells[i], (len(legend_freq), 1))
+        ax[1].pcolormesh(X, Y, grid_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
+    for i in range(len(rolling_classifiers_non_grid_cells)):
+        legend_freq +=1
+        Y, X = np.meshgrid(trial_numbers, legend_freq)
+        nongrid_cell_classifier_tiled = np.tile(rolling_classifiers_non_grid_cells[i], (len(legend_freq), 1))
+        ax[1].pcolormesh(X, Y, nongrid_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
+
 
     #legend_freq += 1
     #Y, X = np.meshgrid(trial_numbers, legend_freq)
@@ -5663,10 +5799,10 @@ def plot_coding_schemes_vs_hits(spike_data, output_path, track_length, processed
     #nongrid_cell_classifier_tiled = np.tile(dominant_mode_non_grid_cells, (len(legend_freq), 1))
     #ax[1].pcolormesh(X, Y, nongrid_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
 
-    legend_freq += 1
-    Y, X = np.meshgrid(trial_numbers, legend_freq)
-    all_cell_classifier_tiled = np.tile(dominant_mode_all_cells, (len(legend_freq), 1))
-    ax[1].pcolormesh(X, Y, all_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
+    #legend_freq += 1
+    #Y, X = np.meshgrid(trial_numbers, legend_freq)
+    #all_cell_classifier_tiled = np.tile(dominant_mode_all_cells, (len(legend_freq), 1))
+    #ax[1].pcolormesh(X, Y, all_cell_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
 
     for axis in ax:
         axis.spines['top'].set_visible(False)
@@ -5679,7 +5815,7 @@ def plot_coding_schemes_vs_hits(spike_data, output_path, track_length, processed
         axis.set_xticks([])
         axis.set_yticks([])
 
-    plt.subplots_adjust(hspace=None, wspace=.3, bottom=None, left=None, right=None, top=None)
+    plt.subplots_adjust(hspace=None, wspace=.25, bottom=None, left=None, right=None, top=None)
     plt.savefig(save_path + '/cell_modes_and_hits.png', dpi=300)
     plt.close()
     return
@@ -6303,17 +6439,12 @@ def plot_stops_and_histograms(spike_data, processed_position_data, output_path, 
 
 def plot_all_firing_rates_compact(spike_data, processed_position_data, output_path, track_length, n_window_size_for_rolling_window):
     spike_data["grid_cell"] = spike_data["paired_cell_type_classification"] == "G"
-    spike_data = spike_data.sort_values(by=["grid_cell", "agreement_between_cell_and_global"], ascending=False)
+    spike_data = spike_data.sort_values(by=["grid_cell", "agreement_between_cell_and_grid_global"], ascending=False)
 
-    vmax_global = np.nanmax(spike_data["vmax"])
     print('plotting moving lomb_scargle periodogram...')
     save_path = output_path + '/Figures/firing_rate_maps_trials'
     if os.path.exists(save_path) is False:
         os.makedirs(save_path)
-
-    power_step = Settings.power_estimate_step
-    step = Settings.frequency_step
-    frequency = Settings.frequency
 
     nrows = 2
     ncols = int(np.ceil(len(spike_data)/nrows))
@@ -6321,9 +6452,13 @@ def plot_all_firing_rates_compact(spike_data, processed_position_data, output_pa
 
     i=0
     j=0
+    n=0
+    n_max = nrows * ncols
+
     fig, ax = plt.subplots(ncols=ncols, nrows=nrows, figsize=(12, 4))
 
     for cluster_index, cluster_id in enumerate(spike_data.cluster_id):
+        n+=1
         cluster_spike_data = spike_data[spike_data["cluster_id"] == cluster_id]
         firing_times_cluster = np.array(cluster_spike_data["firing_times"].iloc[0])
 
@@ -6340,33 +6475,11 @@ def plot_all_firing_rates_compact(spike_data, processed_position_data, output_pa
             ordered = np.arange(0, len(processed_position_data), 1)
             X, Y = np.meshgrid(locations, ordered)
             cmap = plt.cm.get_cmap(Settings.rate_map_cmap)
-            ax[j,i].pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=0, vmax=vmax)
-            #ax[j, i].tick_params(axis='both', which='both', labelsize=30)
-            ax[j, i].set_xlim([0, track_length])
-            ax[j, i].set_ylim([0, len(processed_position_data)])
 
-            """
-            # plot the classifier
-            rolling_power_threshold = cluster_spike_data["rolling_threshold"].iloc[0]
-            powers = np.array(cluster_spike_data["MOVING_LOMB_all_powers"].iloc[0])
-            centre_trials = np.array(cluster_spike_data["MOVING_LOMB_all_centre_trials"].iloc[0])
-            centre_trials = np.round(centre_trials).astype(np.int64)
-            powers[np.isnan(powers)] = 0
-            x_pos = track_length + 10
-            legend_freq = np.linspace(x_pos, x_pos + 16, 5)
-            rolling_lomb_classifier, rolling_lomb_classifier_numeric, rolling_lomb_classifier_colors, rolling_frequencies, rolling_points = get_rolling_lomb_classifier_for_centre_trial(
-                centre_trials=centre_trials, powers=powers, power_threshold=rolling_power_threshold, power_step=power_step, track_length=track_length, n_window_size=n_window_size_for_rolling_window)
-            rolling_lomb_classifier_tiled = np.tile(rolling_lomb_classifier_numeric, (len(legend_freq), 1))
-            cmap = colors.ListedColormap([Settings.allocentric_color, Settings.egocentric_color, Settings.null_color, 'black'])
-            boundaries = [0, 1, 2, 3, 4]
-            norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
-            Y, X = np.meshgrid(centre_trials, legend_freq)
-            ax[j, i].pcolormesh(X, Y, rolling_lomb_classifier_tiled, cmap=cmap, norm=norm, shading="flat")
-            #ax[j,i].title(str(np.round(percentile_99th_display, decimals=1)) + " Hz", fontsize=20)
-            ax[j, i].tick_params(axis='both', which='both', labelsize=20)
-            ax[j, i].set_xlim([0, track_length+21])
-            ax[j, i].set_ylim([0, len(processed_position_data) - 1])
-            """
+            if n<=n_max:
+                ax[j, i].pcolormesh(X, Y, cluster_firing_maps, cmap=cmap, shading="auto", vmin=0, vmax=vmax)
+                ax[j, i].set_xlim([0, track_length])
+                ax[j, i].set_ylim([0, len(processed_position_data)])
             i+=1
             if i==ncols:
                 i=0
@@ -6999,11 +7112,13 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
             if len(spike_data)>0:
                 spike_data = add_peaks_to_troughs(spike_data)
                 spike_data = spike_data[spike_data["snippet_peak_to_trough"] < 500]  # uV
+
                 if paired_recording is not None:
                     paired_spike_data = pd.read_pickle(paired_recording+"/"+sorter_name+"/DataFrames/spatial_firing.pkl")
                     spike_data = add_open_field_classifier(spike_data, paired_spike_data)
                     spike_data = add_open_field_firing_rate(spike_data, paired_spike_data)
-                    spike_data = spike_data[spike_data["mean_firing_rate_of"] > 0.1]
+                    spike_data = spike_data[spike_data["mean_firing_rate_of"] > 0.2]
+                    print("There are ", str(len(spike_data)), " cells in this recording")
 
                 # BEHAVIOURAL
                 position_data = add_speed_per_100ms(position_data, track_length=get_track_length(recording))
@@ -7031,7 +7146,7 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_speed_per_trial(processed_position_data, output_path, track_length=get_track_length(recording))
                 #plot_hits_of_cued_and_pi_trials(processed_position_data, output_path)
                 #plot_trial_types(processed_position_data, output_path)
-                plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording),plot_rewarded=True)
+                plot_stops_on_track(processed_position_data, output_path, track_length=get_track_length(recording), plot_rewarded=False)
                 #plot_streak_vs_trial_types(processed_position_data, output_path)
                 #plot_streak_vs_trial_types_with_rolling_classification(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
@@ -7040,9 +7155,10 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
 
                 #spike_data = calculate_spatial_information(spike_data, position_data, track_length=get_track_length(recording))
                 #spike_data = add_vmax_for_firing_rate_plot(spike_data)
-                #spike_data = add_agreement_between_cell_and_global(spike_data)
-                #spike_data = add_grid_code_global(spike_data, processed_position_data=processed_position_data)
                 #spike_data = add_code_global(spike_data, processed_position_data=processed_position_data)
+                #spike_data = add_agreement_between_cell_and_global(spike_data)
+                spike_data = add_grid_code_global(spike_data, processed_position_data=processed_position_data)
+                spike_data = add_agreement_between_cell_and_grid_global(spike_data)
                 #plot_all_firing_rates(spike_data=spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording), n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_all_periodograms(spike_data=spike_data, output_path=output_path, track_length=get_track_length(recording), position_data=position_data, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
 
@@ -7073,14 +7189,15 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #plot_field_distributions(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_field_location(spike_data,processed_position_data=processed_position_data,position_data=position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_first_field_location_vs_first_stop_location(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording))
-                plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording), plot_codes=True)
-                plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
+                #plot_firing_rate_maps_short_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, position_data=position_data, output_path=output_path, track_length= get_track_length(recording), plot_codes=True)
+                #plot_avg_spatial_periodograms_with_rolling_classifications(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length = get_track_length(recording))
                 #plot_firing_rate_maps_short(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_firing_rate_maps_per_trial(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=True, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_spatial_periodogram(spike_data, processed_position_data, output_path, track_length = get_track_length(recording), plot_rolling_marker=False, n_window_size_for_rolling_window=Settings.rolling_window_size_for_lomb_classifier)
                 #plot_both_spatial_periodograms(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_stop_histogram_between_coding_epochs2(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
+                #plot_stop_histogram_between_coding_epochs_across_session(spike_data, processed_position_data, output_path, track_length = get_track_length(recording))
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=0)
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=1)
                 #plot_speed_histogram_for_coded_trials(spike_data, processed_position_data, output_path, track_length=get_track_length(recording), tt=0, plot_by_code="P")
@@ -7125,6 +7242,9 @@ def process_recordings(vr_recording_path_list, of_recording_path_list):
                 #                                 output_path="/mnt/datastore/Harry/Vr_grid_cells/example_cell_plots/",
                 #                                 track_length=get_track_length(recording), trial_types_to_plot=[0], rewarded=False, smoothen=True)
                 #plot_power_spectra_of_spikes(spike_data=spike_data, output_path=output_path)
+                #plot_histogram_of_position_template_correlations(spike_data, save_path=output_path)
+                plot_firing_rates_around_switches(spike_data, processed_position_data=processed_position_data, output_path=output_path, track_length=get_track_length(recording))
+
                 print("This session has, ", str(len(spike_data)), " clusters")
                 print("complete for ", recording)
 
@@ -7353,9 +7473,9 @@ def main():
     #vr_recording_path_list = ["/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
     #                          "/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D12_2021-05-25_11-03-39"]
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M17_D6_2023-05-29_15-02-14"]
-    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort9_february2023/vr/M16_D1_2023-02-28_17-42-27"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D34_2021-06-24_12-48-57"]
     #vr_recording_path_list = list(filter(lambda k: 'M14' in k, vr_recording_path_list))
-    vr_recording_path_list = ["/mnt/datastore/Harry/Cohort7_october2020/vr/M3_D18_2020-11-21_14-29-49"]
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21"]
 
     #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M14_D26_2021-06-14_12-22-50",
     #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D39_2021-07-01_11-47-10",
@@ -7366,6 +7486,7 @@ def main():
     #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36",
     #                          "/mnt/datastore/Harry/cohort8_may2021/vr/M11_D40_2021-07-02_12-58-24"]
     #vr_recording_path_list = ['/mnt/datastore/Harry/cohort8_may2021/vr/M11_D36_2021-06-28_12-04-36']
+    #vr_recording_path_list = ["/mnt/datastore/Harry/Cohort8_may2021/vr/M11_D21_2021-06-07_10-26-21"]
     process_recordings(vr_recording_path_list, of_recording_path_list)
     print("look now")
 

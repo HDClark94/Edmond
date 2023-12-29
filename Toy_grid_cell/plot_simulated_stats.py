@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.metrics import accuracy_score, confusion_matrix
 from matplotlib.ticker import MaxNLocator
 from Edmond.Toy_grid_cell.plot_example_periodic_cells import *
 from Edmond.Toy_grid_cell.Generate_simulated_grid_cells import generate_spatial_periodogram
@@ -170,7 +171,7 @@ def plot_switch_bias(sim_data, save_path, switch_code="block"):
 
 def plot_bias(sim_data, save_path):
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 4, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     markers=[".", "+", "x"]
     alphas=[0.333,0.666,1]
@@ -183,8 +184,8 @@ def plot_bias(sim_data, save_path):
             subset_sim_data = p_scalar_sim_data[p_scalar_sim_data["field_noise_sigma"] == noise]
 
             # take only 500 of each
-            subset_sim_data = pd.concat([subset_sim_data[subset_sim_data["true_classification"]=="P"].head(500),
-                                         subset_sim_data[subset_sim_data["true_classification"]=="D"].head(500)], ignore_index=True)
+            subset_sim_data = pd.concat([subset_sim_data[subset_sim_data["true_classification"]=="P"].head(400),
+                                         subset_sim_data[subset_sim_data["true_classification"]=="D"].head(400)], ignore_index=True)
 
             true_classifications = np.array(subset_sim_data['true_classification'])
 
@@ -202,8 +203,35 @@ def plot_bias(sim_data, save_path):
                 actual_difference_of_position_and_distance_cells = total_number_of_position_cells - total_number_of_distance_cells
                 predicted_difference_of_position_and_distance_cells = total_number_of_predicted_position_cells - total_number_of_predicted_distance_cells
 
-                bias = actual_difference_of_position_and_distance_cells - predicted_difference_of_position_and_distance_cells
-                biases.append(bias)
+                bias_percentage = 100*((actual_difference_of_position_and_distance_cells/total_number_of_cells) -
+                                       (predicted_difference_of_position_and_distance_cells/total_number_of_cells))
+
+                bias_percentage = (100*(total_number_of_position_cells/total_number_of_cells)) - \
+                                  (100*(total_number_of_predicted_position_cells/total_number_of_cells))
+
+                # a better way of producing the bias
+                # Create confusion matrix
+                class_labels = ["P", "D"]
+                confusion_mat = confusion_matrix(true_classifications, classsications, labels=class_labels)
+                # Calculate bias for each class
+                bias_dict = {}
+                for l, label in enumerate(class_labels):
+                    true_positive = confusion_mat[l, l]
+                    false_positive = sum(confusion_mat[:, l]) - true_positive
+                    total_actual_positive = sum(confusion_mat[l, :])
+                    # Avoid division by zero
+                    if total_actual_positive == 0:
+                        bias = 0.0
+                    else:
+                        bias = false_positive / total_actual_positive
+                    bias_dict[label] = bias
+                # Calculate bias percentage
+                #bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]]) * 100
+                #bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]])/(bias_dict[class_labels[0]] + bias_dict[class_labels[1]])*100
+                #bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]]) / max(bias_dict[class_labels[0]], bias_dict[class_labels[1]]) * 100
+                #bias_percentage = 100 * (bias_dict[class_labels[0]] - bias_dict[class_labels[1]]) / (bias_dict[class_labels[0]] + bias_dict[class_labels[1]])
+
+                biases.append(bias_percentage)
 
             #ax.plot(frequency_thresholds, biases, label= "s="+str(noise)+",gs="+grid_spacings+",ps="+str(p_scalar),
             #                      marker=markers[m], color=cmap(i/len(np.unique(sim_data["field_noise_sigma"]))), clip_on=False, linestyle=linestyle)
@@ -217,7 +245,7 @@ def plot_bias(sim_data, save_path):
     #ax.spines['bottom'].set_visible(False)
     ax.set_xticks([0, 0.1, 0.2, 0.3, 0.4, 0.5])
     ax.set_xlim([0,0.5])
-    ax.set_ylim([-1000, 1000])
+    ax.set_ylim([-100, 100])
     ax.yaxis.set_tick_params(labelsize=20)
     ax.xaxis.set_tick_params(labelsize=20)
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
@@ -228,7 +256,7 @@ def plot_bias(sim_data, save_path):
 
 def plot_prediction_accuracy(sim_data, save_path):
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 4, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     markers = [".", "+", "x"]
     alphas=[0.333,0.666,1]
@@ -251,9 +279,13 @@ def plot_prediction_accuracy(sim_data, save_path):
             frequency_thresholds = np.arange(0,0.52, 0.02)
             for frequency_threshold in frequency_thresholds:
                 classsications = get_classifications(subset_sim_data, frequency_threshold)
-                acc = 100*((np.sum(classsications == true_classifications))/len(true_classifications))
-                P_acc = 100*((np.sum(classsications[true_classifications=="P"] == true_classifications[true_classifications=="P"]))/len(true_classifications[true_classifications=="P"]))
-                D_acc = 100*((np.sum(classsications[true_classifications=="D"] == true_classifications[true_classifications=="D"]))/len(true_classifications[true_classifications=="D"]))
+                acc = 100 * accuracy_score(true_classifications, classsications)
+                P_acc = 100 * accuracy_score(true_classifications[true_classifications == "P"], classsications[true_classifications == "P"])
+                D_acc = 100 * accuracy_score(true_classifications[true_classifications == "D"], classsications[true_classifications == "D"])
+
+                #acc = 100*((np.sum(classsications == true_classifications))/len(true_classifications))
+                #P_acc = 100*((np.sum(classsications[true_classifications=="P"] == true_classifications[true_classifications=="P"]))/len(true_classifications[true_classifications=="P"]))
+                #D_acc = 100*((np.sum(classsications[true_classifications=="D"] == true_classifications[true_classifications=="D"]))/len(true_classifications[true_classifications=="D"]))
                 P_accuracies.append(P_acc)
                 D_accuracies.append(D_acc)
                 overall_accuracies.append(acc)
@@ -269,7 +301,7 @@ def plot_prediction_accuracy(sim_data, save_path):
     #ax.set_xlabel('Freq threshold', fontsize=30, labelpad = 10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_xlim([0, 0.5])
+    ax.set_xlim([0,0.5])
     ax.set_ylim([0, 100])
     #ax.set_yticks([0, 1])
     ax.set_xticks([0, 0.1, 0.2, 0.3, 0.4, 0.5])

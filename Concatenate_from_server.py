@@ -187,6 +187,8 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
                     collumn_names_to_keep.append("firing_times")
                     collumn_names_to_keep.append("random_snippets")
+                    if "firing_times" in list(spatial_firing):
+                        collumn_names_to_keep.append("firing_times")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
                     if "percentage_hits" in list(spatial_firing):
@@ -227,6 +229,10 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("rolling:block_lengths_shuffled_small_window")
                     if "rolling:classifier_by_trial_number" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:classifier_by_trial_number")
+                    if "rolling:position_correlation_by_trial_number_t2tmethod" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:position_correlation_by_trial_number_t2tmethod")
+                    if "rolling:correlation_by_trial_number_t2tmethod" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:correlation_by_trial_number_t2tmethod")
                     #if "MOVING_LOMB_all_powers" in list(spatial_firing):
                     #    collumn_names_to_keep.append("MOVING_LOMB_all_powers")
                     #if "MOVING_LOMB_all_centre_trials" in list(spatial_firing):

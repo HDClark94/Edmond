@@ -510,7 +510,7 @@ def plot_cell_spikes(cell_type, save_path, spikes_locations, spike_trial_numbers
     plt.savefig(save_path + '/' + cell_type + 'spike_trajectory'+plot_suffix+'.png', dpi=200)
     plt.close()
 
-def plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial, plot_suffix):
+def plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial, plot_suffix, true_classifications):
     n_trials = len(firing_rate_map_by_trial)
     track_length = len(firing_rate_map_by_trial[0])
 
@@ -585,6 +585,40 @@ def plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial, plot_suffix)
     #cbar.outline.set_visible(False)
     #cbar.ax.tick_params(labelsize=20)
     plt.savefig(save_path + '/'+cell_type+'_avg_rate_map'+plot_suffix+'.png', dpi=300)
+    plt.close()
+
+    cluster_firing_maps = cluster_firing_maps[true_classifications=="P"]
+    spikes_on_track = plt.figure()
+    spikes_on_track.set_size_inches(6, 2, forward=True)
+    ax = spikes_on_track.add_subplot(1, 1, 1)
+    locations = np.arange(0, len(cluster_firing_maps[0]))
+    ax.fill_between(locations, np.nanmean(cluster_firing_maps, axis=0)-stats.sem(cluster_firing_maps, axis=0), np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0), color=Settings.allocentric_color, alpha=0.3)
+    ax.plot(locations, np.nanmean(cluster_firing_maps, axis=0), color=Settings.allocentric_color, linewidth=3)
+    plt.ylabel('FR (Hz)', fontsize=25, labelpad = 10)
+    plt.xlabel('Location (cm)', fontsize=25, labelpad = 10)
+    plt.xlim(0, track_length)
+    ax.tick_params(axis='both', which='both', labelsize=20)
+    ax.set_xlim([0, track_length])
+    max_fr = max(np.nanmean(cluster_firing_maps, axis=0)+stats.sem(cluster_firing_maps, axis=0))
+    max_fr = max_fr+(0.1*(max_fr))
+    #ax.set_ylim([0, max_fr])
+    ax.set_yticks([0, np.round(ax.get_ylim()[1], 2)])
+    ax.set_yticks([0, 1])
+    ax.set_ylim(bottom=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(100))
+    #ax.yaxis.set_major_locator(ticker.MultipleLocator(50))
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+    plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.32, right = 0.87, top = 0.92)
+    #cbar = spikes_on_track.colorbar(c, ax=ax, fraction=0.046, pad=0.04)
+    #cbar.set_label('Firing Rate (Hz)', rotation=270, fontsize=20)
+    #cbar.set_ticks([0,vmax])
+    #cbar.set_ticklabels(["0", "Max"])
+    #cbar.outline.set_visible(False)
+    #cbar.ax.tick_params(labelsize=20)
+    plt.savefig(save_path + '/'+cell_type+'_avg_rate_map'+plot_suffix+'_P_trials.png', dpi=300)
     plt.close()
 
 
@@ -1242,7 +1276,7 @@ def plot_cell(cell_type, save_path, shuffled_save_path, n_trials=100, track_leng
 
     # default plots
     plot_cell_spikes(cell_type, save_path, spikes_locations, spike_trial_numbers, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
-    plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
+    plot_cell_rates(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix, true_classifications=true_classifications)
     plot_cell_spatial_autocorrelogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, plot_suffix=plot_suffix)
     plot_cell_spatial_periodogram(cell_type, save_path, firing_rate_map_by_trial_smoothed, rolling_far=None,
                                   rolling_window_size_for_lomb_classifier=rolling_window_size_for_lomb_classifier, plot_suffix=plot_suffix) # requires field shuffle IF the rolling classification is wanted
@@ -1286,9 +1320,15 @@ def main():
 
 
     # for lomb demo supp
-    plot_lomb_demo(save_path, mode="allo")
-    plot_lomb_demo(save_path, mode="ego")
+    #plot_lomb_demo(save_path, mode="allo")
+    #plot_lomb_demo(save_path, mode="ego")
     print("look now")
+
+    # another supp
+    plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
+    plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
+    plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
 
     # supp
     np.random.seed(0)
@@ -1302,12 +1342,6 @@ def main():
     plot_cell(cell_type="ramp_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
     plot_cell(cell_type="noisy_field_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling)
 
-    # another supp
-    plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    plot_cell(cell_type="unstable_switch_grid_cell_type2", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=10, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=10");np.random.seed(0)
-    plot_cell(cell_type="unstable_switch_grid_cell", save_path=save_path, shuffled_save_path=shuffled_save_path, field_noise_std=0, rolling_window_size_for_lomb_classifier=lomb_window_size_rolling, plot_suffix="_field_noise=0");np.random.seed(0)
-    print("look now")
 
 if __name__ == '__main__':
     main()

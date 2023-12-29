@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib.ticker import MaxNLocator
+from sklearn.metrics import accuracy_score, confusion_matrix
 from Edmond.Toy_grid_cell.plot_example_periodic_cells import *
 from Edmond.utility_functions.array_manipulations import *
 import scipy
@@ -97,7 +98,7 @@ def switch_grid_cells_alt_method(switch_coding_mode, grid_stability, grid_spacin
                                                                                                      field_noise_std=field_noise_std,
                                                                                                      p_scalar=p_scalar)
 
-        template = np.nanmean(firing_rate_map_by_trial_smoothed, axis=0)
+        template = np.nanmean(firing_rate_map_by_trial_smoothed[true_classifications=="P"], axis=0)
         trial_correlations = correlation_with_template(firing_rate_map_by_trial_smoothed, template)
 
         correlations_all_cells.append(trial_correlations)
@@ -111,6 +112,7 @@ def correlation_with_template(firing_rate_map_by_trial_smoothed, template):
         nonnanmask = np.array(bool_to_int_array(~np.isnan(template)) * bool_to_int_array(~np.isnan(firing_rate_map_by_trial_smoothed[i])), dtype=np.bool8)
         if ((len(template[nonnanmask]) == len(firing_rate_map_by_trial_smoothed[i][nonnanmask])) and (len(template[nonnanmask]) > 0)):
             corr = pearsonr(template[nonnanmask], firing_rate_map_by_trial_smoothed[i][nonnanmask])[0]
+            #corr = np.correlate(template[nonnanmask], firing_rate_map_by_trial_smoothed[i][nonnanmask])[0]
         else:
             corr = np.nan
         correlations.append(corr)
@@ -479,13 +481,13 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
     rolling_window_sizes = np.array([1, 50, 75, 100, 150, 200, 300, 400, 500, 600, 800, 1000])
 
-    field_noise_stds = [0, 10, 20]
+    field_noise_stds = [0, 10, 20, 30]
     p_scalars=[0.01, 0.1, 1]
 
-    Biases_in_coding = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
-    overall_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
-    position_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
-    distance_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(rolling_window_sizes), n_cells))
+    Biases_in_coding = np.zeros((len(p_scalars), len(field_noise_stds), len(rolling_window_sizes), n_cells))
+    overall_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(rolling_window_sizes), n_cells))
+    position_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(rolling_window_sizes), n_cells))
+    distance_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(rolling_window_sizes), n_cells))
 
     for j, p_scalar in enumerate(np.unique(p_scalars)):
         for n, noise in enumerate(np.unique(field_noise_stds)):
@@ -509,6 +511,7 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
                     cell_true_classifications = cell_true_classifications[1:len(rolling_classifiers)+1]
                     predicted_classifications = rolling_classifiers
 
+                    total_number_of_trials = len(cell_true_classifications)
                     total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
                     total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
 
@@ -523,13 +526,44 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
                     distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
                     accuracy_trial = 100*(np.sum(predicted_classifications == cell_true_classifications)/len(cell_true_classifications))
 
-                    Biases_in_coding[j,n,m,i] = bias
-                    overall_coding_accuracy[j,n,m,i] = accuracy_trial
-                    position_coding_accuracy[j,n,m,i] = position_trial_accuracy
-                    distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
+                    # Create confusion matrix
+                    class_labels=["P", "D"]
+                    confusion_mat = confusion_matrix(cell_true_classifications, predicted_classifications, labels=class_labels)
+                    # Calculate bias for each class
+                    bias_dict = {}
+                    for l, label in enumerate(class_labels):
+                        true_positive = confusion_mat[l, l]
+                        false_positive = sum(confusion_mat[:, l]) - true_positive
+                        total_actual_positive = sum(confusion_mat[l, :])
+                        # Avoid division by zero
+                        if total_actual_positive == 0:
+                            bias = 0.0
+                        else:
+                            bias = false_positive / total_actual_positive
+                        bias_dict[label] = bias
+                    # Calculate bias percentage
+                    bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]])*100
+                    bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]]) / (bias_dict[class_labels[0]] + bias_dict[class_labels[1]]) * 100
+
+                    bias_percentage = 100 * (
+                                (actual_difference_of_position_and_distance_trials / total_number_of_trials) -
+                                (predicted_difference_of_position_and_distance_trials / total_number_of_trials))
+
+                    bias_percentage = (100 * (total_number_of_position_trials / total_number_of_trials)) - \
+                                      (100 * (total_number_of_predicted_position_trials / total_number_of_trials))
+
+                    Biases_in_coding[j, n, m, i] = bias_percentage
+                    overall_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications, predicted_classifications)
+                    position_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications[cell_true_classifications=="P"], predicted_classifications[cell_true_classifications=="P"])
+                    distance_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications[cell_true_classifications=="D"], predicted_classifications[cell_true_classifications=="D"])
+
+                    #Biases_in_coding[j,n,m,i] = bias
+                    #overall_coding_accuracy[j,n,m,i] = accuracy_trial
+                    #position_coding_accuracy[j,n,m,i] = position_trial_accuracy
+                    #distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
 
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 3, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     alphas = [0.333, 0.666, 1]
     linestyles = ["solid", "dashed", "dashdot", "dotted"]
@@ -552,7 +586,7 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
 
 
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 3, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     alphas = [0.333, 0.666, 1]
     linestyles = ["solid", "dashed", "dashdot", "dotted"]
@@ -577,7 +611,6 @@ def run_bias_assay(switch_coding_mode, grid_stability, save_path, grid_spacing_l
     plt.subplots_adjust(hspace = .35, wspace = .35,  bottom = 0.2, left = 0.3, right = 0.87, top = 0.92)
     plt.savefig(save_path + '/accuracy_trial'+grid_stability+'_cell'+plot_suffix+'.png', dpi=300)
     plt.close()
-
     return
 
 
@@ -585,13 +618,13 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
     grid_spacings = np.random.uniform(low=grid_spacing_low, high=grid_spacing_high, size=n_cells);
     correlation_thresholds = np.array([-1, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])
 
-    field_noise_stds = [0, 10, 20]
+    field_noise_stds = [0, 10, 20, 30]
     p_scalars=[0.01, 0.1, 1]
 
-    Biases_in_coding = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
-    overall_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
-    position_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
-    distance_coding_accuracy = np.zeros((len(field_noise_stds), len(p_scalars), len(correlation_thresholds), n_cells))
+    Biases_in_coding = np.zeros((len(p_scalars), len(field_noise_stds), len(correlation_thresholds), n_cells))
+    overall_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(correlation_thresholds), n_cells))
+    position_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(correlation_thresholds), n_cells))
+    distance_coding_accuracy = np.zeros((len(p_scalars), len(field_noise_stds), len(correlation_thresholds), n_cells))
 
     for j, p_scalar in enumerate(np.unique(p_scalars)):
         for n, noise in enumerate(np.unique(field_noise_stds)):
@@ -600,6 +633,36 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
             correlations_all_cells, true_classifications = \
                 switch_grid_cells_alt_method(switch_coding_mode, grid_stability, grid_spacings, n_cells, trial_switch_probability,
                                   field_noise_std=noise, p_scalar=p_scalar)
+
+            fig, ax = plt.subplots(figsize=(6, 3))
+            correlations_flattened = np.array(correlations_all_cells).flatten()
+            true_classifications_flattened = np.array(true_classifications).flatten()
+            ax.hist(correlations_flattened[true_classifications_flattened == "P"], range=(-1, 1), bins=100,color=Settings.allocentric_color, density=True)
+            #ax.hist(correlations_flattened[true_classifications_flattened == "P"], range=(0, 100), bins=100,color=Settings.allocentric_color, density=True)
+            ax.tick_params(axis='both', which='major', labelsize=20)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            #ax.set_xlim(-1, 1)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.2, right=0.87, top=0.92)
+            plt.savefig(save_path + '/'+plot_suffix+'correlations_hist_against_position_template_P_pscalar_'+str(p_scalar)+'_noise_'+str(noise)+'.png', dpi=300)
+
+            fig, ax = plt.subplots(figsize=(6, 3))
+            ax.hist(correlations_flattened[true_classifications_flattened == "D"], range=(-1, 1), bins=100,color=Settings.egocentric_color, density=True)
+            #ax.hist(correlations_flattened[true_classifications_flattened == "D"], range=(0, 100), bins=100,color=Settings.egocentric_color, density=True)
+            ax.tick_params(axis='both', which='major', labelsize=20)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.yaxis.set_ticks_position('left')
+            ax.xaxis.set_ticks_position('bottom')
+            #ax.set_xlim(-1, 1)
+            ax.tick_params(axis='both', which='both', labelsize=20)
+            plt.subplots_adjust(hspace=.35, wspace=.35, bottom=0.2, left=0.2, right=0.87, top=0.92)
+            plt.savefig(save_path + '/'+plot_suffix+'correlations_hist_against_position_template_D_pscalar_'+str(p_scalar)+'_noise_'+str(noise)+'.png', dpi=300)
+            plt.close()
+
 
             for m in range(len(correlation_thresholds)):
                 for i in range(n_cells):
@@ -613,6 +676,7 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
                     # compare the true classifications to the estimated classifications
                     cell_true_classifications = true_classifications[i]
 
+                    total_number_of_trials = len(cell_true_classifications)
                     total_number_of_position_trials = len(cell_true_classifications[cell_true_classifications=="P"])
                     total_number_of_distance_trials = len(cell_true_classifications[cell_true_classifications=="D"])
 
@@ -627,13 +691,43 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
                     distance_trial_accuracy = 100*(np.sum(predicted_classifications[cell_true_classifications=="D"] == cell_true_classifications[cell_true_classifications=="D"])/total_number_of_distance_trials)
                     accuracy_trial = 100*(np.sum(predicted_classifications == cell_true_classifications)/len(cell_true_classifications))
 
-                    Biases_in_coding[j,n,m,i] = bias
-                    overall_coding_accuracy[j,n,m,i] = accuracy_trial
-                    position_coding_accuracy[j,n,m,i] = position_trial_accuracy
-                    distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
+                    # Create confusion matrix
+                    class_labels=["P", "D"]
+                    confusion_mat = confusion_matrix(cell_true_classifications, predicted_classifications, labels=class_labels)
+                    # Calculate bias for each class
+                    bias_dict = {}
+                    for l, label in enumerate(class_labels):
+                        true_positive = confusion_mat[l, l]
+                        false_positive = sum(confusion_mat[:, l]) - true_positive
+                        total_actual_positive = sum(confusion_mat[l, :])
+                        # Avoid division by zero
+                        if total_actual_positive == 0:
+                            bias = 0.0
+                        else:
+                            bias = false_positive / total_actual_positive
+                        bias_dict[label] = bias
+                    # Calculate bias percentage
+                    bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]])*100
+                    bias_percentage = (bias_dict[class_labels[0]] - bias_dict[class_labels[1]]) / ( bias_dict[class_labels[0]] + bias_dict[class_labels[1]]) * 100
+                    bias_percentage = 100 * (
+                                (actual_difference_of_position_and_distance_trials / total_number_of_trials) -
+                                (predicted_difference_of_position_and_distance_trials / total_number_of_trials))
+
+                    bias_percentage = (100 * (total_number_of_position_trials / total_number_of_trials)) - \
+                                      (100 * (total_number_of_predicted_position_trials / total_number_of_trials))
+
+                    Biases_in_coding[j, n, m, i] = bias_percentage
+                    overall_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications, predicted_classifications)
+                    position_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications[cell_true_classifications=="P"], predicted_classifications[cell_true_classifications=="P"])
+                    distance_coding_accuracy[j, n, m, i] = 100*accuracy_score(cell_true_classifications[cell_true_classifications=="D"], predicted_classifications[cell_true_classifications=="D"])
+
+                    #Biases_in_coding[j,n,m,i] = bias
+                    #overall_coding_accuracy[j,n,m,i] = accuracy_trial
+                    #position_coding_accuracy[j,n,m,i] = position_trial_accuracy
+                    #distance_coding_accuracy[j,n,m,i] = distance_trial_accuracy
 
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 3, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     alphas = [0.333, 0.666, 1]
     linestyles = ["solid", "dashed", "dashdot", "dotted"]
@@ -656,7 +750,7 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
 
 
     fig = plt.figure()
-    fig.set_size_inches(5, 5, forward=True)
+    fig.set_size_inches(5, 3, forward=True)
     ax = fig.add_subplot(1, 1, 1)
     alphas = [0.333, 0.666, 1]
     linestyles = ["solid", "dashed", "dashdot", "dotted"]
@@ -665,7 +759,7 @@ def run_bias_assay_alt_method(switch_coding_mode, grid_stability, save_path, gri
         for n, noise in enumerate(np.unique(field_noise_stds)):
             ax.plot(correlation_thresholds, np.nanmean(position_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=Settings.allocentric_color,
                     clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
-            ax.plot(correlation_thresholds, np.nanmean(distance_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=np.array([109/255, 217/255, 255/255]),
+            ax.plot(correlation_thresholds, np.nanmean(distance_coding_accuracy[j,n], axis=1), label="s=" + str(noise) + ",ps=" + str(p_scalar), color=Settings.egocentric_color,
                     clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
             ax.plot(correlation_thresholds, np.nanmean(overall_coding_accuracy[j, n], axis=1),label="s=" + str(noise) + ",ps=" + str(p_scalar), color="black",
                     clip_on=False, linestyle=linestyles[n], alpha=alphas[j])
@@ -696,13 +790,13 @@ def main():
     for switch_coding in ["block", "by_trial"]:
         for freq_thres in [0.05]:
             np.random.seed(0)
-            #run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
-            #               n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
-            #                            plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
-            run_bias_assay_alt_method(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
+            run_bias_assay(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
                            n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
-                                        plot_suffix="alt_method_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
+                                        plot_suffix="_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
 
+            #run_bias_assay_alt_method(switch_coding_mode=switch_coding, grid_stability="imperfect", save_path=save_path, grid_spacing_low=grid_spacing_low, grid_spacing_high=grid_spacing_high,
+            #               n_cells=n_cells, trial_switch_probability=0.1, freq_thres=freq_thres,
+            #                            plot_suffix="alt_method_grid_spacings-"+str(grid_spacing_low)+"-"+str(grid_spacing_high)+"sigma_switch_coding="+switch_coding+"_freq_thres="+str(freq_thres))
 
 if __name__ == '__main__':
     main()
