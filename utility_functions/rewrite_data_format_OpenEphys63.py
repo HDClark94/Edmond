@@ -56,8 +56,7 @@ def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
 
-
-    base_path = "/mnt/datastore/Harry/test_recording"
+    base_path = "/mnt/datastore/Harry/Cohort10_october2023"
     vr_paths = get_recording_paths([], base_path+"/vr")
     of_paths = get_recording_paths([], base_path+"/of")
 

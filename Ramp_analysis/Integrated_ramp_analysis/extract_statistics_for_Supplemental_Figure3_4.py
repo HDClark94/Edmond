@@ -1,6 +1,6 @@
 from scipy import stats
 import scipy
-from Edmond.VR_grid_analysis.vr_grid_cells import *
+from Edmond.eLife_Grid_anchoring_2024.vr_grid_cells import *
 from Edmond.utility_functions.array_manipulations import *
 
 warnings.filterwarnings('ignore')

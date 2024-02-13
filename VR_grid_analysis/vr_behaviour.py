@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 import numbers
 import matplotlib
 import PostSorting.parameters
@@ -13,31 +11,21 @@ import PostSorting.vr_spatial_data
 import matplotlib.colors as colors
 from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
-import cycler
 from sklearn.cluster import DBSCAN
-from scipy import stats
 import matplotlib.cm as cm
-from scipy import signal
-from astropy.convolution import convolve, Gaussian1DKernel
-import os
-import traceback
-import warnings
-import matplotlib.ticker as ticker
 import sys
 import Edmond.plot_utility2
 import Edmond.VR_grid_analysis.vr_grid_stability_plots
 import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
-from Edmond.VR_grid_analysis.vr_grid_cells import *
+from Edmond.eLife_Grid_anchoring_2024.vr_grid_cells import *
 import settings
 from scipy import stats
-import Edmond.VR_grid_analysis.analysis_settings as Settings
+import Edmond.eLife_Grid_anchoring_2024.analysis_settings as Settings
 import matplotlib.pylab as plt
-import matplotlib as mpl
 import control_sorting_analysis
 import PostSorting.post_process_sorted_data_vr
 warnings.filterwarnings('ignore')
-from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
-from scipy.stats.stats import pearsonr
+
 
 def find_paired_recording(recording_path, of_recording_path_list):
     mouse=recording_path.split("/")[-1].split("_")[0]
@@ -293,33 +281,6 @@ def add_avg_RZ_speed(processed_position_data, track_length):
         avg_speed_in_RZs.append(avg_speed_in_RZ)
 
     processed_position_data["avg_speed_in_RZ"] = avg_speed_in_RZs
-    return processed_position_data
-
-def add_avg_track_speed(processed_position_data, track_length):
-    reward_zone_start = track_length-60-30-20
-    reward_zone_end = track_length-60-30
-    track_start = 30
-    track_end = track_length-30
-
-    avg_speed_on_tracks = []
-    for i, trial_number in enumerate(processed_position_data.trial_number):
-        trial_processed_position_data = processed_position_data[processed_position_data["trial_number"] == trial_number]
-        speeds_in_time = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_processed_position_data['speeds_binned_in_time'])
-        pos_in_time = Edmond.plot_utility2.pandas_collumn_to_numpy_array(trial_processed_position_data['pos_binned_in_time'])
-        in_rz_mask = (pos_in_time > reward_zone_start) & (pos_in_time <= reward_zone_end)
-        speeds_in_time_outside_RZ = speeds_in_time[~in_rz_mask]
-        pos_in_time = pos_in_time[~in_rz_mask]
-        track_mask = (pos_in_time > track_start) & (pos_in_time <= track_end)
-        speeds_in_time_outside_RZ = speeds_in_time_outside_RZ[track_mask]
-
-        #speeds_in_time_in_RZ = speeds_in_time_in_RZ[speeds_in_time_in_RZ > 0] # remove dead stops or backwards movements
-        if len(speeds_in_time_outside_RZ)==0:
-            avg_speed_on_track = np.nan
-        else:
-            avg_speed_on_track = np.nanmean(speeds_in_time_outside_RZ)
-        avg_speed_on_tracks.append(avg_speed_on_track)
-
-    processed_position_data["avg_speed_on_track"] = avg_speed_on_tracks
     return processed_position_data
 
 def get_mouse_color(mouse_array, mouse_ids, mouse_colors):
@@ -1166,7 +1127,7 @@ def plot_all_speeds(mouse_df, save_path):
     track_length = mouse_df.track_length.iloc[0]
     fig = plt.figure(figsize=(6,30))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-    trial_speeds = Edmond.plot_utility2.pandas_collumn_to_2d_numpy_array(mouse_df["speeds_binned_in_space"])
+    trial_speeds = pandas_collumn_to_2d_numpy_array(mouse_df["speeds_binned_in_space"])
     where_are_NaNs = np.isnan(trial_speeds)
     trial_speeds[where_are_NaNs] = 0
     locations = np.arange(0, len(trial_speeds[0]))
@@ -2115,7 +2076,7 @@ def plot_speed_heat_map(mouse_df, session_number, save_path):
     x_max = len(session_df)
     fig = plt.figure(figsize=(6,6))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-    trial_speeds = Edmond.plot_utility2.pandas_collumn_to_2d_numpy_array(session_df["speeds_binned_in_space"])
+    trial_speeds = pandas_collumn_to_2d_numpy_array(session_df["speeds_binned_in_space"])
     where_are_NaNs = np.isnan(trial_speeds)
     trial_speeds[where_are_NaNs] = 0
     locations = np.arange(0, len(trial_speeds[0]))
@@ -3673,15 +3634,16 @@ def process_recordings(vr_recording_path_list, all_behaviour, cohort):
             position_data = add_stopped_in_rz(position_data)
 
             processed_position_data = add_avg_trial_speed(processed_position_data)
-            processed_position_data = add_avg_RZ_speed(processed_position_data, track_length=track_length)
-            processed_position_data = add_avg_track_speed(processed_position_data, track_length=track_length)
-            processed_position_data, _ = add_hit_miss_try3(processed_position_data, track_length=track_length)
+            processed_position_data = add_avg_track_speed(processed_position_data, position_data, track_length=track_length)
             processed_position_data = add_hit_according_to_blender(processed_position_data, position_data)
+            processed_position_data = add_stops_according_to_blender(processed_position_data, position_data)
+            processed_position_data, _ = add_hit_miss_try(processed_position_data)
 
             processed_position_data["session_number"] = session_number
             processed_position_data["mouse_id"] = mouse_id
             processed_position_data["track_length"] = track_length
             processed_position_data["cohort"] = cohort
+            processed_position_data["session_id_vr"] = session_id
 
             all_behaviour = pd.concat([all_behaviour, processed_position_data], ignore_index=True)
             print("successfully processed and saved vr_grid analysis on "+recording)
@@ -4220,14 +4182,14 @@ def main():
 
     # give a path for a directory of recordings or path of a single recording
     all_behaviour = pd.DataFrame()
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort2/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=2)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort3/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=3)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort4/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=4)
-    vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort5/VirtualReality") if f.is_dir()]
-    all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=5)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort2/VirtualReality") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=2)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort3/VirtualReality") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=3)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort4/VirtualReality") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=4)
+    #vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Sarah/Data/Ramp_project/OpenEphys/_cohort5/VirtualReality") if f.is_dir()]
+    #all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=5)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/vr") if f.is_dir()]
     all_behaviour = process_recordings(vr_path_list, all_behaviour, cohort=6)
     vr_path_list = [f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/vr") if f.is_dir()]

@@ -1,11 +1,9 @@
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import imageio
 import scipy.stats as stats
-import Edmond.VR_grid_analysis.analysis_settings as Settings
+import Edmond.eLife_Grid_anchoring_2024.analysis_settings as Settings
 from Edmond.Concatenate_from_server import *
-from Edmond.VR_grid_analysis.vr_grid_cells import add_lomb_classifier
+from Edmond.eLife_Grid_anchoring_2024.vr_grid_cells import add_lomb_classifier
 plt.rc('axes', linewidth=3)
 
 def summarise_grid_cells(combined_df, save_path, save=True):

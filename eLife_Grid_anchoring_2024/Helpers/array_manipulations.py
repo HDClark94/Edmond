@@ -33,3 +33,20 @@ def add_zero_to_data_if_empty(data):
         if len(data[i]) == 0:
             data[i] = np.array([0])
     return data
+
+
+def min_max_normalize(x):
+    """
+        argument
+            - x: input image data in numpy array [32, 32, 3]
+        return
+            - normalized x
+    """
+    min_val = np.min(x)
+    max_val = np.max(x)
+    x = (x-min_val) / (max_val-min_val)
+    return x
+
+def min_max_normlise(array, min_val, max_val):
+    normalised_array = ((max_val-min_val)*((array-min(array))/(max(array)-min(array))))+min_val
+    return normalised_array

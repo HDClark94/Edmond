@@ -3,13 +3,10 @@ import matplotlib.pylab as plt
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 from astropy.timeseries import LombScargle
-from scipy.interpolate import interp1d
 from astropy.convolution import convolve, Gaussian1DKernel
 from Edmond.VR_grid_analysis.vr_grid_stability_plots import get_allocentric_peak, get_egocentric_peak, get_rolling_lomb_classifier_for_centre_trial
-import matplotlib.ticker as ticker
-import Edmond.VR_grid_analysis.analysis_settings as Settings
+import Edmond.eLife_Grid_anchoring_2024.analysis_settings as Settings
 
-from Edmond.VR_grid_analysis.vr_grid_cells import get_max_int_SNR, get_max_SNR, reduce_digits, get_first_peak
 plt.rc('axes', linewidth=3)
 
 def moving_sum(array, window):

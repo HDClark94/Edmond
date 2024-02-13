@@ -2,12 +2,7 @@ import matplotlib.pylab as plt
 import math
 import numpy as np
 import random
-import settings
 from astropy.nddata import block_reduce
-
-'''
-colour functions are from https://gist.github.com/adewes/5884820
-'''
 
 def draw_reward_zone():
     for stripe in range(8):
@@ -16,11 +11,9 @@ def draw_reward_zone():
         else:
             plt.axvline(91.25+stripe*2.5, color='k', linewidth=5.5, alpha=0.4, zorder=0)
 
-
 def draw_black_boxes():
     plt.axvline(15, color='k', linewidth=66, alpha=0.25, zorder=0)
     plt.axvline(185, color='k', linewidth=66, alpha=0.25, zorder=0)
-
 
 def style_plot(ax):
     ax.spines['top'].set_visible(False)
@@ -28,7 +21,6 @@ def style_plot(ax):
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
     return plt, ax
-
 
 def style_open_field_plot(ax):
     ax.spines['top'].set_visible(False)
@@ -44,10 +36,8 @@ def style_open_field_plot(ax):
         left=False,
         labelleft=False,
         labelbottom=False)  # labels along the bottom edge are off
-
     ax.set_aspect('equal')
     return ax
-
 
 def style_polar_plot(ax):
     ax.spines['polar'].set_visible(False)
@@ -63,14 +53,11 @@ def style_polar_plot(ax):
     ax.xaxis.set_tick_params(labelsize=25)
     return ax
 
-
 def get_random_color(pastel_factor = 0.5):
     return [(x+pastel_factor)/(1.0+pastel_factor) for x in [random.uniform(0,1.0) for i in [1,2,3]]]
 
-
 def color_distance(c1,c2):
     return sum([abs(x[0]-x[1]) for x in zip(c1,c2)])
-
 
 def generate_new_color(existing_colors, pastel_factor=0.5):
     max_distance = None
@@ -99,9 +86,6 @@ def style_vr_plot_offset(ax, x_max):
         left=True,
         labelleft=True,
         labelbottom=True)  # labels along the bottom edge are off
-
-    #ax.set_aspect('equal')
-
     plt.ylim(0, x_max)
     return ax
 
@@ -109,7 +93,6 @@ def style_track_plot(ax, track_length,alpha=0.25):
     ax.axvspan(track_length-60-30-20, track_length-60-30, facecolor='DarkGreen', alpha=alpha, linewidth =0)
     ax.axvspan(0, 30, facecolor='k', linewidth =0, alpha=.25) # black box
     ax.axvspan(track_length-30, track_length, facecolor='k', linewidth =0, alpha=alpha)# black box
-
 
 def makelegend(fig,ax, x_location):
     handles, labels = ax.get_legend_handles_labels()
@@ -119,11 +102,9 @@ def makelegend(fig,ax, x_location):
     frame.set_edgecolor('w')
     frame.set_alpha(0.2)
 
-
 def adjust_spine_thickness(ax):
     for axis in ['left','bottom']:
         ax.spines[axis].set_linewidth(1)
-
 
 def adjust_spines(ax,spines):
     for loc, spine in ax.spines.items():
@@ -146,22 +127,9 @@ def adjust_spines(ax,spines):
         # no xaxis ticks
         ax.xaxis.set_ticks([])
 
-
 def get_weights_normalized_hist(array_in):
     weights = np.ones_like(array_in) / float(len(array_in))
     return weights
-
-def pandas_collumn_to_numpy_array(pandas_series):
-    new_array = []
-    for i in range(len(pandas_series)):
-        element = pandas_series.iloc[i]
-
-        if len(np.shape(element)) == 0:
-            new_array.append(element)
-        else:
-            new_array.extend(element)
-
-    return np.array(new_array)
 
 def style_vr_plot(ax, x_max=None):
     ax.spines['top'].set_visible(False)
@@ -189,19 +157,3 @@ def get_vmin_vmax(cluster_firing_maps, bin_cm=8):
     vmin= 0
     vmax= np.max(cluster_firing_maps_reduced)
     return vmin, vmax
-
-def min_max_normalize(x):
-    """
-        argument
-            - x: input image data in numpy array [32, 32, 3]
-        return
-            - normalized x
-    """
-    min_val = np.min(x)
-    max_val = np.max(x)
-    x = (x-min_val) / (max_val-min_val)
-    return x
-
-def min_max_normlise(array, min_val, max_val):
-    normalised_array = ((max_val-min_val)*((array-min(array))/(max(array)-min(array))))+min_val
-    return normalised_array

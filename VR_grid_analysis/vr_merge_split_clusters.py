@@ -1,41 +1,12 @@
-import numpy as np
 import pandas as pd
-import PostSorting.parameters
-import PostSorting.vr_stop_analysis
-import PostSorting.vr_time_analysis
-import PostSorting.vr_make_plots
-import PostSorting.vr_cued
-import PostSorting.theta_modulation
-import PostSorting.vr_spatial_data
-from Edmond.VR_grid_analysis.remake_position_data import syncronise_position_data
-from PostSorting.vr_spatial_firing import bin_fr_in_space, bin_fr_in_time, add_position_x
-from scipy import stats
-import Edmond.VR_grid_analysis.analysis_settings as Settings
-from scipy import signal
-from scipy.interpolate import interp1d
-from astropy.convolution import convolve, Gaussian1DKernel, Gaussian2DKernel
 import os
 import traceback
-from astropy.nddata import block_reduce
 import warnings
-import matplotlib.ticker as ticker
 import sys
-import Edmond.plot_utility2
-import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
-import settings
-from scipy import stats
 import matplotlib.pylab as plt
-import matplotlib as mpl
-import control_sorting_analysis
-import PostSorting.post_process_sorted_data_vr
-from astropy.timeseries import LombScargle
 from Edmond.utility_functions.array_manipulations import *
-from joblib import Parallel, delayed
-import multiprocessing
-import open_ephys_IO
+
 warnings.filterwarnings('ignore')
-from scipy.stats.stats import pearsonr
-from scipy.stats import shapiro
 plt.rc('axes', linewidth=3)
 
 def merge_clusters(spike_data, matched_cluster_ids):

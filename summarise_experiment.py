@@ -383,20 +383,24 @@ def main():
     #combined_df = combine_of_vr_dataframes(vr_data, of_data)
     #combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort9.pkl")
 
+    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
+    combined_df = combine_of_vr_dataframes(vr_data, of_data)
+    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
+    combined_df.to_pickle("/mnt/datastore/Harry/Grid_anchoring_eLife_2023/real/data/combined_cohort8.pkl")
+
     vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort6_july2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort6_july2020/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort6.pkl")
+    combined_df.to_pickle("/mnt/datastore/Harry/Grid_anchoring_eLife_2023/real/data/combined_cohort6.pkl")
 
     vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
     of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort7_october2020/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort7_october2020/summary/")
     combined_df = combine_of_vr_dataframes(vr_data, of_data)
     combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort7.pkl")
+    combined_df.to_pickle("/mnt/datastore/Harry/Grid_anchoring_eLife_2023/real/data/combined_cohort7.pkl")
 
-    vr_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/vr", suffix="vr", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
-    of_data = summarise_experiment(recordings_folder_path="/mnt/datastore/Harry/Cohort8_may2021/of", suffix="of", save_path="/mnt/datastore/Harry/Cohort8_may2021/summary/")
-    combined_df = combine_of_vr_dataframes(vr_data, of_data)
-    combined_df.to_pickle("/mnt/datastore/Harry/Vr_grid_cells/combined_cohort8.pkl")
 
     '''
     # Ramp cell project

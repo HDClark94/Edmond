@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-import os
 import PostSorting.open_field_spatial_firing
 import PostSorting.speed
 import PostSorting.open_field_firing_maps
@@ -12,7 +10,6 @@ import PostSorting.compare_first_and_second_half
 import os
 import traceback
 import PostSorting.parameters as pt
-import warnings
 import sys
 import settings
 
@@ -36,24 +33,25 @@ def recompute_scores(spike_data, synced_spatial_data, recompute_speed_score=Fals
         spike_data, _, _, _, _, = PostSorting.compare_first_and_second_half.analyse_half_session_rate_maps(synced_spatial_data, spike_data)
     return spike_data
 
-def process_dir(recording_folder_path, recompute_speed_score=True, recompute_hd_score=True, recompute_grid_score=True,
+def process_dir(recording_list, recompute_speed_score=True, recompute_hd_score=True, recompute_grid_score=True,
                 recompute_spatial_score=True, recompute_border_score=True, recompute_stability_score=True):
-    # get list of all recordings in the recordings folder
-    recording_list = [f.path for f in os.scandir(recording_folder_path) if f.is_dir()]
-    recording_list = ["/mnt/datastore/Harry/Cohort8_may2021/of/M11_D40_2021-07-02_12-11-42"]
 
     # loop over recordings and add spatial firing to the concatenated frame, add the paths to processed position
     for recording in recording_list:
         try:
             print("processeding ", recording.split("/")[-1])
 
-            spike_data_spatial = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
-            synced_spatial_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position.pkl")
-            spike_data_spatial = recompute_scores(spike_data_spatial, synced_spatial_data, recompute_speed_score=recompute_speed_score,
-                                                  recompute_hd_score=recompute_hd_score, recompute_grid_score=recompute_grid_score,
-                                                  recompute_spatial_score=recompute_spatial_score, recompute_border_score=recompute_border_score,
-                                                  recompute_stability_score=recompute_stability_score)
-            spike_data_spatial.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+            spike_data = pd.read_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
+
+            if "occupancy_maps" in list(spike_data):
+                print("yesssssssssssssssssss")
+            else:
+                synced_spatial_data = pd.read_pickle(recording+"/MountainSort/DataFrames/position.pkl")
+                spike_data = recompute_scores(spike_data, synced_spatial_data, recompute_speed_score=recompute_speed_score,
+                                              recompute_hd_score=recompute_hd_score, recompute_grid_score=recompute_grid_score,
+                                              recompute_spatial_score=recompute_spatial_score, recompute_border_score=recompute_border_score,
+                                              recompute_stability_score=recompute_stability_score)
+                spike_data.to_pickle(recording+"/MountainSort/DataFrames/spatial_firing.pkl")
 
         except Exception as ex:
             print('This is what Python says happened:')
@@ -67,12 +65,14 @@ def process_dir(recording_folder_path, recompute_speed_score=True, recompute_hd_
 def main():
     print('-------------------------------------------------------------')
     print('-------------------------------------------------------------')
+    of_path_list=[]
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort8_may2021/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort7_october2020/of") if f.is_dir()])
+    of_path_list.extend([f.path for f in os.scandir("/mnt/datastore/Harry/cohort6_july2020/of") if f.is_dir()])
+    of_path_list.sort()
 
-    #process_dir(recording_folder_path= "/mnt/datastore/Harry/cohort7_october2020/of",
-    #            recompute_speed_score=False, recompute_hd_score=True, recompute_grid_score=False,
-    #            recompute_spatial_score=False, recompute_border_score=False, recompute_stability_score=False)
-    process_dir(recording_folder_path= "/mnt/datastore/Harry/cohort8_may2021/of",
-                recompute_speed_score=False, recompute_hd_score=True, recompute_grid_score=False,
+    process_dir(recording_list=of_path_list,
+                recompute_speed_score=False, recompute_hd_score=False, recompute_grid_score=False,
                 recompute_spatial_score=False, recompute_border_score=False, recompute_stability_score=False)
     print("were done for now ")
 

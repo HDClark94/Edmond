@@ -1,10 +1,6 @@
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import settings
 from numpy import inf
-import Edmond.VR_grid_analysis.analysis_settings as Settings
-from astropy.convolution import convolve, Gaussian1DKernel, Box1DKernel
+import Edmond.eLife_Grid_anchoring_2024.analysis_settings as Settings
 from Edmond.Concatenate_from_server import *
 from scipy import stats
 from sklearn.linear_model import LinearRegression

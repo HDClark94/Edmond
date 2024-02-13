@@ -1,4 +1,0 @@
-#!/bin/bash
-
-# docker push magland/sf-tridesclous:1.4.3
-docker push teristam/sf-tridesclous:1.6.0

@@ -436,7 +436,7 @@ def plot_spike_raster_vs_track_position(spatial_firing, save_path):
         plt.close()
     return
 
-def plot_spike_raster2(spatial_firing, save_path):
+def plot_spike_raster2(spatial_firing, save_path, suffix=""):
     mec_color="blue"
     ca1_color="green"
 
@@ -467,7 +467,7 @@ def plot_spike_raster2(spatial_firing, save_path):
     ax.set_xlim(0, 20*60*30000)
     #ax.set_x_lim[time_interval_min, time_interval_max]
     plt.subplots_adjust(hspace=None, wspace=None, bottom=None, left=None, right=None, top=None)
-    plt.savefig(save_path + '/spike_raster2.png', dpi=800)
+    plt.savefig(save_path + '/spike_raster2'+suffix+'.png', dpi=800)
     plt.close()
     return
 
@@ -625,13 +625,15 @@ def plot_all_waveforms(spike_data, save_path):
 def main():
 
     print('-------------------------------------------------------------')
-    plot_spike_raster2(spatial_firing=pd.read_pickle(
-        "/mnt/datastore/Harry/Cohort10_october2023/of/M18_D1_2023-10-30_13-25-44/mountainsort4/DataFrames/spatial_firing.pkl"),
-                      save_path="/mnt/datastore/Harry/Cohort10_october2023/of/M18_D1_2023-10-30_13-25-44/mountainsort4/Figures")
 
     plot_spike_raster2(spatial_firing=pd.read_pickle(
         "/mnt/datastore/Harry/Cohort10_october2023/vr/M18_D1_2023-10-30_12-38-29/mountainsort4/DataFrames/spatial_firing.pkl"),
-                      save_path="/mnt/datastore/Harry/Cohort10_october2023/vr/M18_D1_2023-10-30_12-38-29/mountainsort4/Figures")
+                      save_path="/mnt/datastore/Harry/test_recording/M18_D1_2023-10-30_12-38-29/Figures", suffix="_vr")
+
+    plot_spike_raster2(spatial_firing=pd.read_pickle(
+        "/mnt/datastore/Harry/Cohort10_october2023/of/M18_D1_2023-10-30_13-25-44/mountainsort4/DataFrames/spatial_firing.pkl"),
+                      save_path="/mnt/datastore/Harry/test_recording/M18_D1_2023-10-30_12-38-29/Figures", suffix="_of")
+
 
     #remove_tmp_files()
     #plot_voltage_traces_from_recording_by_probe(recording="/mnt/datastore/Harry/Cohort9_february2023/of/M17_2023-05-16_15-43-04",

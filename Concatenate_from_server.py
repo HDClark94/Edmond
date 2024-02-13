@@ -6,6 +6,7 @@ import sys
 import PostSorting.parameters
 import file_utility
 import settings
+import PostSorting.open_field_firing_maps
 from Edmond.utility_functions.array_manipulations import *
 prm = PostSorting.parameters.Parameters()
 prm.set_sampling_rate(30000)
@@ -191,8 +192,10 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("firing_times")
                     if "MOVING_LOMB_avg_power" in list(spatial_firing):
                         collumn_names_to_keep.append("MOVING_LOMB_avg_power")
-                    if "percentage_hits" in list(spatial_firing):
-                        collumn_names_to_keep.append("percentage_hits")
+                    if "MOVING_LOMB_all_powers" in list(spatial_firing):
+                        collumn_names_to_keep.append("MOVING_LOMB_all_powers")
+                    if "MOVING_LOMB_all_centre_trials" in list(spatial_firing):
+                        collumn_names_to_keep.append("MOVING_LOMB_all_centre_trials")
                     if "stop_locations" in list(spatial_firing):
                         collumn_names_to_keep.append("stop_locations")
                     if "stop_trial_numbers" in list(spatial_firing):
@@ -203,58 +206,24 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("behaviour_hit_try_miss")
                     if "behaviour_trial_types" in list(spatial_firing):
                         collumn_names_to_keep.append("behaviour_trial_types")
-                    if "rolling:block_lengths_for_encoder" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:block_lengths_for_encoder")
-                    if "rolling:block_lengths_for_encoder_shuffled" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:block_lengths_for_encoder_shuffled")
-                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:encoding_position_by_trial_category")
-                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:encoding_distance_by_trial_category")
-                    if "rolling:encoding_position_by_trial_category" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:encoding_null_by_trial_category")
-                    if "rolling:percentage_trials_encoding_position" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_position")
-                    if "rolling:percentage_trials_encoding_distance" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_distance")
-                    if "rolling:percentage_trials_encoding_null" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:percentage_trials_encoding_null")
                     if "rolling:block_lengths_shuffled" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:block_lengths_shuffled")
                     if "rolling:block_lengths" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:block_lengths")
-                    if "rolling:block_lengths_small_window" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:block_lengths_small_window")
-                    if "rolling:block_lengths_shuffled_small_window" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:block_lengths_shuffled_small_window")
                     if "rolling:classifier_by_trial_number" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:classifier_by_trial_number")
+                    if "rolling:rolling_centre_trials" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:rolling_centre_trials")
+                    if "rolling:rolling_classifiers" in list(spatial_firing):
+                        collumn_names_to_keep.append("rolling:rolling_classifiers")
                     if "rolling:position_correlation_by_trial_number_t2tmethod" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:position_correlation_by_trial_number_t2tmethod")
-                    if "rolling:correlation_by_trial_number_t2tmethod" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:correlation_by_trial_number_t2tmethod")
-                    #if "MOVING_LOMB_all_powers" in list(spatial_firing):
-                    #    collumn_names_to_keep.append("MOVING_LOMB_all_powers")
-                    #if "MOVING_LOMB_all_centre_trials" in list(spatial_firing):
-                    #    collumn_names_to_keep.append("MOVING_LOMB_all_centre_trials")
-                    if "rolling:spatial_info_by_other_P" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:spatial_info_by_other_P")
-                    if "rolling:spatial_info_by_other_D" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:spatial_info_by_other_D")
-                    if "rolling:spatial_info_by_other_ids" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:spatial_info_by_other_ids")
-                    if "average_rolling_classification_for_multiple_grid_cells" in list(spatial_firing):
-                        collumn_names_to_keep.append("average_rolling_classification_for_multiple_grid_cells")
-                    if "average_rolling_centre_trials_for_multiple_grid_cells" in list(spatial_firing):
-                        collumn_names_to_keep.append("average_rolling_centre_trials_for_multiple_grid_cells")
                     if "fr_binned_in_space_smoothed" in list(spatial_firing):
                         collumn_names_to_keep.append("fr_binned_in_space_smoothed")
                     if "avg_z_scored_firing_rates" in list(spatial_firing):
                         collumn_names_to_keep.append("avg_z_scored_firing_rates")
                     if "avg_z_scored_running_speeds" in list(spatial_firing):
                         collumn_names_to_keep.append("avg_z_scored_running_speeds")
-                    if "rolling:code_global" in list(spatial_firing):
-                        collumn_names_to_keep.append("rolling:code_global")
                     if "rolling:grid_code_global" in list(spatial_firing):
                         collumn_names_to_keep.append("rolling:grid_code_global")
                     if "field_locations" in list(spatial_firing):
@@ -263,6 +232,7 @@ def load_virtual_reality_spatial_firing(all_days_df, recording_paths, save_path=
                         collumn_names_to_keep.append("field_trial_numbers")
                     if "speeds_binned_in_space_smoothed" in list(spatial_firing):
                         collumn_names_to_keep.append("speeds_binned_in_space_smoothed")
+
 
                     spatial_firing=spatial_firing[collumn_names_to_keep]
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
@@ -313,7 +283,7 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
         tags = get_tags_parameter_file(path)
         sorter_name = check_for_tag_name(tags, "sorter_name")
         spatial_firing_path = "/" + sorter_name + "/DataFrames/spatial_firing.pkl"
-        spatial_path = "/" + sorter_name + "/DataFrames/position_data.pkl"
+        spatial_path = "/" + sorter_name + "/DataFrames/position.pkl"
         data_frame_path = path + spatial_firing_path
         spatial_df_path = path + spatial_path
 
@@ -322,6 +292,12 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
             try:
                 print('I found a spatial data frame, processing ' + data_frame_path)
                 spatial_firing = pd.read_pickle(data_frame_path)
+                position_data = pd.read_pickle(spatial_df_path)
+
+                if "occupancy_maps" in list(spatial_firing):
+                    print("occupancy_maps found")
+                else:
+                    print("occupancy_maps not found")
 
                 if "Curated" in list(spatial_firing):
                     spatial_firing = spatial_firing[spatial_firing["Curated"] == 1]
@@ -332,6 +308,10 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
                     collumn_names_to_keep = get_collumns_with_single_values(spatial_firing)
                     collumn_names_to_keep.append("firing_times")
                     collumn_names_to_keep.append("random_snippets")
+                    collumn_names_to_keep.append("firing_maps")
+                    collumn_names_to_keep.append("occupancy_maps")
+                    collumn_names_to_keep.append("rate_map_autocorrelogram")
+
                     spatial_firing=spatial_firing[collumn_names_to_keep]
 
                     # rename the mean_firing_rate_local collumn to be specific to vr or of
@@ -339,6 +319,9 @@ def load_open_field_spatial_firing(all_days_df, recording_paths, save_path=None,
                     spatial_firing = spatial_firing.rename(columns={'firing_times': ('firing_times_of')})
                     spatial_firing = spatial_firing.rename(columns={'random_snippets': ('random_snippets_of')})
                     spatial_firing = spatial_firing.rename(columns={'full_session_id': ('full_session_id_of')})
+                    spatial_firing = spatial_firing.rename(columns={'firing_maps': ('firing_maps_of')})
+                    spatial_firing = spatial_firing.rename(columns={'occupancy_maps': ('occupancy_maps_of')})
+                    spatial_firing = spatial_firing.rename(columns={'rate_map_autocorrelogram': ('rate_map_autocorrelogram_of')})
                     spatial_firing["session_id_of"] = spatial_firing["session_id"]
 
                     # remove duplicated columns

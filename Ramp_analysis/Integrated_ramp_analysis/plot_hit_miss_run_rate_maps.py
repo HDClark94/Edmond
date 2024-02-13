@@ -12,7 +12,7 @@ import sys
 import scipy
 import Edmond.plot_utility2
 import Edmond.VR_grid_analysis.hit_miss_try_firing_analysis
-from Edmond.VR_grid_analysis.vr_grid_cells import *
+from Edmond.eLife_Grid_anchoring_2024.vr_grid_cells import *
 import settings
 import matplotlib.pylab as plt
 import control_sorting_analysis
@@ -145,7 +145,7 @@ def plot_speed_per_trial(processed_position_data, output_path, track_length=200)
     x_max = len(processed_position_data)
     fig = plt.figure(figsize=(6,6))
     ax = fig.add_subplot(1, 1, 1)  # specify (nrows, ncols, axnum)
-    trial_speeds = Edmond.plot_utility2.pandas_collumn_to_2d_numpy_array(processed_position_data["speeds_binned_in_space"])
+    trial_speeds = pandas_collumn_to_2d_numpy_array(processed_position_data["speeds_binned_in_space"])
     where_are_NaNs = np.isnan(trial_speeds)
     trial_speeds[where_are_NaNs] = 0
     locations = np.arange(0, len(trial_speeds[0]))
